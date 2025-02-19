@@ -1,32 +1,35 @@
 #+TITLE: 基于 Nix Flakes 的 Emacs 配置
-#+PROPERTY: header-args :tangle yes
 
 * 本配置的用法
 
-这份配置文件使用 Nix Flakes 管理包。使用 Nix 的这类系统管理的包的目的
-主要是因为
+这份配置文件使用Nix Flakes管理包。使用Nix的这类系统管理的包的目的主要
+是因为
 
-- emacs 内置的包管理器无法处理系统工具的依存：如 =ripgrep=, 特定版本的
+- emacs内置的包管理器无法处理系统工具的依存：如 =ripgrep=, 特定版本的
   =python=
 
-- 使用 gitsubmodule 相同
+- 使用gitsubmodule相同
 
-- 完全使用 Nix 的话，写配置和尝试包的体验感比较差
+- 完全使用Nix的话，写配置和尝试包的体验感比较差
 
 这份配置的解决法如下：
 
-- 通过 org-babel 同时写作 Nix 和 elisp。前者用于版本和包的管理，后者用
-  于包的配置
+- 通过org-babel同时写作Nix和elisp。前者用于版本和包的管理，后者用于包
+  的配置
 
-- 可以在 elisp 中用 =$pkgs.git= 的方式直接引用 Nix 的包
+- 可以在elisp中用 =$pkgs.git= 的方式直接引用Nix的包
   
 - 提供一个函数加入一个新包时使用这个函数更新包列表
 
 * 实现方式
 
-下面以配置 =Magit= 为例说明这个配置的方法。这里借鉴了 Spacemacs 的逻辑，
-我们把整体目的一致的包放在一个集群实现。每个集群主要分成两个子节点，一
-个用于安装包和依赖项，一个用于配置
+下面以配置 =Magit= 为例说明这个配置的方法。这里和大多数的配置一样我们
+把整体目的一致的包放在一个集群实现。每个集群主要分成两个子节点，一个用
+于安装包和依赖项，一个用于配置。配置部分可以细分为键位绑定，custom，
+hook，config，自定义的函数。
+
+依赖的部分可以从 =pkgs=[fn::=nixpkgs.legacyPackages.${system}=] 同时安
+装emacs外部的依赖。然后从 =epkgs=[fn::=pkgs.emacs.pkgs.withPackages=]
 
 #+begin_src org
   ,* Git 配置
@@ -61,16 +64,54 @@
   ,#+end_src
 #+end_src
 
+这里稍微多做一些解释。在配置节里面，我们利用了org-babel的一些特性。首
+先我们在一个汇总代码块中使用了 =:noweb=yes= ，然后在后面的代码块中我们
+使用 =:noweb-ref= 参照汇总代码块，最后后续的这些代码块都会在tangle时合
+并到第一个代码块中。这个被tangle的代码块在后续过程中会被nix依赖代码读
+入作为配置。
+
+* 运行
+
+运行可以通过如下方式
+
+** 调试
+#+begin_src sh :tangle nil
+  nix run <path/to/this/config>.#emacs
+#+end_src
+
+** 构建后运行：
+#+begin_src sh :tangle nil
+  nix build <path/to/this/config>.#emacs
+  <path/to/this/config>/result/bin/emacs
+#+end_src
+
+** 版本回滚
+#+begin_src sh :tangle nil
+  # 回滚到上一个版本
+  nix profile rollback
+
+  # 回滚到特定版本号
+  nix profile history  # 查看 Flake 的输出历史
+  nix profile rollback --to NUMBER 
+
+  # 或者使用 profile 中的特定版本
+  nix run /nix/store/xxx-profile-xxx#emacs
+#+end_src
+
+---
+
+* 配置本体
+
 ** Flake 入口和 init.nix 入口
 
-包的安装通过使用下面的 =flake.nix= 和 =init.nix=
+包的安装基于下面的 =flake.nix= 和 =init.nix= 。
 
 #+BEGIN_SRC nix :tangle flake.nix
   {
     description = "idiig's Emacs Configuration with Nix Flakes";
 
     inputs = {
-      nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+      nixpkgs.url = "github:NixOS/nixpkgs/nixos-24.11";
       flake-utils.url = "github:numtide/flake-utils";
     };
 
@@ -87,32 +128,41 @@
 	in {
 	  packages = {
 	    emacs = emacsWithConfig;
-	    default = emacsWithConfig;
+	    default = emacsWithConfig;  # 用于nix run
 	  };
 	}
       );
   }
 #+END_SRC
 
+=init.nix= 为了规避手动填入要import的下级nix文件采取了遍历emacs/nix中
+所有的nix文件，并通过 =foldl= 函数把每个文件中写入的 =packages= 部分和
+=config= 部分拼接成一个。
+
 #+BEGIN_SRC nix nix :tangle emacs/init.nix
   { pkgs, epkgs }:
 
   let
     dir = ./nix;
+    # 读取该目录下所有文件名
     nixFiles = builtins.attrNames (builtins.readDir dir);
+    # 过滤非nix文件后向每个文件传递参数（pkgs, epkgs）
     modules = map (file: import (dir + ("/" + file)) { inherit pkgs epkgs; })
 	       (builtins.filter (name: builtins.match ".*\\.nix" name != null) nixFiles);
+    # builtins.foldl' (累加函数) (初始值) (要处理的列表)
     merged = builtins.foldl' (acc: module: {
       packages = acc.packages ++ module.packages;
       config = acc.config + "\n" + module.config;
-    }) { packages = []; config = ""; } modules;
+    })
+      { packages = []; config = ""; }
+      modules;
   in
     merged
 #+END_SRC
 
-* Git相关配置
+** Git相关配置
 
-** 依赖
+*** 依赖
 
 #+BEGIN_SRC nix :tangle emacs/nix/git.nix
   { pkgs, epkgs }:
@@ -128,7 +178,7 @@
   }
 #+END_SRC
 
-** 配置
+*** 配置
 
 #+BEGIN_SRC sh :tangle "emacs/config/git.el" :noweb yes
   <<git-config>>
