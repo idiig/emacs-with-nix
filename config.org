@@ -29,24 +29,20 @@
 个用于安装包和依赖项，一个用于配置
 
 #+begin_src org
-  ,* Git相关配置
+  ,* Git 配置
 
   ,** 依赖
-
   ,#+BEGIN_SRC nix :tangle emacs/nix/git.nix
-    { pkgs }:
+    { pkgs, epkgs }:
 
     {
       packages = with pkgs; [
 	git
-      ] ++ with pkgs.emacsPackages; [
-	magit
-      ];
+      ] ++ ([
+	epkgs.magit
+      ]);
 
-      config = {
-	enable = true;
-	extraConfig = builtins.readFile ../config/git.el;
-      };
+      config = builtins.readFile ../config/git.el;
     }
   ,#+END_SRC
 
@@ -82,10 +78,16 @@
       flake-utils.lib.eachDefaultSystem (system:
 	let
 	  pkgs = nixpkgs.legacyPackages.${system};
-	  emacsConfig = import ./emacs/init.nix { inherit pkgs; };
+	  emacsWithConfig = pkgs.emacs.pkgs.withPackages (epkgs: 
+	    let 
+	      config = import ./emacs/init.nix { inherit pkgs epkgs; };
+	    in
+	      config.packages
+	  );
 	in {
 	  packages = {
-	    emacs = emacsConfig;
+	    emacs = emacsWithConfig;
+	    default = emacsWithConfig;
 	  };
 	}
       );
@@ -93,15 +95,19 @@
 #+END_SRC
 
 #+BEGIN_SRC nix nix :tangle emacs/init.nix
-  { pkgs }:
+  { pkgs, epkgs }:
 
   let
-    dir = ./emacs/nix;
+    dir = ./nix;
     nixFiles = builtins.attrNames (builtins.readDir dir);
-    modules = map (file: import (dir + ("/" + file)) { inherit pkgs; })
-		 (builtins.filter (name: builtins.match ".*\\.nix" name != null) nixFiles);
+    modules = map (file: import (dir + ("/" + file)) { inherit pkgs epkgs; })
+	       (builtins.filter (name: builtins.match ".*\\.nix" name != null) nixFiles);
+    merged = builtins.foldl' (acc: module: {
+      packages = acc.packages ++ module.packages;
+      config = acc.config + "\n" + module.config;
+    }) { packages = []; config = ""; } modules;
   in
-  builtins.foldl' (acc: module: acc // module) {} modules
+    merged
 #+END_SRC
 
 * Git相关配置
@@ -109,19 +115,16 @@
 ** 依赖
 
 #+BEGIN_SRC nix :tangle emacs/nix/git.nix
-  { pkgs }:
+  { pkgs, epkgs }:
 
   {
     packages = with pkgs; [
       git
-    ] ++ with pkgs.emacsPackages; [
-      magit
-    ];
+    ] ++ ([
+      epkgs.magit
+    ]);
 
-    config = {
-      enable = true;
-      extraConfig = builtins.readFile ../config/git.el;
-    };
+    config = builtins.readFile ../config/git.el;
   }
 #+END_SRC
 
@@ -132,9 +135,9 @@
 #+END_SRC
 
 #+begin_src emacs-lisp :noweb-ref git-config
-  ...
+  (require 'magit)
 #+end_src
 
 #+begin_src emacs-lisp :noweb-ref git-config
-  ...
+  (global-set-key (kbd "C-x g") 'magit-status)
 #+end_src

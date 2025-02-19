@@ -1,14 +1,11 @@
-{ pkgs }:
+{ pkgs, epkgs }:
 
 {
   packages = with pkgs; [
     git
-  ] ++ with pkgs.emacsPackages; [
-    magit
-  ];
+  ] ++ ([
+    epkgs.magit
+  ]);
 
-  config = {
-    enable = true;
-    extraConfig = builtins.readFile ../config/git.el;
-  };
+  config = builtins.readFile ../config/git.el;
 }

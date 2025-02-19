@@ -10,10 +10,16 @@
     flake-utils.lib.eachDefaultSystem (system:
       let
 	pkgs = nixpkgs.legacyPackages.${system};
-	emacsConfig = import ./emacs/init.nix { inherit pkgs; };
+	emacsWithConfig = pkgs.emacs.pkgs.withPackages (epkgs: 
+	  let 
+	    config = import ./emacs/init.nix { inherit pkgs epkgs; };
+	  in
+	    config.packages
+	);
       in {
 	packages = {
-	  emacs = emacsConfig;
+	  emacs = emacsWithConfig;
+	  default = emacsWithConfig;
 	};
       }
     );
