@@ -1,0 +1,140 @@
+#+TITLE: 基于 Nix Flakes 的 Emacs 配置
+#+PROPERTY: header-args :tangle yes
+
+* 本配置的用法
+
+这份配置文件使用 Nix Flakes 管理包。使用 Nix 的这类系统管理的包的目的
+主要是因为
+
+- emacs 内置的包管理器无法处理系统工具的依存：如 =ripgrep=, 特定版本的
+  =python=
+
+- 使用 gitsubmodule 相同
+
+- 完全使用 Nix 的话，写配置和尝试包的体验感比较差
+
+这份配置的解决法如下：
+
+- 通过 org-babel 同时写作 Nix 和 elisp。前者用于版本和包的管理，后者用
+  于包的配置
+
+- 可以在 elisp 中用 =$pkgs.git= 的方式直接引用 Nix 的包
+  
+- 提供一个函数加入一个新包时使用这个函数更新包列表
+
+* 实现方式
+
+下面以配置 =Magit= 为例说明这个配置的方法。这里借鉴了 Spacemacs 的逻辑，
+我们把整体目的一致的包放在一个集群实现。每个集群主要分成两个子节点，一
+个用于安装包和依赖项，一个用于配置
+
+#+begin_src org
+  ,* Git相关配置
+
+  ,** 依赖
+
+  ,#+BEGIN_SRC nix :tangle emacs/nix/git.nix
+    { pkgs }:
+
+    {
+      packages = with pkgs; [
+	git
+      ] ++ with pkgs.emacsPackages; [
+	magit
+      ];
+
+      config = {
+	enable = true;
+	extraConfig = builtins.readFile ../config/git.el;
+      };
+    }
+  ,#+END_SRC
+
+  ,** 配置
+
+  ,#+BEGIN_SRC sh :tangle "emacs/config/git.el" :noweb yes
+    <<git-config>>
+  ,#+END_SRC
+
+  ,#+begin_src emacs-lisp :noweb-ref git-config
+    (require 'magit)
+  ,#+end_src
+
+  ,#+begin_src emacs-lisp :noweb-ref git-config
+    (global-set-key (kbd "C-x g") 'magit-status)
+  ,#+end_src
+#+end_src
+
+** Flake 入口和 init.nix 入口
+
+包的安装通过使用下面的 =flake.nix= 和 =init.nix=
+
+#+BEGIN_SRC nix :tangle flake.nix
+  {
+    description = "idiig's Emacs Configuration with Nix Flakes";
+
+    inputs = {
+      nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+      flake-utils.url = "github:numtide/flake-utils";
+    };
+
+    outputs = { self, nixpkgs, flake-utils }:
+      flake-utils.lib.eachDefaultSystem (system:
+	let
+	  pkgs = nixpkgs.legacyPackages.${system};
+	  emacsConfig = import ./emacs/init.nix { inherit pkgs; };
+	in {
+	  packages = {
+	    emacs = emacsConfig;
+	  };
+	}
+      );
+  }
+#+END_SRC
+
+#+BEGIN_SRC nix nix :tangle emacs/init.nix
+  { pkgs }:
+
+  let
+    dir = ./emacs/nix;
+    nixFiles = builtins.attrNames (builtins.readDir dir);
+    modules = map (file: import (dir + ("/" + file)) { inherit pkgs; })
+		 (builtins.filter (name: builtins.match ".*\\.nix" name != null) nixFiles);
+  in
+  builtins.foldl' (acc: module: acc // module) {} modules
+#+END_SRC
+
+* Git相关配置
+
+** 依赖
+
+#+BEGIN_SRC nix :tangle emacs/nix/git.nix
+  { pkgs }:
+
+  {
+    packages = with pkgs; [
+      git
+    ] ++ with pkgs.emacsPackages; [
+      magit
+    ];
+
+    config = {
+      enable = true;
+      extraConfig = builtins.readFile ../config/git.el;
+    };
+  }
+#+END_SRC
+
+** 配置
+
+#+BEGIN_SRC sh :tangle "emacs/config/git.el" :noweb yes
+  <<git-config>>
+#+END_SRC
+
+#+begin_src emacs-lisp :noweb-ref git-config
+  ...
+#+end_src
+
+#+begin_src emacs-lisp :noweb-ref git-config
+  ...
+#+end_src
