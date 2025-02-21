@@ -290,11 +290,36 @@ hook，config，自定义的函数。
 
 **** 本体
 
-***** 基础设定
+***** TODO 基础设定
 
 : custom
 #+BEGIN_SRC emacs-lisp
   (with-eval-after-load 'org
     (setq org-support-shift-select 2))
+#+END_SRC
+
+** AI辅助功能
+
+*** TODO 文档写作
+
+**** gptel.el
+
+
+***** 依赖
+:PROPERTIES:
+:header-args: :noweb-ref emacs-packages
+:END:
+
+#+BEGIN_SRC nix
+  gptel
+#+END_SRC
+
+***** 配置
+:PROPERTIES:
+:header-args: :noweb-ref emacs-config
+:END:
+
+: custom
+#+BEGIN_SRC emacs-lisp
 #+END_SRC
 
