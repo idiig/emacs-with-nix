@@ -1,6 +1,9 @@
 #+TITLE: 基于 Nix Flakes 的 Emacs 配置
 
 * 本配置的用法
+:PROPERTIES:
+:header-args: :tangle no
+:END:
 
 这份配置文件使用Nix Flakes管理包。使用Nix的这类系统管理的包的目的主要
 是因为
@@ -22,6 +25,9 @@
 - 提供一个函数加入一个新包时使用这个函数更新包列表
 
 * 实现方式
+:PROPERTIES:
+:header-args: :tangle no
+:END:
 
 下面以配置 =Magit= 为例说明这个配置的方法。这里和大多数的配置一样我们
 把整体目的一致的包放在一个集群实现。每个集群主要分成两个子节点，一个用
@@ -32,36 +38,6 @@ hook，config，自定义的函数。
 装emacs外部的依赖。然后从 =epkgs=[fn::=pkgs.emacs.pkgs.withPackages=]
 
 #+begin_src org
-  ,* Git 配置
-
-  ,** 依赖
-  ,#+BEGIN_SRC nix :tangle emacs/nix/git.nix
-    { pkgs, epkgs }:
-
-    {
-      packages = with pkgs; [
-	git
-      ] ++ ([
-	epkgs.magit
-      ]);
-
-      config = builtins.readFile ../config/git.el;
-    }
-  ,#+END_SRC
-
-  ,** 配置
-
-  ,#+BEGIN_SRC sh :tangle "emacs/config/git.el" :noweb yes
-    <<git-config>>
-  ,#+END_SRC
-
-  ,#+begin_src emacs-lisp :noweb-ref git-config
-    (require 'magit)
-  ,#+end_src
-
-  ,#+begin_src emacs-lisp :noweb-ref git-config
-    (global-set-key (kbd "C-x g") 'magit-status)
-  ,#+end_src
 #+end_src
 
 这里稍微多做一些解释。在配置节里面，我们利用了org-babel的一些特性。首
@@ -71,22 +47,25 @@ hook，config，自定义的函数。
 入作为配置。
 
 * 运行
+:PROPERTIES:
+:header-args: :tangle no
+:END:
 
 运行可以通过如下方式
 
 ** 调试
-#+begin_src sh :tangle nil
+#+begin_src sh
   nix run <path/to/this/config>.#emacs
 #+end_src
 
 ** 构建后运行：
-#+begin_src sh :tangle nil
+#+begin_src sh
   nix build <path/to/this/config>.#emacs
   <path/to/this/config>/result/bin/emacs
 #+end_src
 
 ** 版本回滚
-#+begin_src sh :tangle nil
+#+begin_src sh
   # 回滚到上一个版本
   nix profile rollback
 
@@ -98,96 +77,224 @@ hook，config，自定义的函数。
   nix run /nix/store/xxx-profile-xxx#emacs
 #+end_src
 
----
-
 * 配置本体
+:PROPERTIES:
+:header-args: :tangle no
+:END:
 
-** Flake 入口和 init.nix 入口
+** Flake 入口
 
 包的安装基于下面的 =flake.nix= 和 =init.nix= 。
 
-#+BEGIN_SRC nix :tangle flake.nix
+#+BEGIN_SRC nix :tangle flake.nix :noweb yes
   {
     description = "idiig's Emacs Configuration with Nix Flakes";
 
     inputs = {
       nixpkgs.url = "github:NixOS/nixpkgs/nixos-24.11";
       flake-utils.url = "github:numtide/flake-utils";
+      emacs-overlay.url = "github:nix-community/emacs-overlay";
     };
 
-    outputs = { self, nixpkgs, flake-utils }:
+    outputs = { self, nixpkgs, flake-utils, emacs-overlay }:
       flake-utils.lib.eachDefaultSystem (system:
 	let
-	  pkgs = nixpkgs.legacyPackages.${system};
-	  emacsWithConfig = pkgs.emacs.pkgs.withPackages (epkgs: 
-	    let 
-	      config = import ./emacs/init.nix { inherit pkgs epkgs; };
-	    in
-	      config.packages
-	  );
-	in {
-	  packages = {
-	    emacs = emacsWithConfig;
-	    default = emacsWithConfig;  # 用于nix run
+	  pkgs = import nixpkgs {
+	    inherit system;
+	    overlays = [ emacs-overlay.overlay ];
 	  };
+    emacsConfig = pkgs.writeText "default.el" ''
+	    <<emacs-config>>
+	  '';        
+		emacsWithConfig = pkgs.emacs.pkgs.withPackages (epkgs: (with epkgs; [
+		  (pkgs.runCommand "default.el" {} ''
+		     mkdir -p $out/share/emacs/site-lisp
+		     cp ${emacsConfig} $out/share/emacs/site-lisp/default.el
+		  '')
+	    <<emacs-packages>>
+		]));
+	in {
+		packages = {
+			emacs = emacsWithConfig;
+			default = emacsWithConfig;  # 用于nix run
+		};
 	}
       );
   }
 #+END_SRC
 
-=init.nix= 为了规避手动填入要import的下级nix文件采取了遍历emacs/nix中
-所有的nix文件，并通过 =foldl= 函数把每个文件中写入的 =packages= 部分和
-=config= 部分拼接成一个。
+** 日文
 
-#+BEGIN_SRC nix nix :tangle emacs/init.nix
-  { pkgs, epkgs }:
+*** 输入法
 
-  let
-    dir = ./nix;
-    # 读取该目录下所有文件名
-    nixFiles = builtins.attrNames (builtins.readDir dir);
-    # 过滤非nix文件后向每个文件传递参数（pkgs, epkgs）
-    modules = map (file: import (dir + ("/" + file)) { inherit pkgs epkgs; })
-	       (builtins.filter (name: builtins.match ".*\\.nix" name != null) nixFiles);
-    # builtins.foldl' (累加函数) (初始值) (要处理的列表)
-    merged = builtins.foldl' (acc: module: {
-      packages = acc.packages ++ module.packages;
-      config = acc.config + "\n" + module.config;
-    })
-      { packages = []; config = ""; }
-      modules;
-  in
-    merged
+**** 依赖
+:PROPERTIES:
+:header-args: :noweb-ref emacs-packages
+:END:
+
+#+BEGIN_SRC nix 
+  ddskk
 #+END_SRC
+
+**** 配置
+:PROPERTIES:
+:header-args: :noweb-ref emacs-config
+:END:
+
+***** TODO 字体
+
+***** TODO 检索（Migemo）
+
+***** 输入法（DDSKK）
+#+begin_src emacs-lisp
+  (global-set-key (kbd "C-x j") 'skk-mode)
+
+  (with-eval-after-load 'ddskk
+    (setq skk-server-inhibit-startup-server nil)
+    (setq skk-server-host "localhost")
+    (setq skk-server-portnum 55100)
+    (setq skk-share-private-jisyo t)
+
+    ;; 候补显示设置
+    (setq skk-show-inline t)
+    (setq skk-show-tooltip t)
+    (setq skk-show-candidates-always-pop-to-buffer t)
+    (setq skk-henkan-show-candidates-rows 2)
+
+    ;; 行为设置
+    (setq skk-egg-like-newline t)
+    (setq skk-delete-implies-kakutei nil)
+    (setq skk-use-look t)
+    (setq skk-auto-insert-paren t)
+    (setq skk-henkan-strict-okuri-precedence t)
+
+    ;; 加载额外功能
+    (require 'skk-hint)
+    (add-hook 'skk-load-hook
+	      (lambda ()
+		(require 'context-skk)))
+
+    ;; 片假名转换设置
+    (setq skk-search-katakana 'jisx0201-kana))
+
+  (require 'ddskk nil t)
+#+end_src
+
+** 中文
+
+*** 输入法
+
+**** 依赖
+:PROPERTIES:
+:header-args: :noweb-ref emacs-packages
+:END:
+
+#+BEGIN_SRC nix 
+  # (pkgs.emacsPackages.pyim.overrideAttrs (old: {
+  #     nativeComp = false;
+  # }))
+  pyim
+  pyim-basedict
+#+END_SRC
+
+**** 配置
+:PROPERTIES:
+:header-args: :noweb-ref emacs-config
+:END:
+
+***** 基础设定
+#+begin_src emacs-lisp
+  (with-eval-after-load 'pyim
+    ;; 基本设置
+    (setq default-input-method "pyim")
+    (setq pyim-dcache-directory "~/emacs-config/.cache/pyim/dcache/")
+    ;; 按键绑定
+    (define-key minibuffer-local-map (kbd "C-<return>") 'pyim-cregexp-convert-at-point)
+    ;; 输入法设置
+    (setq pyim-default-scheme 'quanpin)
+    ;; 启用搜索功能
+    (pyim-isearch-mode 1)
+    ;; 选词框设置
+    (setq pyim-page-tooltip 'popup)
+    (setq pyim-page-length 5)
+    ;; 加载并启用基础词库
+    (require 'pyim-basedict)
+    (pyim-basedict-enable))
+
+  ;; 加载 pyim 包
+  (require 'pyim nil t)
+
+  ;; diminish 设置 (如果使用 diminish)
+  (with-eval-after-load 'diminish
+    (diminish 'pyim-isearch-mode))
+#+end_src
+
+***** Orderless交互
+#+begin_src emacs-lisp
+  ;; 确保在 orderless 加载后再加载这些配置
+  (with-eval-after-load 'orderless
+    ;; 拼音检索字符串功能
+    (defun zh-orderless-regexp (orig_func component)
+      (call-interactively #'pyim-activate)
+      (call-interactively #'pyim-deactivate)
+      (let ((result (funcall orig_func component)))
+	(pyim-cregexp-build result)))
+    (advice-add 'orderless-regexp :around #'zh-orderless-regexp))
+#+end_src
 
 ** Git相关配置
 
 *** 依赖
+:PROPERTIES:
+:header-args: :noweb-ref emacs-packages
+:END:
 
-#+BEGIN_SRC nix :tangle emacs/nix/git.nix
-  { pkgs, epkgs }:
+**** Magit
+#+BEGIN_SRC nix
+  magit
+#+END_SRC
 
-  {
-    packages = with pkgs; [
-      git
-    ] ++ ([
-      epkgs.magit
-    ]);
+**** Git 目录路径
+#+begin_src emacs-lisp  :noweb-ref emacs-config
+  (add-to-list 'exec-path "${pkgs.git}/bin")
+#+end_src
 
-    config = builtins.readFile ../config/git.el;
-  }
+*** 配置
+:PROPERTIES:
+:header-args: :noweb-ref emacs-config
+:END:
+
+**** Magit
+
+***** 基础设定
+#+BEGIN_SRC emacs-lisp
+  (require 'magit)
+#+END_SRC
+
+** Org Mode相关配置
+
+*** 依赖
+:PROPERTIES:
+:header-args: :noweb-ref emacs-packages
+:END:
+
+**** Org本体
+#+BEGIN_SRC nix
+  org
 #+END_SRC
 
 *** 配置
+:PROPERTIES:
+:header-args: :noweb-ref emacs-config
+:END:
 
-#+BEGIN_SRC sh :tangle "emacs/config/git.el" :noweb yes
-  <<git-config>>
+**** 本体
+
+***** 基础设定
+
+: custom
+#+BEGIN_SRC emacs-lisp
+  (with-eval-after-load 'org
+    (setq org-support-shift-select 2))
 #+END_SRC
 
-#+begin_src emacs-lisp :noweb-ref git-config
-  (require 'magit)
-#+end_src
-
-#+begin_src emacs-lisp :noweb-ref git-config
-  (global-set-key (kbd "C-x g") 'magit-status)
-#+end_src
