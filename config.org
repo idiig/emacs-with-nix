@@ -52,12 +52,13 @@ hook，config，自定义的函数。
 并到第一个代码块中。这个被tangle的代码块在后续过程中会被nix依赖代码读
 入作为配置。
 
-* 运行
+* 如何使用？
 :PROPERTIES:
 :header-args: :tangle no
 :END:
 
-运行可以通过如下方式
+用emacs打开本文档， =M-x org-babel-tangle= 或使用快捷键 =C-c C-v t= 生
+成flake.nix。接下去运行可以通过如下方式：
 
 ** 调试
 #+begin_src sh
@@ -67,20 +68,24 @@ hook，config，自定义的函数。
 ** 构建后运行：
 #+begin_src sh
   nix build <path/to/this/config>.#emacs
-  <path/to/this/config>/result/bin/emacs
+  <path/to/this/config>/result/bin/emacs -init-directory $out/share/emacs/site-lisp/ 
 #+end_src
 
 ** 版本回滚
 #+begin_src sh
-  # 回滚到上一个版本
-  nix profile rollback
+  # 查看以前的版本
+  nix flake metadata
 
-  # 回滚到特定版本号
-  nix profile history  # 查看 Flake 的输出历史
-  nix profile rollback --to NUMBER 
+  # 备份版本
+  cp flake.lock flake.lock.bachup
+  # 使用特定锁文件版本
+  nix run --recreate-lock-file --inputs-from ./flake.lock.backup
+#+end_src
 
-  # 或者使用 profile 中的特定版本
-  nix run /nix/store/xxx-profile-xxx#emacs
+或者使用git：
+#+begin_src sh
+  git checkout <previous-commit>
+  nix run
 #+end_src
 
 * 配置本体
@@ -120,19 +125,33 @@ hook，config，自定义的函数。
 	    <<emacs-early-init-config>>
 	  '';
 
-	  emacsWithConfig = pkgs.emacs.pkgs.withPackages (epkgs: (with epkgs; [
-	    (pkgs.runCommand "emacs-config-files" {} ''
-	      mkdir -p $out/share/emacs/site-lisp
-	      cp ${emacsConfig} $out/share/emacs/site-lisp/init.el
-	      cp ${emacsEarlyInitConfig} $out/share/emacs/site-lisp/early-init.el
-	    '')
+    # emacs 和包
+	  emacsWithPackages = pkgs.emacs.pkgs.withPackages (epkgs: (with epkgs; [
 	    <<emacs-packages>>
 	  ]));
+
+    # 输出配置到 .emacs.d
+	    autoExportConfig = pkgs.writeShellScriptBin "auto-export-config" ''
+	    #!/usr/bin/env bash
+	    set -e
+
+	    # 导出配置到 .emacs.d
+	    mkdir -p "$HOME/.emacs.d"
+	    ${pkgs.rsync}/bin/rsync ${emacsConfig} "$HOME/.emacs.d/init.el"
+	    ${pkgs.rsync}/bin/rsync ${emacsEarlyInitConfig} "$HOME/.emacs.d/early-init.el"
+
+	    echo "Emacs配置已同步到 $HOME/.emacs.d/"
+
+	    # 启动 Emacs
+	    exec ${emacsWithPackages}/bin/emacs "$@"
+	  '';
 	in {
 	  packages = {
-	    emacs = emacsWithConfig;
-	    default = emacsWithConfig;  # 用于nix run
+	    emacs = emacsWithPackages;
+	    default = autoExportConfig;
+      export-config = autoExportConfig;
 	  };
+
 	}
       );
   }
@@ -144,16 +163,31 @@ hook，config，自定义的函数。
 :END:
 
 #+begin_src emacs-lisp
-  ;;(package-initialize)
   (setq gc-cons-threshold 402653184 gc-cons-percentage 0.6)
 
-  (load "$out/share/emacs/site-lisp/init.el")
+  (load (concat user-emacs-directory "init.el"))
 
   (setq gc-cons-threshold 10485760
 	gc-cons-percentage 0.1)
 #+end_src
 
 ** 日文
+
+*** TODO 字体
+**** 配置
+:PROPERTIES:
+:header-args: :noweb-ref emacs-config
+:END:
+
+#+begin_src emacs-lisp
+  (add-hook 'after-init-hook
+	    (lambda ()
+	      (let ((font-path "${pkgs.sarasa-gothic}/share/fonts/truetype/Sarasa-Regular.ttc"))
+		(if (file-exists-p font-path)
+		    (set-fontset-font t 'han (font-spec :file font-path))
+		  (message "字体文件不存在: %s" font-path)))))
+#+end_src
+
 
 *** 输入法
 
@@ -204,16 +238,6 @@ hook，config，自定义的函数。
     (setq skk-search-katakana 'jisx0201-kana))
 
   ;; (require 'ddskk nil t)
-#+end_src
-
-*** TODO 字体
-**** 配置
-:PROPERTIES:
-:header-args: :noweb-ref emacs-config
-:END:
-
-#+begin_src emacs-lisp
-  (set-fontset-font t 'han (font-spec :file "${pkgs.sarasa-gothic}/share/fonts/truetype/sarasa-gothic.ttc"))
 #+end_src
 
 *** TODO 检索（Migemo）

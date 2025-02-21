@@ -17,6 +17,12 @@
 
 	# 主配置文件
 	emacsConfig = pkgs.writeText "init.el" ''
+	  (add-hook 'after-init-hook
+	  	  (lambda ()
+	  	    (let ((font-path "${pkgs.sarasa-gothic}/share/fonts/truetype/Sarasa-Regular.ttc"))
+	  	      (if (file-exists-p font-path)
+	  		  (set-fontset-font t 'han (font-spec :file font-path))
+	  		(message "字体文件不存在: %s" font-path)))))
 	  (global-set-key (kbd "C-x j") 'skk-mode)
 	  
 	  (with-eval-after-load 'ddskk
@@ -48,7 +54,6 @@
 	    (setq skk-search-katakana 'jisx0201-kana))
 	  
 	  ;; (require 'ddskk nil t)
-	  (set-fontset-font t 'han (font-spec :file "${pkgs.sarasa-gothic}/share/fonts/truetype/sarasa-gothic.ttc"))
 	  (with-eval-after-load 'pyim
 	    ;; 基本设置
 	    (setq default-input-method "pyim")
@@ -90,21 +95,16 @@
 
 	# early-init 配置文件
 	emacsEarlyInitConfig = pkgs.writeText "early-init.el" ''
-	  ;;(package-initialize)
 	  (setq gc-cons-threshold 402653184 gc-cons-percentage 0.6)
 	  
-	  (load "$out/share/emacs/site-lisp/init.el")
+	  (load (concat user-emacs-directory "init.el"))
 	  
 	  (setq gc-cons-threshold 10485760
 	        gc-cons-percentage 0.1)
 	'';
 
-	emacsWithConfig = pkgs.emacs.pkgs.withPackages (epkgs: (with epkgs; [
-	  (pkgs.runCommand "emacs-config-files" {} ''
-	    mkdir -p $out/share/emacs/site-lisp
-	    cp ${emacsConfig} $out/share/emacs/site-lisp/init.el
-	    cp ${emacsEarlyInitConfig} $out/share/emacs/site-lisp/early-init.el
-	  '')
+  # emacs 和包
+	emacsWithPackages = pkgs.emacs.pkgs.withPackages (epkgs: (with epkgs; [
 	  ddskk
 	  # (pkgs.emacsPackages.pyim.overrideAttrs (old: {
 	  #     nativeComp = false;
@@ -114,11 +114,29 @@
 	  magit
 	  gptel
 	]));
+
+  # 输出配置到 .emacs.d
+	  autoExportConfig = pkgs.writeShellScriptBin "auto-export-config" ''
+	  #!/usr/bin/env bash
+	  set -e
+
+	  # 导出配置到 .emacs.d
+	  mkdir -p "$HOME/.emacs.d"
+	  ${pkgs.rsync}/bin/rsync ${emacsConfig} "$HOME/.emacs.d/init.el"
+	  ${pkgs.rsync}/bin/rsync ${emacsEarlyInitConfig} "$HOME/.emacs.d/early-init.el"
+
+	  echo "Emacs配置已同步到 $HOME/.emacs.d/"
+
+	  # 启动 Emacs
+	  exec ${emacsWithPackages}/bin/emacs "$@"
+	'';
       in {
 	packages = {
-	  emacs = emacsWithConfig;
-	  default = emacsWithConfig;  # 用于nix run
+	  emacs = emacsWithPackages;
+	  default = autoExportConfig;
+    export-config = autoExportConfig;
 	};
+
       }
     );
 }
