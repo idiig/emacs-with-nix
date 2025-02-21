@@ -14,7 +14,9 @@
 	  inherit system;
 	  overlays = [ emacs-overlay.overlay ];
 	};
-  emacsConfig = pkgs.writeText "default.el" ''
+
+	# 主配置文件
+	emacsConfig = pkgs.writeText "init.el" ''
 	  (global-set-key (kbd "C-x j") 'skk-mode)
 	  
 	  (with-eval-after-load 'ddskk
@@ -84,12 +86,25 @@
 	  (with-eval-after-load 'org
 	    (setq org-support-shift-select 2))
 	  
-	'';        
-	      emacsWithConfig = pkgs.emacs.pkgs.withPackages (epkgs: (with epkgs; [
-		(pkgs.runCommand "default.el" {} ''
-		   mkdir -p $out/share/emacs/site-lisp
-		   cp ${emacsConfig} $out/share/emacs/site-lisp/default.el
-		'')
+	'';
+
+	# early-init 配置文件
+	emacsEarlyInitConfig = pkgs.writeText "early-init.el" ''
+	  ;;(package-initialize)
+	  (setq gc-cons-threshold 402653184 gc-cons-percentage 0.6)
+	  
+	  (load "$out/share/emacs/site-lisp/init.el")
+	  
+	  (setq gc-cons-threshold 10485760
+	        gc-cons-percentage 0.1)
+	'';
+
+	emacsWithConfig = pkgs.emacs.pkgs.withPackages (epkgs: (with epkgs; [
+	  (pkgs.runCommand "emacs-config-files" {} ''
+	    mkdir -p $out/share/emacs/site-lisp
+	    cp ${emacsConfig} $out/share/emacs/site-lisp/init.el
+	    cp ${emacsEarlyInitConfig} $out/share/emacs/site-lisp/early-init.el
+	  '')
 	  ddskk
 	  # (pkgs.emacsPackages.pyim.overrideAttrs (old: {
 	  #     nativeComp = false;
@@ -98,12 +113,12 @@
 	  pyim-basedict
 	  magit
 	  gptel
-	      ]));
+	]));
       in {
-	      packages = {
-		      emacs = emacsWithConfig;
-		      default = emacsWithConfig;  # 用于nix run
-	      };
+	packages = {
+	  emacs = emacsWithConfig;
+	  default = emacsWithConfig;  # 用于nix run
+	};
       }
     );
 }
