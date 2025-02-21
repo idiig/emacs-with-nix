@@ -1,3 +1,9 @@
+:PROPERTIES:
+:GPTEL_MODEL: gpt-4o-mini
+:GPTEL_BACKEND: ChatGPT
+:GPTEL_SYSTEM: You are a large language model living in Emacs and a helpful assistant. Respond concisely.
+:GPTEL_BOUNDS: nil
+:END:
 #+TITLE: 基于 Nix Flakes 的 Emacs 配置
 
 * 本配置的用法
@@ -141,10 +147,6 @@ hook，config，自定义的函数。
 :header-args: :noweb-ref emacs-config
 :END:
 
-***** TODO 字体
-
-***** TODO 检索（Migemo）
-
 ***** 输入法（DDSKK）
 #+begin_src emacs-lisp
   (global-set-key (kbd "C-x j") 'skk-mode)
@@ -177,8 +179,28 @@ hook，config，自定义的函数。
     ;; 片假名转换设置
     (setq skk-search-katakana 'jisx0201-kana))
 
-  (require 'ddskk nil t)
+  ;; (require 'ddskk nil t)
 #+end_src
+
+*** TODO 字体
+**** 配置
+:PROPERTIES:
+:header-args: :noweb-ref emacs-config
+:END:
+
+#+begin_src emacs-lisp
+  (set-fontset-font t 'han (font-spec :file "${pkgs.sarasa-gothic}/share/fonts/truetype/sarasa-gothic.ttc"))
+#+end_src
+
+*** TODO 检索（Migemo）
+**** 依赖
+:PROPERTIES:
+:header-args: :noweb-ref emacs-packages
+:END:
+**** 配置
+:PROPERTIES:
+:header-args: :noweb-ref emacs-config
+:END:
 
 ** 中文
 
@@ -221,8 +243,8 @@ hook，config，自定义的函数。
     (require 'pyim-basedict)
     (pyim-basedict-enable))
 
-  ;; 加载 pyim 包
-  (require 'pyim nil t)
+  ;; ;; 加载 pyim 包
+  ;; (require 'pyim nil t)
 
   ;; diminish 设置 (如果使用 diminish)
   (with-eval-after-load 'diminish
@@ -273,22 +295,12 @@ hook，config，自定义的函数。
 
 ** Org Mode相关配置
 
-*** 依赖
-:PROPERTIES:
-:header-args: :noweb-ref emacs-packages
-:END:
-
-**** Org本体
-#+BEGIN_SRC nix
-  org
-#+END_SRC
-
-*** 配置
+*** Org本体
+**** 依赖
+**** 配置
 :PROPERTIES:
 :header-args: :noweb-ref emacs-config
 :END:
-
-**** 本体
 
 ***** TODO 基础设定
 
@@ -303,7 +315,6 @@ hook，config，自定义的函数。
 *** TODO 文档写作
 
 **** gptel.el
-
 
 ***** 依赖
 :PROPERTIES:

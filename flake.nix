@@ -45,7 +45,8 @@
 	    ;; 片假名转换设置
 	    (setq skk-search-katakana 'jisx0201-kana))
 	  
-	  (require 'ddskk nil t)
+	  ;; (require 'ddskk nil t)
+	  (set-fontset-font t 'han (font-spec :file "${pkgs.sarasa-gothic}/share/fonts/truetype/sarasa-gothic.ttc"))
 	  (with-eval-after-load 'pyim
 	    ;; 基本设置
 	    (setq default-input-method "pyim")
@@ -63,8 +64,8 @@
 	    (require 'pyim-basedict)
 	    (pyim-basedict-enable))
 	  
-	  ;; 加载 pyim 包
-	  (require 'pyim nil t)
+	  ;; ;; 加载 pyim 包
+	  ;; (require 'pyim nil t)
 	  
 	  ;; diminish 设置 (如果使用 diminish)
 	  (with-eval-after-load 'diminish
@@ -80,6 +81,9 @@
 	    (advice-add 'orderless-regexp :around #'zh-orderless-regexp))
 	  (add-to-list 'exec-path "${pkgs.git}/bin")
 	  (require 'magit)
+	  (with-eval-after-load 'org
+	    (setq org-support-shift-select 2))
+	  
 	'';        
 	      emacsWithConfig = pkgs.emacs.pkgs.withPackages (epkgs: (with epkgs; [
 		(pkgs.runCommand "default.el" {} ''
@@ -93,6 +97,7 @@
 	  pyim
 	  pyim-basedict
 	  magit
+	  gptel
 	      ]));
       in {
 	      packages = {
