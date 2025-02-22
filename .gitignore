@@ -18,3 +18,4 @@ local/
 emacs-gc-stats.eld
 tree-sitter/
 transient/
+/.bashrc

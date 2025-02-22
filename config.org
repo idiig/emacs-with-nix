@@ -52,7 +52,7 @@ hook，config，自定义的函数。
 并到第一个代码块中。这个被tangle的代码块在后续过程中会被nix依赖代码读
 入作为配置。
 
-* 如何使用？
+* 如何使用
 :PROPERTIES:
 :header-args: :tangle no
 :END:
@@ -63,6 +63,7 @@ hook，config，自定义的函数。
 ** 调试
 #+begin_src sh
   nix run <path/to/this/config>.#emacs
+  source ~/.bashrc
 #+end_src
 
 ** 构建后运行：
@@ -110,28 +111,28 @@ hook，config，自定义的函数。
     outputs = { self, nixpkgs, flake-utils, emacs-overlay }:
       flake-utils.lib.eachDefaultSystem (system:
 	let
-	  pkgs = import nixpkgs {
-	    inherit system;
-	    overlays = [ emacs-overlay.overlay ];
-	  };
+		pkgs = import nixpkgs {
+			inherit system;
+			overlays = [ emacs-overlay.overlay ];
+		};
 
-	  # 主配置文件
-	  emacsConfig = pkgs.writeText "init.el" ''
-	    <<emacs-config>>
+		# 主配置文件
+		emacsConfig = pkgs.writeText "init.el" ''
+  <<emacs-config>>
 	  '';
 
-	  # early-init 配置文件
-	  emacsEarlyInitConfig = pkgs.writeText "early-init.el" ''
-	    <<emacs-early-init-config>>
+		# early-init 配置文件
+		emacsEarlyInitConfig = pkgs.writeText "early-init.el" ''
+  <<emacs-early-init-config>>
 	  '';
 
-    # emacs 和包
-	  emacsWithPackages = pkgs.emacs.pkgs.withPackages (epkgs: (with epkgs; [
-	    <<emacs-packages>>
-	  ]));
+		# emacs 和包
+		emacsWithPackages = pkgs.emacs.pkgs.withPackages (epkgs: (with epkgs; [
+  <<emacs-packages>>
+		]));
 
-    # 输出配置到 .emacs.d
-	    autoExportConfig = pkgs.writeShellScriptBin "auto-export-config" ''
+		# 输出配置到 .emacs.d
+		autoExportConfig = pkgs.writeShellScriptBin "auto-export-config" ''
 	    #!/usr/bin/env bash
 	    set -e
 
@@ -140,17 +141,20 @@ hook，config，自定义的函数。
 	    ${pkgs.rsync}/bin/rsync ${emacsConfig} "$HOME/.emacs.d/init.el"
 	    ${pkgs.rsync}/bin/rsync ${emacsEarlyInitConfig} "$HOME/.emacs.d/early-init.el"
 
-	    echo "Emacs配置已同步到 $HOME/.emacs.d/"
+      # 路径
+      <<dependencies>>
 
-	    # 启动 Emacs
-	    exec ${emacsWithPackages}/bin/emacs "$@"
+	    # 更新Emacs路径
+      sed -i '/^alias emacs=/d' "$HOME/.bashrc"
+      echo 'alias emacs='"${emacsWithPackages}/bin/emacs" >> "$HOME/.bashrc"
+      source "$HOME/.bashrc"
+
+	    echo "Emacs配置已同步到 $HOME/.emacs.d/"
 	  '';
 	in {
-	  packages = {
-	    emacs = emacsWithPackages;
-	    default = autoExportConfig;
-      export-config = autoExportConfig;
-	  };
+		packages = {
+			default = autoExportConfig;
+		};
 
 	}
       );
@@ -171,10 +175,23 @@ hook，config，自定义的函数。
 	gc-cons-percentage 0.1)
 #+end_src
 
-** 日文
+** CJK字体
 
-*** TODO 字体
-**** 配置
+这里我统一使用的是Sarasa的等宽字体，可以避免2个问题：
+- 输入latin以后输入cjk文字以后，由于字体高度不等导致行高抖动
+- 方便org等表格等宽表示
+
+*** 依赖
+:PROPERTIES:
+:header-args: :noweb-ref dependencies
+:END:
+#+begin_src sh
+  mkdir -p "$HOME/.local/share/fonts/truetype/"
+  ${pkgs.rsync}/bin/rsync -av ${pkgs.sarasa-gothic}/share/fonts/truetype/ "$HOME/.local/share/fonts/sarasa-gothic/"
+  fc-cache -f -v ~/.local/share/fonts/
+#+end_src
+
+*** 配置
 :PROPERTIES:
 :header-args: :noweb-ref emacs-config
 :END:
@@ -182,12 +199,16 @@ hook，config，自定义的函数。
 #+begin_src emacs-lisp
   (add-hook 'after-init-hook
 	    (lambda ()
-	      (let ((font-path "${pkgs.sarasa-gothic}/share/fonts/truetype/Sarasa-Regular.ttc"))
-		(if (file-exists-p font-path)
-		    (set-fontset-font t 'han (font-spec :file font-path))
-		  (message "字体文件不存在: %s" font-path)))))
+	      (let ((my-font-height 130)
+		    (my-font "Sarasa Mono SC"))
+		(set-face-attribute 'default nil :family my-font :height my-font-height))))
+
+  ;; 工具栏，菜单保持默认字体
+  (set-face-attribute 'menu nil :inherit 'unspecified)
+  (set-face-attribute 'tool-bar nil :inherit 'unspecified)
 #+end_src
 
+** 日文
 
 *** 输入法
 
