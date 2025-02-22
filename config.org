@@ -52,7 +52,7 @@ hook，config，自定义的函数。
 并到第一个代码块中。这个被tangle的代码块在后续过程中会被nix依赖代码读
 入作为配置。
 
-* 如何使用
+* 如何使用？
 :PROPERTIES:
 :header-args: :tangle no
 :END:
@@ -64,15 +64,20 @@ hook，config，自定义的函数。
 #+begin_src sh
   nix run <path/to/this/config>.#emacs
   source ~/.bashrc
-#+end_src
-
-** 构建后运行：
-#+begin_src sh
-  nix build <path/to/this/config>.#emacs
-  <path/to/this/config>/result/bin/emacs -init-directory $out/share/emacs/site-lisp/ 
+  emacs
 #+end_src
 
 ** 版本回滚
+
+- 使用git：
+#+begin_src sh
+  git checkout <previous-commit>
+  nix run
+  source ~/.bashrc
+  emacs
+#+end_src
+
+- 备份lock文件：
 #+begin_src sh
   # 查看以前的版本
   nix flake metadata
@@ -81,12 +86,6 @@ hook，config，自定义的函数。
   cp flake.lock flake.lock.bachup
   # 使用特定锁文件版本
   nix run --recreate-lock-file --inputs-from ./flake.lock.backup
-#+end_src
-
-或者使用git：
-#+begin_src sh
-  git checkout <previous-commit>
-  nix run
 #+end_src
 
 * 配置本体
@@ -128,7 +127,7 @@ hook，config，自定义的函数。
 
 		# emacs 和包
 		emacsWithPackages = pkgs.emacs.pkgs.withPackages (epkgs: (with epkgs; [
-  <<emacs-packages>>
+	    <<emacs-packages>>
 		]));
 
 		# 输出配置到 .emacs.d
@@ -173,6 +172,27 @@ hook，config，自定义的函数。
 
   (setq gc-cons-threshold 10485760
 	gc-cons-percentage 0.1)
+#+end_src
+
+** Emacs基建
+*** 字符检索（Ctrlf）
+
+**** 依赖
+:PROPERTIES:
+:header-args: :noweb-ref emacs-packages
+:END:
+
+#+BEGIN_SRC nix 
+  ctrlf
+#+END_SRC
+
+**** 配置
+:PROPERTIES:
+:header-args: :noweb-ref emacs-config
+:END:
+
+#+begin_src emacs-lisp
+  (ctrlf-mode +1)
 #+end_src
 
 ** CJK字体
@@ -226,7 +246,6 @@ hook，config，自定义的函数。
 :header-args: :noweb-ref emacs-config
 :END:
 
-***** 输入法（DDSKK）
 #+begin_src emacs-lisp
   (global-set-key (kbd "C-x j") 'skk-mode)
 
@@ -298,10 +317,10 @@ hook，config，自定义的函数。
   (with-eval-after-load 'pyim
     ;; 基本设置
     (setq default-input-method "pyim")
-    (setq pyim-dcache-directory "~/emacs-config/.cache/pyim/dcache/")
-    ;; 按键绑定
+    (setq pyim-dcache-directory "~/.emacs.d/.cache/pyim/dcache/")
+    ;; C-return 把当前选中的位置转换为正则表达
     (define-key minibuffer-local-map (kbd "C-<return>") 'pyim-cregexp-convert-at-point)
-    ;; 输入法设置
+    ;; 输入法设置为全拼
     (setq pyim-default-scheme 'quanpin)
     ;; 启用搜索功能
     (pyim-isearch-mode 1)
@@ -311,9 +330,6 @@ hook，config，自定义的函数。
     ;; 加载并启用基础词库
     (require 'pyim-basedict)
     (pyim-basedict-enable))
-
-  ;; ;; 加载 pyim 包
-  ;; (require 'pyim nil t)
 
   ;; diminish 设置 (如果使用 diminish)
   (with-eval-after-load 'diminish
@@ -403,3 +419,24 @@ hook，config，自定义的函数。
 #+BEGIN_SRC emacs-lisp
 #+END_SRC
 
+*** Aider
+
+**** 依赖
+:PROPERTIES:
+:header-args: :noweb-ref emacs-packages
+:END:
+
+***** TODO Aider.el
+#+BEGIN_SRC nix
+  # aider
+#+END_SRC
+
+***** Aider 目录路径
+#+begin_src emacs-lisp  :noweb-ref emacs-config
+  (add-to-list 'exec-path "${pkgs.aider-chat}/bin")
+#+end_src
+
+**** TODO 配置
+:PROPERTIES:
+:header-args: :noweb-ref emacs-config
+:END
