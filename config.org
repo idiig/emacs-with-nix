@@ -387,10 +387,19 @@ hook，config，自定义的函数。
   (require 'magit)
 #+END_SRC
 
-** Org Mode相关配置
+** 编程语言
+*** 我有可能使用的语言
 
+#+begin_src emacs-lisp
+  (defvar idiig/language-list
+    '("emacs-lisp" "python" "C" "sh" "js" "clojure" "css" "nix"
+      "dot" "gnuplot" "R" "sql" "awk" "haskell" "latex" "lisp"
+      "org" "julia" "scheme" "sqlite")
+    "支持的编程语言列表。")
+#+end_src
+
+** Org Mode相关配置
 *** Org本体
-**** 依赖
 **** 配置
 :PROPERTIES:
 :header-args: :noweb-ref emacs-config
@@ -401,8 +410,30 @@ hook，config，自定义的函数。
 : custom
 #+BEGIN_SRC emacs-lisp
   (with-eval-after-load 'org
-    (setq org-support-shift-select 2))
+    (setq org-support-shift-select 2)  ; 允许shift用于选择
+    (require 'org-tempo)               ; 允许<Tab补齐org插入环境
+    )
 #+END_SRC
+
+***** 函数与advice
+
+=org-insert-structure-template= 后选择 =s= (src block) 时自动提示插入代码块的语言
+
+#+begin_src emacs-lisp
+  (with-eval-after-load 'org
+    (defun idiig/org-insert-structure-template-src-advice (orig-fun type)
+      "Advice for org-insert-structure-template to handle src blocks."
+      (if (string= type "src")  ; 判断条件为 "src"
+	  (let* ((src-code-types
+		  '("emacs-lisp" "python" "C" "sh" "js" "clojure" "css" "nix"
+		    "dot" "gnuplot" "R" "sql" "awk" "haskell" "latex" "lisp"
+		    "org" "julia" "scheme" "sqlite"))
+		 (selected-type (ido-completing-read "Source code type: " src-code-types)))
+	    (funcall orig-fun (format "src %s" selected-type)))
+	(funcall orig-fun type)))
+
+    (advice-add 'org-insert-structure-template :around #'idiig/org-insert-structure-template-src-advice))
+#+end_src
 
 ** AI辅助功能
 

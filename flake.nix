@@ -92,6 +92,19 @@
 (require 'magit)
 (with-eval-after-load 'org
   (setq org-support-shift-select 2))
+(with-eval-after-load 'org
+  (defun idiig/org-insert-structure-template-advice (orig-fun type)
+    "Advice for org-insert-structure-template to handle src blocks."
+    (if (string= type "src")  ; 判断条件为 "src"
+	(let* ((src-code-types
+		'("emacs-lisp" "python" "C" "sh" "js" "clojure" "css" "nix"
+		  "dot" "gnuplot" "R" "sql" "awk" "haskell" "latex" "lisp"
+		  "org" "julia" "scheme" "sqlite"))
+	       (selected-type (ido-completing-read "Source code type: " src-code-types)))
+	  (funcall orig-fun (format "src %s" selected-type)))
+      (funcall orig-fun type)))
+
+  (advice-add 'org-insert-structure-template :around #'idiig/org-insert-structure-template-advice))
 
 (add-to-list 'exec-path "${pkgs.aider-chat}/bin")
 	'';
@@ -108,6 +121,7 @@
 
 	      # emacs 和包
 	      emacsWithPackages = pkgs.emacs.pkgs.withPackages (epkgs: (with epkgs; [
+	  meow
 	  ctrlf
 	  ddskk
 	  # (pkgs.emacsPackages.pyim.overrideAttrs (old: {
