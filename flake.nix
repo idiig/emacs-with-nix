@@ -90,21 +90,32 @@
   (advice-add 'orderless-regexp :around #'zh-orderless-regexp))
 (add-to-list 'exec-path "${pkgs.git}/bin")
 (require 'magit)
+(defvar idiig/language-list
+  '("emacs-lisp" "python" "C" "sh" "js" "clojure" "css" "nix"
+    "dot" "gnuplot" "R" "sql" "awk" "haskell" "latex" "lisp"
+    "org" "julia" "scheme" "sqlite")
+  "支持的编程语言列表。")
 (with-eval-after-load 'org
-  (setq org-support-shift-select 2))
-(with-eval-after-load 'org
-  (defun idiig/org-insert-structure-template-advice (orig-fun type)
+  (defun idiig/org-insert-structure-template-src-advice (orig-fun type)
     "Advice for org-insert-structure-template to handle src blocks."
     (if (string= type "src")  ; 判断条件为 "src"
-	(let* ((src-code-types
-		'("emacs-lisp" "python" "C" "sh" "js" "clojure" "css" "nix"
-		  "dot" "gnuplot" "R" "sql" "awk" "haskell" "latex" "lisp"
-		  "org" "julia" "scheme" "sqlite"))
-	       (selected-type (ido-completing-read "Source code type: " src-code-types)))
+	(let ((selected-type (ido-completing-read "Source code type: " idiig/language-list)))
 	  (funcall orig-fun (format "src %s" selected-type)))
       (funcall orig-fun type)))
 
-  (advice-add 'org-insert-structure-template :around #'idiig/org-insert-structure-template-advice))
+  (advice-add 'org-insert-structure-template :around #'idiig/org-insert-structure-template-src-advice))
+(defun idiig/load-org-babel-languages ()
+  "根据 `idiig/language-list` 启用 `org-babel` 语言。"
+  (let ((languages '()))
+    (dolist (lang idiig/language-list)
+      (push (cons (intern lang) t) languages)) ;; 将字符串转换为符号
+    (org-babel-do-load-languages 'org-babel-load-languages languages)))
+
+(add-hook 'org-mode-hook #'idiig/load-org-babel-languages)
+(with-eval-after-load 'org
+  (setq org-support-shift-select 2)  ; 允许shift用于选择
+  (require 'org-tempo)               ; 允许<Tab补齐org插入环境
+  )
 
 (add-to-list 'exec-path "${pkgs.aider-chat}/bin")
 	'';
