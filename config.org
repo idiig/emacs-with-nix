@@ -175,6 +175,14 @@ hook，config，自定义的函数。
 #+end_src
 
 ** Emacs基建
+*** 模态编辑（Meow）
+**** 依赖
+:PROPERTIES:
+:header-args: :noweb-ref emacs-packages
+:END:
+#+begin_src nix
+  meow
+#+end_src
 *** 字符检索（Ctrlf）
 
 **** 依赖
@@ -192,6 +200,7 @@ hook，config，自定义的函数。
 :END:
 
 #+begin_src emacs-lisp
+  (require 'ctrlf)
   (ctrlf-mode +1)
 #+end_src
 
