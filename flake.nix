@@ -29,13 +29,20 @@
 (customize-set-variable 'display-buffer-base-action
   '((display-buffer-reuse-window display-buffer-same-window)
     (reusable-frames . t)))
-(defadvice split-window (after split-window-after activate)
-  (other-window 1))
+(defadvice split-window-below (after split-window-below-and-switch activate)
+  "切换到新分割的窗口"
+  (when (called-interactively-p 'any)
+    (other-window 1)))
+
+(defadvice split-window-right (after split-window-right-and-switch activate)
+  "切换到新分割的窗口"
+  (when (called-interactively-p 'any)
+    (other-window 1)))
 (require 'ctrlf)
 (ctrlf-mode +1)
 (add-hook 'after-init-hook
 	  (lambda ()
-	    (let ((my-font-height 130)
+	    (let ((my-font-height 140)
 		  (my-font "Sarasa Mono SC"))
 	      (set-face-attribute 'default nil :family my-font :height my-font-height))))
 
