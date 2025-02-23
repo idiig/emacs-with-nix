@@ -172,6 +172,57 @@ hook，config，自定义的函数。
 #+end_src
 
 ** Emacs基建
+*** 更好的默认设置
+**** 本体的设定
+:PROPERTIES:
+:header-args: :noweb-ref emacs-config
+:END:
+
+***** 关闭警告声
+#+begin_src emacs-lisp
+  (setq ring-bell-function 'ignore)
+#+end_src
+
+***** 确认使用y或n
+
+而不是yes或no。
+#+begin_src emacs-lisp
+  (defalias 'yes-or-no-p 'y-or-n-p)
+#+end_src
+
+***** 在选中区域的状态下 =C-w= 删除选中的区域
+
+而不是删除上一个合并区域。
+#+begin_src emacs-lisp
+  (defun backward-kill-word-or-region (&optional arg)
+    (interactive "p")
+    (if (region-active-p)
+	(call-interactively #'kill-region)
+      (backward-kill-word arg)))
+#+end_src
+
+***** 光标跳到新窗口
+
+emacs在打开新的窗口时，默认光标维持在原来的窗口。比如当你使用
+=describe-function= 时，光标不会跳到函数的简介窗口。在这类窗口我们本身
+可以按 =q= 来退出和关闭窗口。所以跳转到新窗口非常便利。
+
+- 专用buffer（display-buffer行为；主要影响 Emacs 自动创建的窗口（如
+  help、compilation 等）
+#+begin_src emacs-lisp
+  (setq switch-to-buffer-obey-display-actions t)
+  (setq switch-to-buffer-in-dedicated-window 'pop)
+  (customize-set-variable 'display-buffer-base-action
+    '((display-buffer-reuse-window display-buffer-same-window)
+      (reusable-frames . t)))
+#+end_src
+
+- split-window时转跳到新窗口
+#+begin_src emacs-lisp
+  (defadvice split-window (after split-window-after activate)
+    (other-window 1))
+#+end_src
+
 *** 模态编辑（Meow）
 **** 依赖
 :PROPERTIES:
