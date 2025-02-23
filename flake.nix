@@ -17,6 +17,20 @@
 
 	      # 主配置文件
 	      emacsConfig = pkgs.writeText "init.el" ''
+(setq ring-bell-function 'ignore)
+(defalias 'yes-or-no-p 'y-or-n-p)
+(defun backward-kill-word-or-region (&optional arg)
+  (interactive "p")
+  (if (region-active-p)
+      (call-interactively #'kill-region)
+    (backward-kill-word arg)))
+(setq switch-to-buffer-obey-display-actions t)
+(setq switch-to-buffer-in-dedicated-window 'pop)
+(customize-set-variable 'display-buffer-base-action
+  '((display-buffer-reuse-window display-buffer-same-window)
+    (reusable-frames . t)))
+(defadvice split-window (after split-window-after activate)
+  (other-window 1))
 (require 'ctrlf)
 (ctrlf-mode +1)
 (add-hook 'after-init-hook
@@ -141,6 +155,7 @@
 	  pyim
 	  pyim-basedict
 	  magit
+	  ob-nix
 	  gptel
 	  # aider
 	      ]));

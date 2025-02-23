@@ -208,7 +208,8 @@ emacs在打开新的窗口时，默认光标维持在原来的窗口。比如当
 可以按 =q= 来退出和关闭窗口。所以跳转到新窗口非常便利。
 
 - 专用buffer（display-buffer行为；主要影响 Emacs 自动创建的窗口（如
-  help、compilation 等）
+  help、compilation 等）。注意这里也会影响到 =magit= 这类 transient 窗
+  口
 #+begin_src emacs-lisp
   (setq switch-to-buffer-obey-display-actions t)
   (setq switch-to-buffer-in-dedicated-window 'pop)
