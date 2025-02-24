@@ -38,11 +38,54 @@
   "切换到新分割的窗口"
   (when (called-interactively-p 'any)
     (other-window 1)))
+;; (global-set-key (kbd "C-x V") shrink-window)
+
+(defun idiig/window-adjust (orig-fun &rest args)
+  "使用 Emacs 风格按键 (^, V, {, }, +) 持续调整窗口大小。"
+  (let* ((ev last-command-event)
+	 (echo-keystrokes nil))
+    ;; 执行初始调整
+    (apply orig-fun args)
+
+    ;; 设置 transient map
+    (let ((delta (car args))) 
+      (set-transient-map
+       (let ((map (make-sparse-keymap)))
+	 ;; 垂直调整
+	 (define-key map (kbd "^")
+		     `(lambda () (interactive) (enlarge-window ,delta nil)))
+	 (define-key map (kbd "V")
+		     `(lambda () (interactive) (shrink-window ,delta nil)))
+
+	 ;; 水平调整
+	 (define-key map (kbd "{")
+		     `(lambda () (interactive) (shrink-window ,delta t)))
+	 (define-key map (kbd "}")
+		     `(lambda () (interactive) (enlarge-window ,delta t)))
+
+	 ;; 平衡窗口
+	 (define-key map (kbd "+")
+		     (lambda () (interactive) (balance-windows)))
+	 map)
+       nil nil
+       "Use %k for further adjustment"))))
+
+;; ;; 如果需要移除 advice:
+;; (advice-remove 'enlarge-window #'idiig/window-adjust)
+;; (advice-remove 'shrink-window #'idiig/window-adjust)
+;; (advice-remove 'enlarge-window-horizontally #'idiig/window-adjust)
+;; (advice-remove 'shrink-window-horizontally #'idiig/window-adjust)
+
+;; 添加 advice
+(advice-add 'enlarge-window :around #'idiig/window-adjust)
+(advice-add 'shrink-window :around #'idiig/window-adjust)
+(advice-add 'enlarge-window-horizontally :around #'idiig/window-adjust)
+(advice-add 'shrink-window-horizontally :around #'idiig/window-adjust)
 (require 'ctrlf)
 (ctrlf-mode +1)
 (add-hook 'after-init-hook
 	  (lambda ()
-	    (let ((my-font-height 140)
+	    (let ((my-font-height 130)
 		  (my-font "Sarasa Mono SC"))
 	      (set-face-attribute 'default nil :family my-font :height my-font-height))))
 
@@ -84,8 +127,6 @@
   ;; 基本设置
   (setq default-input-method "pyim")
   (setq pyim-dcache-directory "~/.emacs.d/.cache/pyim/dcache/")
-  ;; C-return 把当前选中的位置转换为正则表达
-  (define-key minibuffer-local-map (kbd "C-<return>") 'pyim-cregexp-convert-at-point)
   ;; 输入法设置为全拼
   (setq pyim-default-scheme 'quanpin)
   ;; 启用搜索功能
@@ -100,6 +141,16 @@
 ;; diminish 设置 (如果使用 diminish)
 (with-eval-after-load 'diminish
   (diminish 'pyim-isearch-mode))
+(with-eval-after-load 'pyim
+  (require 'pyim-cstring-utils)
+
+  ;; C-return 把当前选中的位置转换为正则表达
+  (define-key minibuffer-local-map (kbd "C-<return>") 'pyim-cregexp-convert-at-point)
+
+  ;; 中文状态下的前进后退词
+  (global-set-key (kbd "M-f") 'pyim-forward-word)
+  (global-set-key (kbd "M-b") 'pyim-backward-word)
+  )
 ;; 确保在 orderless 加载后再加载这些配置
 (with-eval-after-load 'orderless
   ;; 拼音检索字符串功能
@@ -135,9 +186,8 @@
 (add-hook 'org-mode-hook #'idiig/load-org-babel-languages)
 (with-eval-after-load 'org
   (setq org-support-shift-select 2)  ; 允许shift用于选择
-  (require 'org-tempo)               ; 允许<Tab补齐org插入环境
+  ;; (require 'org-tempo)               ; 允许<Tab补齐org插入环境
   )
-
 (add-to-list 'exec-path "${pkgs.aider-chat}/bin")
 ;; (defalias 'meow-visit #'ctrlf-forward-default) ; 需要ctrlf
 
@@ -228,7 +278,6 @@
 (require 'meow)
 (meow-setup)
 (meow-global-mode 1)
-
 (require 'meow-tree-sitter)
 (meow-tree-sitter-register-defaults)  
 (defvar-local the-late-input-method nil)

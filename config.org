@@ -241,46 +241,47 @@ emacs在打开新的窗口时，默认光标维持在原来的窗口。比如当
 #+begin_src emacs-lisp
   ;; (global-set-key (kbd "C-x V") shrink-window)
 
-  (defun window-adjust-continue (orig-fun &rest args)
-    "使用 Emacs 风格按键 (^, V, {, }) 持续调整窗口大小。"
-    (let ((echo-keystrokes 0)
-	  (continue t))
+  (defun idiig/window-adjust (orig-fun &rest args)
+    "使用 Emacs 风格按键 (^, V, {, }, +) 持续调整窗口大小。"
+    (let* ((ev last-command-event)
+	   (echo-keystrokes nil))
       ;; 执行初始调整
       (apply orig-fun args)
 
-      ;; 进入持续调整循环
-      (while continue
-	(let* ((key (read-event "Use ^, V, {, } for further adjustment)"))
-	       (delta (car args)))
-	  (cond
+      ;; 设置 transient map
+      (let ((delta (car args))) 
+	(set-transient-map
+	 (let ((map (make-sparse-keymap)))
 	   ;; 垂直调整
-	   ((eq key ?^)
-	    (enlarge-window delta nil))
-	   ((eq key ?V)
-	    (shrink-window delta nil))
+	   (define-key map (kbd "^")
+		       `(lambda () (interactive) (enlarge-window ,delta nil)))
+	   (define-key map (kbd "V")
+		       `(lambda () (interactive) (shrink-window ,delta nil)))
+
 	   ;; 水平调整
-	   ((eq key ?{)
-	    (shrink-window delta t))
-	   ((eq key ?})
-	    (enlarge-window delta t))
-	   ;; 平衡和退出
-	   ((eq key ?0)
-	    (balance-windows)
-	    (setq continue nil))
-	   (t
-	    (setq continue nil)))))))
+	   (define-key map (kbd "{")
+		       `(lambda () (interactive) (shrink-window ,delta t)))
+	   (define-key map (kbd "}")
+		       `(lambda () (interactive) (enlarge-window ,delta t)))
 
-  ;; 如果需要移除 advice:
-  ;; (advice-remove 'enlarge-window #'window-adjust-continue)
-  ;; (advice-remove 'shrink-window #'window-adjust-continue)
-  ;; (advice-remove 'enlarge-window-horizontally #'window-adjust-continue)
-  ;; (advice-remove 'shrink-window-horizontally #'window-adjust-continue)
+	   ;; 平衡窗口
+	   (define-key map (kbd "+")
+		       (lambda () (interactive) (balance-windows)))
+	   map)
+	 nil nil
+	 "Use %k for further adjustment"))))
 
-  ;; 为相关命令添加 advice
-  (advice-add 'enlarge-window :around #'window-adjust-continue)
-  (advice-add 'shrink-window :around #'window-adjust-continue)
-  (advice-add 'enlarge-window-horizontally :around #'window-adjust-continue)
-  (advice-add 'shrink-window-horizontally :around #'window-adjust-continue)
+  ;; ;; 如果需要移除 advice:
+  ;; (advice-remove 'enlarge-window #'idiig/window-adjust)
+  ;; (advice-remove 'shrink-window #'idiig/window-adjust)
+  ;; (advice-remove 'enlarge-window-horizontally #'idiig/window-adjust)
+  ;; (advice-remove 'shrink-window-horizontally #'idiig/window-adjust)
+
+  ;; 添加 advice
+  (advice-add 'enlarge-window :around #'idiig/window-adjust)
+  (advice-add 'shrink-window :around #'idiig/window-adjust)
+  (advice-add 'enlarge-window-horizontally :around #'idiig/window-adjust)
+  (advice-add 'shrink-window-horizontally :around #'idiig/window-adjust)
 #+end_src
 
 **** 检索（ctrlf）
