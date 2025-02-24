@@ -178,8 +178,8 @@
   ;; ;; 挂钩到 pyim 的启用/禁用钩子上
   ;; (advice-remove 'pyim-deactivate #'idiig/disable-pyim-region)
   ;; (advice-remove 'pyim-activate #'idiig/enable-pyim-region)
-  ;; (advice-add 'pyim-deactivate :after #'idiig/pyim-disable-advice)
-  (advice-add 'pyim-activate :after #'idiig/pyim-enable-advice))
+  ;; (advice-add 'pyim-deactivate :after #'idiig/disable-pyim-region)
+  (advice-add 'pyim-activate :after #'idiig/enable-pyim-region))
 ;; 确保在 orderless 加载后再加载这些配置
 (with-eval-after-load 'orderless
   ;; 拼音检索字符串功能

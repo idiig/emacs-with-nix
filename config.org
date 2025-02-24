@@ -483,9 +483,11 @@ emacs在打开新的窗口时，默认光标维持在原来的窗口。比如当
     ;; ;; 挂钩到 pyim 的启用/禁用钩子上
     ;; (advice-remove 'pyim-deactivate #'idiig/disable-pyim-region)
     ;; (advice-remove 'pyim-activate #'idiig/enable-pyim-region)
-    ;; (advice-add 'pyim-deactivate :after #'idiig/pyim-disable-advice)
-    (advice-add 'pyim-activate :after #'idiig/pyim-enable-advice))
+    ;; (advice-add 'pyim-deactivate :after #'idiig/disable-pyim-region)
+    (advice-add 'pyim-activate :after #'idiig/enable-pyim-region))
 #+end_src
+
+#+RESULTS:
 
 ***** 正则表达交互
 
