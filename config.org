@@ -375,8 +375,6 @@ emacs在打开新的窗口时，默认光标维持在原来的窗口。比如当
     ;; 基本设置
     (setq default-input-method "pyim")
     (setq pyim-dcache-directory "~/.emacs.d/.cache/pyim/dcache/")
-    ;; C-return 把当前选中的位置转换为正则表达
-    (define-key minibuffer-local-map (kbd "C-<return>") 'pyim-cregexp-convert-at-point)
     ;; 输入法设置为全拼
     (setq pyim-default-scheme 'quanpin)
     ;; 启用搜索功能
@@ -392,6 +390,21 @@ emacs在打开新的窗口时，默认光标维持在原来的窗口。比如当
   (with-eval-after-load 'diminish
     (diminish 'pyim-isearch-mode))
 #+end_src
+
+#+begin_src emacs-lisp
+  (with-eval-after-load 'pyim
+    (require 'pyim-cstring-utils)
+
+    ;; C-return 把当前选中的位置转换为正则表达
+    (define-key minibuffer-local-map (kbd "C-<return>") 'pyim-cregexp-convert-at-point)
+
+    ;; 中文状态下的前进后退词
+    (global-set-key (kbd "M-f") 'pyim-forward-word)
+    (global-set-key (kbd "M-b") 'pyim-backward-word)
+    )
+#+end_src
+
+***** 正则表达交互
 
 ***** Orderless交互
 #+begin_src emacs-lisp
@@ -503,7 +516,7 @@ emacs在打开新的窗口时，默认光标维持在原来的窗口。比如当
 
 ** AI辅助功能
 
-*** TODO 文档写作
+*** 文档写作
 
 **** gptel.el
 
@@ -516,14 +529,10 @@ emacs在打开新的窗口时，默认光标维持在原来的窗口。比如当
   gptel
 #+END_SRC
 
-***** 配置
+***** TODO 配置
 :PROPERTIES:
 :header-args: :noweb-ref emacs-config
 :END:
-
-: custom
-#+BEGIN_SRC emacs-lisp
-#+END_SRC
 
 *** Aider
 
@@ -545,7 +554,7 @@ emacs在打开新的窗口时，默认光标维持在原来的窗口。比如当
 **** TODO 配置
 :PROPERTIES:
 :header-args: :noweb-ref emacs-config
-:END
+:END:
 
 ** 模态编辑（Meow）
 *** 依赖
@@ -561,6 +570,7 @@ emacs在打开新的窗口时，默认光标维持在原来的窗口。比如当
 :PROPERTIES:
 :header-args: :noweb-ref emacs-config
 :END:
+
 #+begin_src emacs-lisp
   ;; (defalias 'meow-visit #'ctrlf-forward-default) ; 需要ctrlf
 
