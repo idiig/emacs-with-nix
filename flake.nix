@@ -231,6 +231,14 @@
 
 (require 'meow-tree-sitter)
 (meow-tree-sitter-register-defaults)  
+(defvar-local the-late-input-method nil)
+(add-hook 'meow-insert-enter-hook
+	  (lambda ()
+	    (activate-input-method the-late-input-method)))
+(add-hook 'meow-insert-exit-hook
+	  (lambda ()
+	    (setq the-late-input-method current-input-method)
+	    (deactivate-input-method)))
 	'';
 
 	      # early-init 配置文件

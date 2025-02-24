@@ -497,7 +497,7 @@ emacs在打开新的窗口时，默认光标维持在原来的窗口。比如当
 #+BEGIN_SRC emacs-lisp
   (with-eval-after-load 'org
     (setq org-support-shift-select 2)  ; 允许shift用于选择
-    (require 'org-tempo)               ; 允许<Tab补齐org插入环境
+    ;; (require 'org-tempo)               ; 允许<Tab补齐org插入环境
     )
 #+END_SRC
 
@@ -651,7 +651,23 @@ emacs在打开新的窗口时，默认光标维持在原来的窗口。比如当
   (require 'meow)
   (meow-setup)
   (meow-global-mode 1)
+#+end_src
 
+给meow增加treesitter的功能：
+#+begin_src emacs-lisp
   (require 'meow-tree-sitter)
   (meow-tree-sitter-register-defaults)  
+#+end_src
+
+在 meow-edit 退出 insert-state 时，当前输入方式自动被关闭，而再次进入
+insert-state 时重新打开输入方式：
+#+begin_src emacs-lisp
+  (defvar-local the-late-input-method nil)
+  (add-hook 'meow-insert-enter-hook
+	    (lambda ()
+	      (activate-input-method the-late-input-method)))
+  (add-hook 'meow-insert-exit-hook
+	    (lambda ()
+	      (setq the-late-input-method current-input-method)
+	      (deactivate-input-method)))
 #+end_src
