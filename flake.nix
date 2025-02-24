@@ -27,8 +27,8 @@
 (setq switch-to-buffer-obey-display-actions t)
 (setq switch-to-buffer-in-dedicated-window 'pop)
 (customize-set-variable 'display-buffer-base-action
-  '((display-buffer-reuse-window display-buffer-same-window)
-    (reusable-frames . t)))
+			'((display-buffer-reuse-window display-buffer-same-window)
+			  (reusable-frames . t)))
 (defadvice split-window-below (after split-window-below-and-switch activate)
   "切换到新分割的窗口"
   (when (called-interactively-p 'any)
@@ -38,7 +38,7 @@
   "切换到新分割的窗口"
   (when (called-interactively-p 'any)
     (other-window 1)))
-;; (global-set-key (kbd "C-x V") shrink-window)
+(global-set-key (kbd "C-x V") 'shrink-window)
 
 (defun idiig/window-adjust (orig-fun &rest args)
   "使用 Emacs 风格按键 (^, V, {, }, +) 持续调整窗口大小。"
@@ -147,10 +147,39 @@
   ;; C-return 把当前选中的位置转换为正则表达
   (define-key minibuffer-local-map (kbd "C-<return>") 'pyim-cregexp-convert-at-point)
 
-  ;; 中文状态下的前进后退词
-  (global-set-key (kbd "M-f") 'pyim-forward-word)
-  (global-set-key (kbd "M-b") 'pyim-backward-word)
-  )
+  (defvar idiig/pyim-region-enabled nil
+    "记录pyim区域功能是否启用的状态变量。")
+
+  (defun idiig/toggle-pyim-region ()
+    "切换pyim的单词移动功能。
+当启用时，会将forward-word和backward-word重映射为pyim的相应函数；
+当禁用时，会恢复原来的映射。"
+    (interactive)
+    (if idiig/pyim-region-enabled
+	(progn
+	  (idiig/disable-pyim-region)
+	  (setq idiig/pyim-region-enabled nil)
+	  (message "已禁用pyim区域功能"))
+      (progn
+	(idiig/enable-pyim-region)
+	(setq idiig/pyim-region-enabled t)
+	(message "已启用pyim区域功能"))))
+
+  (defun idiig/enable-pyim-region (&rest _)
+    "启用pyim的单词移动建议。"
+    (global-set-key [remap forward-word] 'pyim-forward-word)
+    (global-set-key [remap backward-word] 'pyim-backward-word))
+
+  (defun idiig/disable-pyim-region (&rest _)
+    "禁用pyim的单词移动建议。"
+    (global-unset-key [remap forward-word])
+    (global-unset-key [remap backward-word]))
+
+  ;; ;; 挂钩到 pyim 的启用/禁用钩子上
+  ;; (advice-remove 'pyim-deactivate #'idiig/disable-pyim-region)
+  ;; (advice-remove 'pyim-activate #'idiig/enable-pyim-region)
+  ;; (advice-add 'pyim-deactivate :after #'idiig/pyim-disable-advice)
+  (advice-add 'pyim-activate :after #'idiig/pyim-enable-advice))
 ;; 确保在 orderless 加载后再加载这些配置
 (with-eval-after-load 'orderless
   ;; 拼音检索字符串功能
@@ -304,19 +333,19 @@
 
 	      # emacs 和包
 	      emacsWithPackages = pkgs.emacs.pkgs.withPackages (epkgs: (with epkgs; [
-	  ctrlf
-	  ddskk
-	  # (pkgs.emacsPackages.pyim.overrideAttrs (old: {
-	  #     nativeComp = false;
-	  # }))
-	  pyim
-	  pyim-basedict
-	  magit
-	  ob-nix
-	  gptel
-	  # aider
-	  meow
-	  meow-tree-sitter
+		      ctrlf
+		      ddskk
+		      # (pkgs.emacsPackages.pyim.overrideAttrs (old: {
+		      #     nativeComp = false;
+		      # }))
+		      pyim
+		        pyim-basedict
+		      magit
+		      ob-nix
+		      gptel
+		      # aider
+		      meow
+		      meow-tree-sitter
 	      ]));
 
 	      # 输出配置到 .emacs.d

@@ -62,7 +62,7 @@ hook，config，自定义的函数。
   nix run <path/to/this/config>.#emacs
   source ~/.bashrc
   emacs
-#+end_src
+  #+end_src
 
 ** 版本回滚
 
@@ -124,7 +124,7 @@ hook，config，自定义的函数。
 
 		# emacs 和包
 		emacsWithPackages = pkgs.emacs.pkgs.withPackages (epkgs: (with epkgs; [
-	    <<emacs-packages>>
+			<<emacs-packages>>
 		]));
 
 		# 输出配置到 .emacs.d
@@ -216,8 +216,8 @@ emacs在打开新的窗口时，默认光标维持在原来的窗口。比如当
   (setq switch-to-buffer-obey-display-actions t)
   (setq switch-to-buffer-in-dedicated-window 'pop)
   (customize-set-variable 'display-buffer-base-action
-    '((display-buffer-reuse-window display-buffer-same-window)
-      (reusable-frames . t)))
+			  '((display-buffer-reuse-window display-buffer-same-window)
+			    (reusable-frames . t)))
 #+end_src
 
 - split-window时转跳到新窗口
@@ -234,12 +234,12 @@ emacs在打开新的窗口时，默认光标维持在原来的窗口。比如当
 #+end_src
 
 ***** 窗口的放大缩小转变为持续的行为
-而不是要一直要重复 =C-x= 按键。后续行为使用默认 =^/V/{/}=
+而不是要一直要重复 =C-x= 按键。后续行为使用默认 =^V/{/}=
 
 这里我没用 =C-x v= 是因为这个键位目前用于 =vc=。
 
 #+begin_src emacs-lisp
-  ;; (global-set-key (kbd "C-x V") shrink-window)
+  (global-set-key (kbd "C-x V") 'shrink-window)
 
   (defun idiig/window-adjust (orig-fun &rest args)
     "使用 Emacs 风格按键 (^, V, {, }, +) 持续调整窗口大小。"
@@ -415,7 +415,7 @@ emacs在打开新的窗口时，默认光标维持在原来的窗口。比如当
   #     nativeComp = false;
   # }))
   pyim
-  pyim-basedict
+    pyim-basedict
 #+END_SRC
 
 **** 配置
@@ -452,10 +452,39 @@ emacs在打开新的窗口时，默认光标维持在原来的窗口。比如当
     ;; C-return 把当前选中的位置转换为正则表达
     (define-key minibuffer-local-map (kbd "C-<return>") 'pyim-cregexp-convert-at-point)
 
-    ;; 中文状态下的前进后退词
-    (global-set-key (kbd "M-f") 'pyim-forward-word)
-    (global-set-key (kbd "M-b") 'pyim-backward-word)
-    )
+    (defvar idiig/pyim-region-enabled nil
+      "记录pyim区域功能是否启用的状态变量。")
+
+    (defun idiig/toggle-pyim-region ()
+      "切换pyim的单词移动功能。
+  当启用时，会将forward-word和backward-word重映射为pyim的相应函数；
+  当禁用时，会恢复原来的映射。"
+      (interactive)
+      (if idiig/pyim-region-enabled
+	  (progn
+	    (idiig/disable-pyim-region)
+	    (setq idiig/pyim-region-enabled nil)
+	    (message "已禁用pyim区域功能"))
+	(progn
+	  (idiig/enable-pyim-region)
+	  (setq idiig/pyim-region-enabled t)
+	  (message "已启用pyim区域功能"))))
+
+    (defun idiig/enable-pyim-region (&rest _)
+      "启用pyim的单词移动建议。"
+      (global-set-key [remap forward-word] 'pyim-forward-word)
+      (global-set-key [remap backward-word] 'pyim-backward-word))
+
+    (defun idiig/disable-pyim-region (&rest _)
+      "禁用pyim的单词移动建议。"
+      (global-unset-key [remap forward-word])
+      (global-unset-key [remap backward-word]))
+
+    ;; ;; 挂钩到 pyim 的启用/禁用钩子上
+    ;; (advice-remove 'pyim-deactivate #'idiig/disable-pyim-region)
+    ;; (advice-remove 'pyim-activate #'idiig/enable-pyim-region)
+    ;; (advice-add 'pyim-deactivate :after #'idiig/pyim-disable-advice)
+    (advice-add 'pyim-activate :after #'idiig/pyim-enable-advice))
 #+end_src
 
 ***** 正则表达交互
