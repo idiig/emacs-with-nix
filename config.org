@@ -172,6 +172,13 @@ hook，config，自定义的函数。
 	    (lambda ()
 	      (setq gc-cons-threshold 10485760
 		    gc-cons-percentage 0.1)))
+
+  ;; 禁用bidi，加速大文件
+  (setq-default bidi-display-reordering nil)
+  (setq bidi-inhibit-bpa t
+	long-line-threshold 1000
+	large-hscroll-threshold 1000
+	syntax-wholeline-max 1000)
 #+end_src
 
 ** Emacs基建
