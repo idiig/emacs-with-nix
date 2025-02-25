@@ -95,74 +95,68 @@ hook，config，自定义的函数。
 包的安装基于下面的 =flake.nix= 和 =init.nix= 。
 
 #+BEGIN_SRC nix :tangle flake.nix :noweb yes
-    {
-      description = "idiig's Emacs Configuration with Nix Flakes";
+  {
+    description = "idiig's Emacs Configuration with Nix Flakes";
 
-      inputs = {
-	nixpkgs.url = "github:NixOS/nixpkgs/nixos-24.11";
-	flake-utils.url = "github:numtide/flake-utils";
-	emacs-overlay.url = "github:nix-community/emacs-overlay";
-      };
+    inputs = {
+      nixpkgs.url = "github:NixOS/nixpkgs/nixos-24.11";
+      flake-utils.url = "github:numtide/flake-utils";
+      emacs-overlay.url = "github:nix-community/emacs-overlay";
+    };
 
-      outputs = { self, nixpkgs, flake-utils, emacs-overlay }:
-	flake-utils.lib.eachDefaultSystem (system:
-	  let
-		  pkgs = import nixpkgs {
-			  inherit system;
-			  overlays = [ emacs-overlay.overlay ];
-		  };
+    outputs = { self, nixpkgs, flake-utils, emacs-overlay }:
+      flake-utils.lib.eachDefaultSystem (system:
+	      let
+		      pkgs = import nixpkgs {
+			      inherit system;
+			      overlays = [ emacs-overlay.overlay ];
+		      };
 
-		  # 主配置文件
-		  emacsConfig = pkgs.writeText "init.el" ''
-    <<emacs-config>>
+		      # 主配置文件
+		      emacsConfig = pkgs.writeText "init.el" ''
+	    <<emacs-config>>
 	    '';
 
-		  # early-init 配置文件
-		  emacsEarlyInitConfig = pkgs.writeText "early-init.el" ''
-    <<emacs-early-init-config>>
+		      # early-init 配置文件
+		      emacsEarlyInitConfig = pkgs.writeText "early-init.el" ''
+	    <<emacs-early-init-config>>
 	    '';
 
-		  # emacs 和包
-		  emacsWithPackages = pkgs.emacs.pkgs.withPackages (epkgs: (with epkgs; [
-			  <<emacs-packages>>
-		  ]));
+		      # emacs 和包
+		      emacsWithPackages = pkgs.emacs.pkgs.withPackages (epkgs: (with epkgs; [
+			      <<emacs-packages>>
+		      ]));
 
-		  # 输出配置到 .emacs.d
-  autoExportConfig = pkgs.writeShellScriptBin "auto-export-config" ''
-      #!/usr/bin/env bash
-      set -e
+	      in {
 
-      # 导出配置到 nix-emacs
-      EMACS_DIR="$HOME/nix-emacs"
-      mkdir -p "$EMACS_DIR"
-      ${pkgs.rsync}/bin/rsync ${emacsConfig} "$EMACS_DIR/init.el"
-      ${pkgs.rsync}/bin/rsync ${emacsEarlyInitConfig} "$EMACS_DIR/early-init.el"
+		packages.default = pkgs.writeShellScriptBin "script" ''
+	      #!/usr/bin/env bash
+	      set -e
 
-      # 路径
-      <<dependencies>>
-  
-      # 更新 Emacs 路径（兼容 macOS 和 Linux）
-      if sed --version 2>/dev/null | grep -q GNU; then
-	  sed -i '/^alias nixemacs=/d' "$HOME/.bashrc"
-      else
-	  sed -i \"\" '/^alias nixemacs=/d' "$HOME/.bashrc"
-      fi
+	      # 导出配置到 nix-emacs
+	      EMACS_DIR="$HOME/nix-emacs"
+	      mkdir -p "$EMACS_DIR"
+	      ${pkgs.rsync}/bin/rsync ${emacsConfig} "$EMACS_DIR/init.el"
+	      ${pkgs.rsync}/bin/rsync ${emacsEarlyInitConfig} "$EMACS_DIR/early-init.el"
 
-      echo "alias nixemacs='${emacsWithPackages}/bin/emacs --init-dir \"$EMACS_DIR\"'" >> "$HOME/.bashrc"
+	      # 路径
+	      <<dependencies>>
 
-      # 提示用户手动 source 而不是直接执行，以避免 shell 继承问题
-      echo "请手动运行 'source ~/.bashrc' 以使 alias 生效"
+	      # 更新 Emacs 路径（兼容 macOS 和 Linux）
+	      if sed --version 2>/dev/null | grep -q GNU; then
+		      sed -i '/^alias ne=/d' "$HOME/.bashrc"
+	      else
+		      sed -i \"\" '/^alias ne=/d' "$HOME/.bashrc"
+	      fi
 
-      echo "Emacs 配置已同步到 $EMACS_DIR"
-  '';
-	  in {
-		  packages = {
-			  default = autoExportConfig;
-		  };
+	      echo "alias ne='${emacsWithPackages}/bin/emacs --init-dir \"$EMACS_DIR\"'" >> "$HOME/.bashrc"
 
-	  }
-	);
-    }
+	      # 提示用户手动 source 而不是直接执行，以避免 shell 继承问题
+	      echo "请手动运行 'source ~/.bashrc' 以使 alias 生效"
+	      echo "Emacs 配置已同步到 $EMACS_DIR"
+	      '';  
+	});
+  }
 #+END_SRC
 
 ** Early init
@@ -646,13 +640,18 @@ emacs在打开新的窗口时，默认光标维持在原来的窗口。比如当
 
 **** TODO 基础设定
 
-: custom
+: 允许shift用于选择
 #+BEGIN_SRC emacs-lisp
   (with-eval-after-load 'org
     (setq org-support-shift-select 2)  ; 允许shift用于选择
     ;; (require 'org-tempo)               ; 允许<Tab补齐org插入环境
     )
 #+END_SRC
+
+: 允许折行
+#+begin_src emacs-lisp
+  (add-hook 'org-mode-hook #'visual-line-mode)
+#+end_src
 
 ** AI辅助功能
 
