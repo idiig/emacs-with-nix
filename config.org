@@ -128,26 +128,33 @@ hook，config，自定义的函数。
 		]));
 
 		# 输出配置到 .emacs.d
-		autoExportConfig = pkgs.writeShellScriptBin "auto-export-config" ''
-	    #!/usr/bin/env bash
-	    set -e
+autoExportConfig = pkgs.writeShellScriptBin "auto-export-config" ''
+    #!/usr/bin/env bash
+    set -e
 
-	    # 导出配置到 nix-emacs
-      EMACS_DIR="$HOME/nix-emacs"
-	    mkdir -p "$EMACS_DIR"
-	    ${pkgs.rsync}/bin/rsync ${emacsConfig} "$EMACS_DIR/init.el"
-	    ${pkgs.rsync}/bin/rsync ${emacsEarlyInitConfig} "$EMACS_DIR/early-init.el"
+    # 导出配置到 nix-emacs
+    EMACS_DIR="$HOME/nix-emacs"
+    mkdir -p "$EMACS_DIR"
+    ${pkgs.rsync}/bin/rsync ${emacsConfig} "$EMACS_DIR/init.el"
+    ${pkgs.rsync}/bin/rsync ${emacsEarlyInitConfig} "$EMACS_DIR/early-init.el"
 
-      # 路径
-      <<dependencies>>
+    # 路径
+    <<dependencies>>
+  
+    # 更新 Emacs 路径（兼容 macOS 和 Linux）
+    if sed --version 2>/dev/null | grep -q GNU; then
+        sed -i '/^alias nixemacs=/d' "$HOME/.bashrc"
+    else
+        sed -i \"\" '/^alias nixemacs=/d' "$HOME/.bashrc"
+    fi
 
-	    # 更新Emacs路径
-      sed -i '/^alias nixemacs=/d' "$HOME/.bashrc"
-      echo 'alias nixemacs='"${emacsWithPackages}/bin/emacs --init-dir $EMACS_DIR" >> "$HOME/.bashrc"
-      source "$HOME/.bashrc"
+    echo "alias nixemacs='${emacsWithPackages}/bin/emacs --init-dir \"$EMACS_DIR\"'" >> "$HOME/.bashrc"
 
-	    echo "Emacs配置已同步到 $EMACS_DIR"
-	  '';
+    # 提示用户手动 source 而不是直接执行，以避免 shell 继承问题
+    echo "请手动运行 'source ~/.bashrc' 以使 alias 生效"
+
+    echo "Emacs 配置已同步到 $EMACS_DIR"
+'';
 	in {
 		packages = {
 			default = autoExportConfig;
@@ -182,6 +189,26 @@ hook，config，自定义的函数。
 #+end_src
 
 ** Emacs基建
+
+*** Mac OS 键位设定
+:PROPERTIES:
+:header-args: :noweb-ref emacs-config
+:END:
+
+#+begin_src emacs-lisp
+  ;; 在mac中使用Command key作为meta
+  (setq mac-option-key-is-meta nil
+	mac-command-key-is-meta t
+	mac-command-modifier 'meta
+	mac-option-modifier 'none)
+
+  ;; 便于使用mac的JIS日语键盘
+  (global-set-key (kbd "C-¥") 'toggle-input-method)
+#+end_src
+
+#+RESULTS:
+: toggle-input-method
+
 *** 更好的默认设置
 **** 本体的设定
 :PROPERTIES:
@@ -325,9 +352,17 @@ emacs在打开新的窗口时，默认光标维持在原来的窗口。比如当
 :header-args: :noweb-ref dependencies
 :END:
 #+begin_src sh
-  mkdir -p "$HOME/.local/share/fonts/truetype/"
-  ${pkgs.rsync}/bin/rsync -av ${pkgs.sarasa-gothic}/share/fonts/truetype/ "$HOME/.local/share/fonts/sarasa-gothic/"
-  fc-cache -f -v ~/.local/share/fonts/
+  if [ "$(uname)" = "Darwin" ]; then
+    # macOS
+    mkdir -p "$HOME/Library/Fonts/"
+    ${pkgs.rsync}/bin/rsync -av ${pkgs.sarasa-gothic}/share/fonts/truetype/ "$HOME/Library/Fonts/"
+  else
+    # Assume Linux
+    mkdir -p "$HOME/.local/share/fonts/truetype/"
+    ${pkgs.rsync}/bin/rsync -av ${pkgs.sarasa-gothic}/share/fonts/truetype/ "$HOME/.local/share/fonts/sarasa-gothic/"
+    fc-cache -f -v ~/.local/share/fonts/
+  fi
+
 #+end_src
 
 *** 配置
@@ -338,9 +373,15 @@ emacs在打开新的窗口时，默认光标维持在原来的窗口。比如当
 #+begin_src emacs-lisp
   (add-hook 'after-init-hook
 	    (lambda ()
-	      (let ((my-font-height 130)
-		    (my-font "Sarasa Mono SC"))
-		(set-face-attribute 'default nil :family my-font :height my-font-height))))
+	      (let* ((screen-height (display-pixel-height))
+		     (font-height (if (> screen-height 540) 260 130))  ;; 根据屏幕高度调整
+		     (my-font "Sarasa Mono SC"))
+		(set-face-attribute 'default nil :family my-font :height font-height)
+		;; 设置 mode-line 字体
+		(set-face-attribute 'mode-line nil :family my-font :height font-height)
+		(set-face-attribute 'mode-line-inactive nil :family my-font :height font-height)
+		;; 设置 minibuffer 字体
+		(set-face-attribute 'minibuffer-prompt nil :family my-font :height font-height))))
 
   ;; 工具栏，菜单保持默认字体
   (set-face-attribute 'menu nil :inherit 'unspecified)
