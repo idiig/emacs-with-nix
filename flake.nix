@@ -155,6 +155,8 @@
 当启用时，会将forward-word和backward-word重映射为pyim的相应函数；
 当禁用时，会恢复原来的映射。"
     (interactive)
+    (call-interactively #'pyim-activate)
+    (call-interactively #'pyim-deactivate)
     (if idiig/pyim-region-enabled
 	(progn
 	  (idiig/disable-pyim-region)
@@ -353,10 +355,11 @@
 	  #!/usr/bin/env bash
 	  set -e
 
-	  # 导出配置到 .emacs.d
-	  mkdir -p "$HOME/.emacs.d"
-	  ${pkgs.rsync}/bin/rsync ${emacsConfig} "$HOME/.emacs.d/init.el"
-	  ${pkgs.rsync}/bin/rsync ${emacsEarlyInitConfig} "$HOME/.emacs.d/early-init.el"
+	  # 导出配置到 nix-emacs
+    EMACS_DIR="$HOME/nix-emacs"
+	  mkdir -p "$EMACS_DIR"
+	  ${pkgs.rsync}/bin/rsync ${emacsConfig} "$EMACS_DIR/init.el"
+	  ${pkgs.rsync}/bin/rsync ${emacsEarlyInitConfig} "$EMACS_DIR/early-init.el"
 
     # 路径
     mkdir -p "$HOME/.local/share/fonts/truetype/"
@@ -364,11 +367,11 @@
     fc-cache -f -v ~/.local/share/fonts/
 
 	  # 更新Emacs路径
-    sed -i '/^alias emacs=/d' "$HOME/.bashrc"
-    echo 'alias emacs='"${emacsWithPackages}/bin/emacs" >> "$HOME/.bashrc"
+    sed -i '/^alias nixemacs=/d' "$HOME/.bashrc"
+    echo 'alias nixemacs='"${emacsWithPackages}/bin/emacs --init-dir $EMACS_DIR" >> "$HOME/.bashrc"
     source "$HOME/.bashrc"
 
-	  echo "Emacs配置已同步到 $HOME/.emacs.d/"
+	  echo "Emacs配置已同步到 $EMACS_DIR"
 	'';
       in {
 	      packages = {
