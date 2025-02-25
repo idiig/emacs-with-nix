@@ -95,74 +95,74 @@ hook，config，自定义的函数。
 包的安装基于下面的 =flake.nix= 和 =init.nix= 。
 
 #+BEGIN_SRC nix :tangle flake.nix :noweb yes
-  {
-    description = "idiig's Emacs Configuration with Nix Flakes";
+    {
+      description = "idiig's Emacs Configuration with Nix Flakes";
 
-    inputs = {
-      nixpkgs.url = "github:NixOS/nixpkgs/nixos-24.11";
-      flake-utils.url = "github:numtide/flake-utils";
-      emacs-overlay.url = "github:nix-community/emacs-overlay";
-    };
+      inputs = {
+	nixpkgs.url = "github:NixOS/nixpkgs/nixos-24.11";
+	flake-utils.url = "github:numtide/flake-utils";
+	emacs-overlay.url = "github:nix-community/emacs-overlay";
+      };
 
-    outputs = { self, nixpkgs, flake-utils, emacs-overlay }:
-      flake-utils.lib.eachDefaultSystem (system:
-	let
-		pkgs = import nixpkgs {
-			inherit system;
-			overlays = [ emacs-overlay.overlay ];
-		};
+      outputs = { self, nixpkgs, flake-utils, emacs-overlay }:
+	flake-utils.lib.eachDefaultSystem (system:
+	  let
+		  pkgs = import nixpkgs {
+			  inherit system;
+			  overlays = [ emacs-overlay.overlay ];
+		  };
 
-		# 主配置文件
-		emacsConfig = pkgs.writeText "init.el" ''
-  <<emacs-config>>
-	  '';
+		  # 主配置文件
+		  emacsConfig = pkgs.writeText "init.el" ''
+    <<emacs-config>>
+	    '';
 
-		# early-init 配置文件
-		emacsEarlyInitConfig = pkgs.writeText "early-init.el" ''
-  <<emacs-early-init-config>>
-	  '';
+		  # early-init 配置文件
+		  emacsEarlyInitConfig = pkgs.writeText "early-init.el" ''
+    <<emacs-early-init-config>>
+	    '';
 
-		# emacs 和包
-		emacsWithPackages = pkgs.emacs.pkgs.withPackages (epkgs: (with epkgs; [
-			<<emacs-packages>>
-		]));
+		  # emacs 和包
+		  emacsWithPackages = pkgs.emacs.pkgs.withPackages (epkgs: (with epkgs; [
+			  <<emacs-packages>>
+		  ]));
 
-		# 输出配置到 .emacs.d
-autoExportConfig = pkgs.writeShellScriptBin "auto-export-config" ''
-    #!/usr/bin/env bash
-    set -e
+		  # 输出配置到 .emacs.d
+  autoExportConfig = pkgs.writeShellScriptBin "auto-export-config" ''
+      #!/usr/bin/env bash
+      set -e
 
-    # 导出配置到 nix-emacs
-    EMACS_DIR="$HOME/nix-emacs"
-    mkdir -p "$EMACS_DIR"
-    ${pkgs.rsync}/bin/rsync ${emacsConfig} "$EMACS_DIR/init.el"
-    ${pkgs.rsync}/bin/rsync ${emacsEarlyInitConfig} "$EMACS_DIR/early-init.el"
+      # 导出配置到 nix-emacs
+      EMACS_DIR="$HOME/nix-emacs"
+      mkdir -p "$EMACS_DIR"
+      ${pkgs.rsync}/bin/rsync ${emacsConfig} "$EMACS_DIR/init.el"
+      ${pkgs.rsync}/bin/rsync ${emacsEarlyInitConfig} "$EMACS_DIR/early-init.el"
 
-    # 路径
-    <<dependencies>>
+      # 路径
+      <<dependencies>>
   
-    # 更新 Emacs 路径（兼容 macOS 和 Linux）
-    if sed --version 2>/dev/null | grep -q GNU; then
-        sed -i '/^alias nixemacs=/d' "$HOME/.bashrc"
-    else
-        sed -i \"\" '/^alias nixemacs=/d' "$HOME/.bashrc"
-    fi
+      # 更新 Emacs 路径（兼容 macOS 和 Linux）
+      if sed --version 2>/dev/null | grep -q GNU; then
+	  sed -i '/^alias nixemacs=/d' "$HOME/.bashrc"
+      else
+	  sed -i \"\" '/^alias nixemacs=/d' "$HOME/.bashrc"
+      fi
 
-    echo "alias nixemacs='${emacsWithPackages}/bin/emacs --init-dir \"$EMACS_DIR\"'" >> "$HOME/.bashrc"
+      echo "alias nixemacs='${emacsWithPackages}/bin/emacs --init-dir \"$EMACS_DIR\"'" >> "$HOME/.bashrc"
 
-    # 提示用户手动 source 而不是直接执行，以避免 shell 继承问题
-    echo "请手动运行 'source ~/.bashrc' 以使 alias 生效"
+      # 提示用户手动 source 而不是直接执行，以避免 shell 继承问题
+      echo "请手动运行 'source ~/.bashrc' 以使 alias 生效"
 
-    echo "Emacs 配置已同步到 $EMACS_DIR"
-'';
-	in {
-		packages = {
-			default = autoExportConfig;
-		};
+      echo "Emacs 配置已同步到 $EMACS_DIR"
+  '';
+	  in {
+		  packages = {
+			  default = autoExportConfig;
+		  };
 
-	}
-      );
-  }
+	  }
+	);
+    }
 #+END_SRC
 
 ** Early init
@@ -820,4 +820,15 @@ insert-state 时重新打开输入方式：
 	    (lambda ()
 	      (setq the-late-input-method current-input-method)
 	      (deactivate-input-method)))
+#+end_src
+
+** 编程语言
+
+*** Nix
+:PROPERTIES:
+:header-args: :noweb-ref emacs-packages
+:END:
+
+#+begin_src nix
+  nix-mode
 #+end_src

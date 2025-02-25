@@ -369,6 +369,7 @@
 			# aider
 			meow
 			meow-tree-sitter
+			nix-mode
 		]));
 
 		# 输出配置到 .emacs.d
