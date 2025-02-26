@@ -40,14 +40,17 @@
 于安装包和依赖项，一个用于配置。配置部分可以细分为键位绑定，custom，
 hook，config，自定义的函数。
 
-依赖的部分可以从 =pkgs=[fn::=nixpkgs.legacyPackages.${system}=] 同时安
-装emacs外部的依赖。然后从 =epkgs=[fn::=pkgs.emacs.pkgs.withPackages=]
+依赖的部分可以从 =pkgs= [fn:pkgs: =nixpkgs.legacyPackages.${system}= ]
+同时安装emacs外部的依赖。然后从 =epkgs= [fn:epkgs:
+=pkgs.emacs.pkgs.withPackages= ]
 
 这里稍微多做一些解释。在配置节里面，我们利用了org-babel的一些特性。首
-先我们在一个汇总代码块中使用了 =:noweb=yes= ，然后在后面的代码块中我们
-使用 =:noweb-ref= 参照汇总代码块，最后后续的这些代码块都会在tangle时合
-并到第一个代码块中。这个被tangle的代码块在后续过程中会被nix依赖代码读
-入作为配置。
+先我们在一个汇总代码块中使用了 =:noweb=yes= [fn:noweb:关于文学编程中
+=noweb= 的解释可以参考 [[https://www.cs.tufts.edu/~nr/noweb/][这个链接]] 。本身我们还有一个 =:session= 的方式更
+适合一些数据科学的工作流。这里我们主要为了和 =:tangle= 引起使用。]，然
+后在后面的代码块中我们使用 =:noweb-ref= 参照汇总代码块，最后后续的这些
+代码块都会在tangle时合并到第一个代码块中。这个被tangle的代码块在后续过
+程中会被nix依赖代码读入作为配置。
 
 * 如何使用？
 :PROPERTIES:
@@ -59,7 +62,7 @@ hook，config，自定义的函数。
 
 ** 调试
 #+begin_src sh
-  nix run <path/to/this/config>.#emacs
+  nix run <path/to/this/config>
   source ~/.bashrc
   emacs
   #+end_src
@@ -123,12 +126,13 @@ hook，config，自定义的函数。
 	    '';
 
 		      # emacs 和包
-		      emacsWithPackages = pkgs.emacs.pkgs.withPackages (epkgs: (with epkgs; [
-			      <<emacs-packages>>
-		      ]));
-
+		      emacsWithPackages = pkgs.emacs30.pkgs.withPackages (epkgs:
+		  <<extra-emacs-packages>>
+		  (with epkgs; [
+		    <<emacs-packages>>
+		  ])
+	  );
 	      in {
-
 		packages.default = pkgs.writeShellScriptBin "script" ''
 	      #!/usr/bin/env bash
 	      set -e
@@ -312,6 +316,28 @@ emacs在打开新的窗口时，默认光标维持在原来的窗口。比如当
   (advice-add 'enlarge-window-horizontally :around #'idiig/window-adjust)
   (advice-add 'shrink-window-horizontally :around #'idiig/window-adjust)
 #+end_src
+
+**** 撤回（vundo）
+我原来使用 undotree ，现在使用 vundo。这些用于视觉化撤销树
+
+***** 依赖
+:PROPERTIES:
+:header-args: :noweb-ref emacs-packages
+:END:
+
+#+BEGIN_SRC nix 
+  vundo
+#+END_SRC
+
+***** 配置
+:PROPERTIES:
+:header-args: :noweb-ref emacs-config
+:END:
+
+#+begin_src emacs-lisp
+  (global-set-key (kbd "C-x u") 'vundo)
+#+end_src
+
 
 **** 检索（ctrlf）
 
@@ -830,4 +856,61 @@ insert-state 时重新打开输入方式：
 
 #+begin_src nix
   nix-mode
+#+end_src
+
+** 扩展
+
+*** EAF扩展
+
+**** TODO 本体通过nix安装
+:PROPERTIES:
+:header-args: :noweb-ref nil :tangle no
+:END:
+
+这里我比较难以实现这种在安装后可以选择独立下载其他依存的包。目前下面是
+一个最可供参考的例子。未来考虑尝试。
+
+- [[https://codeberg.org/heraplem/nix-emacs-extra/src/branch/emacs-application-framework/packages/eaf][eaf 和其他的没在 nixpkgs 中的包的包装]]
+
+另外，下面的代码是一个失败的尝试。
+
+#+begin_src nix 
+  [(pkgs.callPackage ./dependencies/eaf.nix { inherit pkgs; })] ++
+#+end_src
+
+#+begin_src nix
+  { pkgs }:
+
+  pkgs.stdenv.mkDerivation rec {
+    pname = "emacs-application-framework";
+    version = "2025-02-26";
+
+    src = pkgs.fetchgit {
+      url = "https://github.com/emacs-eaf/${pname}";
+      branchName = "Master";
+      sha256 = "19mmg79df5ydj2hwbcs3c2pay4b6d16jwgp95s7gv6a129iy80v1";
+    };
+
+    installEaf = ''
+      mkdir -p $out/share/emacs/site-lisp/${pname}/app
+      cp -r ${src}/* $out/share/emacs/site-lisp/${pname}
+    '';
+
+    nativeBuildInputs = [
+      pkgs.git
+      pkgs.python3
+    ];
+
+    installPhase = installEaf;
+
+    # 如果需要特定依赖，可以在这里添加
+    buildInputs = [
+    ];
+  }
+#+end_src
+
+#+begin_src shell
+  cd ${emacsWithPackages}/share/emacs/site-lisp/emacs-application-framework
+  chmod +x ./install-eaf.py
+  ${pkgs.python3} ./install-eaf.py --app-drop-local-edit -i browser
 #+end_src

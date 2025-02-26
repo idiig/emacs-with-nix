@@ -37,12 +37,12 @@
 	  (customize-set-variable 'display-buffer-base-action
 	  			'((display-buffer-reuse-window display-buffer-same-window)
 	  			  (reusable-frames . t)))
-	  (defadvice split-window-below (after split-window-below-and-switch activate)
+	  (define-advice split-window-below (after split-window-below-and-switch activate)
 	    "切换到新分割的窗口"
 	    (when (called-interactively-p 'any)
 	      (other-window 1)))
 	  
-	  (defadvice split-window-right (after split-window-right-and-switch activate)
+	  (define-advice split-window-right (after split-window-right-and-switch activate)
 	    "切换到新分割的窗口"
 	    (when (called-interactively-p 'any)
 	      (other-window 1)))
@@ -89,6 +89,7 @@
 	  (advice-add 'shrink-window :around #'idiig/window-adjust)
 	  (advice-add 'enlarge-window-horizontally :around #'idiig/window-adjust)
 	  (advice-add 'shrink-window-horizontally :around #'idiig/window-adjust)
+	  (global-set-key (kbd "C-x u") 'vundo)
 	  (require 'ctrlf)
 	  (ctrlf-mode +1)
 	  (add-hook 'after-init-hook
@@ -356,25 +357,27 @@
 	  '';
 
 		    # emacs 和包
-		    emacsWithPackages = pkgs.emacs.pkgs.withPackages (epkgs: (with epkgs; [
-			    ctrlf
-			    ddskk
-			    # (pkgs.emacsPackages.pyim.overrideAttrs (old: {
-			    #     nativeComp = false;
-			    # }))
-			    pyim
-			      pyim-basedict
-			    magit
-			    ob-nix
-			    gptel
-			    # aider
-			    meow
-			    meow-tree-sitter
-			    nix-mode
-		    ]));
-
+		    emacsWithPackages = pkgs.emacs30.pkgs.withPackages (epkgs:
+		
+		(with epkgs; [
+		  vundo
+		  ctrlf
+		  ddskk
+		  # (pkgs.emacsPackages.pyim.overrideAttrs (old: {
+		  #     nativeComp = false;
+		  # }))
+		  pyim
+		    pyim-basedict
+		  magit
+		  ob-nix
+		  gptel
+		  # aider
+		  meow
+		  meow-tree-sitter
+		  nix-mode
+		])
+	);
 	    in {
-
 	      packages.default = pkgs.writeShellScriptBin "script" ''
 	    #!/usr/bin/env bash
 	    set -e
