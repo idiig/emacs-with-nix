@@ -1,4 +1,4 @@
-:PROPERTIES:
+# :PROPERTIES:
 :GPTEL_MODEL: gpt-4o-mini
 :GPTEL_BACKEND: ChatGPT
 :GPTEL_SYSTEM: You are a large language model living in Emacs and a helpful assistant. Respond concisely.
@@ -109,57 +109,57 @@ hook，config，自定义的函数。
 
     outputs = { self, nixpkgs, flake-utils, emacs-overlay }:
       flake-utils.lib.eachDefaultSystem (system:
-	      let
-		      pkgs = import nixpkgs {
-			      inherit system;
-			      overlays = [ emacs-overlay.overlay ];
-		      };
+  	      let
+  		      pkgs = import nixpkgs {
+  			      inherit system;
+  			      overlays = [ emacs-overlay.overlay ];
+  		      };
 
-		      # 主配置文件
-		      emacsConfig = pkgs.writeText "init.el" ''
-	    <<emacs-config>>
-	    '';
+  		      # 主配置文件
+  		      emacsConfig = pkgs.writeText "init.el" ''
+  	    <<emacs-config>>
+  	    '';
 
-		      # early-init 配置文件
-		      emacsEarlyInitConfig = pkgs.writeText "early-init.el" ''
-	    <<emacs-early-init-config>>
-	    '';
+  		      # early-init 配置文件
+  		      emacsEarlyInitConfig = pkgs.writeText "early-init.el" ''
+  	    <<emacs-early-init-config>>
+  	    '';
 
-		      # emacs 和包
-		      emacsWithPackages = pkgs.emacs30.pkgs.withPackages (epkgs:
-		  <<extra-emacs-packages>>
-		  (with epkgs; [
-		    <<emacs-packages>>
-		  ])
-	  );
-	      in {
-		packages.default = pkgs.writeShellScriptBin "script" ''
-	      #!/usr/bin/env bash
-	      set -e
+  		      # emacs 和包
+  		      emacsWithPackages = pkgs.emacs30-pgtk.pkgs.withPackages (epkgs:
+  		  <<extra-emacs-packages>>
+  		  (with epkgs; [
+  		    <<emacs-packages>>
+  		  ])
+  	  );
+  	      in {
+  		packages.default = pkgs.writeShellScriptBin "script" ''
+  	      #!/usr/bin/env bash
+  	      set -e
 
-	      # 导出配置到 nix-emacs
-	      EMACS_DIR="$HOME/nix-emacs"
-	      mkdir -p "$EMACS_DIR"
-	      ${pkgs.rsync}/bin/rsync ${emacsConfig} "$EMACS_DIR/init.el"
-	      ${pkgs.rsync}/bin/rsync ${emacsEarlyInitConfig} "$EMACS_DIR/early-init.el"
+  	      # 导出配置到 nix-emacs
+  	      EMACS_DIR="$HOME/nix-emacs"
+  	      mkdir -p "$EMACS_DIR"
+  	      ${pkgs.rsync}/bin/rsync ${emacsConfig} "$EMACS_DIR/init.el"
+  	      ${pkgs.rsync}/bin/rsync ${emacsEarlyInitConfig} "$EMACS_DIR/early-init.el"
 
-	      # 路径
-	      <<dependencies>>
+  	      # 路径
+  	      <<dependencies>>
 
-	      # 更新 Emacs 路径（兼容 macOS 和 Linux）
-	      if sed --version 2>/dev/null | grep -q GNU; then
-		      sed -i '/^alias ne=/d' "$HOME/.bashrc"
-	      else
-		      sed -i \"\" '/^alias ne=/d' "$HOME/.bashrc"
-	      fi
+  	      # 更新 Emacs 路径（兼容 macOS 和 Linux）
+  	      if sed --version 2>/dev/null | grep -q GNU; then
+  		      sed -i '/^alias ne=/d' "$HOME/.bashrc"
+  	      else
+  		      sed -i \"\" '/^alias ne=/d' "$HOME/.bashrc"
+  	      fi
 
-	      echo "alias ne='${emacsWithPackages}/bin/emacs --init-dir \"$EMACS_DIR\"'" >> "$HOME/.bashrc"
+  	      echo "alias ne='${emacsWithPackages}/bin/emacs --init-dir \"$EMACS_DIR\"'" >> "$HOME/.bashrc"
 
-	      # 提示用户手动 source 而不是直接执行，以避免 shell 继承问题
-	      echo "请手动运行 'source ~/.bashrc' 以使 alias 生效"
-	      echo "Emacs 配置已同步到 $EMACS_DIR"
-	      '';  
-	});
+  	      # 提示用户手动 source 而不是直接执行，以避免 shell 继承问题
+  	      echo "请手动运行 'source ~/.bashrc' 以使 alias 生效"
+  	      echo "Emacs 配置已同步到 $EMACS_DIR"
+  	      '';  
+  	});
   }
 #+END_SRC
 
@@ -223,6 +223,11 @@ hook，config，自定义的函数。
 而不是yes或no。
 #+begin_src emacs-lisp
   (defalias 'yes-or-no-p 'y-or-n-p)
+#+end_src
+
+***** 递归minibuffer
+#+begin_src emacs-lisp
+  (setq enable-recursive-minibuffers t)
 #+end_src
 
 ***** 在选中区域的状态下 =C-w= 删除选中的区域
@@ -392,16 +397,17 @@ emacs在打开新的窗口时，默认光标维持在原来的窗口。比如当
 
 #+begin_src emacs-lisp
   (add-hook 'after-init-hook
-	    (lambda ()
-	      (let* ((screen-height (display-pixel-height))
-		     (font-height (if (> screen-height 540) 260 130))  ;; 根据屏幕高度调整
-		     (my-font "Sarasa Mono SC"))
-		(set-face-attribute 'default nil :family my-font :height font-height)
-		;; 设置 mode-line 字体
-		(set-face-attribute 'mode-line nil :family my-font :height font-height)
-		(set-face-attribute 'mode-line-inactive nil :family my-font :height font-height)
-		;; 设置 minibuffer 字体
-		(set-face-attribute 'minibuffer-prompt nil :family my-font :height font-height))))
+  	    (lambda ()
+  	      (let* ((screen-height (display-pixel-height))
+  		     (font-height (if (> screen-height 540) 220 130))  ;; 根据屏幕高度调整
+  		     (minibuffer-font-height (- font-height 0))
+  		     (my-font "Sarasa Mono SC"))
+  		(set-face-attribute 'default nil :family my-font :height font-height)
+  		;; 设置 mode-line 字体
+  		(set-face-attribute 'mode-line nil :family my-font :height font-height)
+  		(set-face-attribute 'mode-line-inactive nil :family my-font :height font-height)
+  		;; 设置 minibuffer 字体
+  		(set-face-attribute 'minibuffer-prompt nil :family my-font :height minibuffer-font-height))))
 
   ;; 工具栏，菜单保持默认字体
   (set-face-attribute 'menu nil :inherit 'unspecified)
@@ -698,6 +704,9 @@ emacs在打开新的窗口时，默认光标维持在原来的窗口。比如当
 :PROPERTIES:
 :header-args: :noweb-ref emacs-config
 :END:
+#+begin_src emacs-lisp
+  (add-to-list 'auto-mode-alist '("\\.ai\\.org\\'" . gptel-mode))
+#+end_src
 
 *** Aider
 
@@ -849,6 +858,8 @@ insert-state 时重新打开输入方式：
 
 ** 编程语言
 
+*** 语言服务器（LSP-Bridge)
+
 *** Nix
 :PROPERTIES:
 :header-args: :noweb-ref emacs-packages
@@ -861,6 +872,44 @@ insert-state 时重新打开输入方式：
 ** 扩展
 
 *** EAF扩展
+**** 依赖
+:PROPERTIES:
+:header-args: :noweb-ref dependencies
+:END:
+
+这里我无法handle nix用于安装这些不存在在 =nixpkgs= 里的包，只能暂时通
+过用手工下载的方式下载，所以不能保证工作环境。
+
+#+begin_src sh
+  TARGET_DIR="$EMACS_DIR/site-lisp/emacs-application-framework/"
+
+  if [ -d "$TARGET_DIR" ]; then
+      echo "目标目录已存在，跳过下载过程。"
+      cd $TARGET_DIR
+      ${pkgs.python3}/bin/python3 ./install-eaf.py --app-drop-local-edit -i browser pdf-viewer
+      exit 0
+  fi
+
+  ${pkgs.git}/bin/git clone --depth=1 -b master https://github.com/emacs-eaf/emacs-application-framework.git $TARGET_DIR
+  cd $TARGET_DIR
+  chmod +x ./install-eaf.py
+  ${pkgs.python3}/bin/python3 ./install-eaf.py --app-drop-local-edit -i browser pdf-viewer
+#+end_src
+
+**** 配置
+:PROPERTIES:
+:header-args: :noweb-ref emacs-config
+:END:
+
+加载 EAF
+#+begin_src emacs-lisp
+  (setq exec-path (append exec-path '("${pkgs.python3}/bin/python3")))
+
+  (add-to-list 'load-path (concat user-emacs-directory "site-lisp/emacs-application-framework/"))
+  (require 'eaf)
+  (require 'eaf-browser)
+  (require 'eaf-pdf-viewer)
+#+end_src
 
 **** TODO 本体通过nix安装
 :PROPERTIES:
