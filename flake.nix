@@ -391,7 +391,7 @@
 	    '';
 
 		      # emacs 和包
-		      emacsWithPackages = pkgs.emacs30-pgtk.pkgs.withPackages (epkgs:
+		      emacsWithPackages = pkgs.emacs30-gtk3.pkgs.withPackages (epkgs:
 		  
 		  (with epkgs; [
 		    vundo

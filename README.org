@@ -126,7 +126,7 @@ hook，config，自定义的函数。
   	    '';
 
   		      # emacs 和包
-  		      emacsWithPackages = pkgs.emacs30-pgtk.pkgs.withPackages (epkgs:
+  		      emacsWithPackages = pkgs.emacs30-gtk3.pkgs.withPackages (epkgs:
   		  <<extra-emacs-packages>>
   		  (with epkgs; [
   		    <<emacs-packages>>
