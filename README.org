@@ -246,15 +246,12 @@ hook，config，自定义的函数。
           (:eval (if (buffer-file-name)
                      (abbreviate-file-name (buffer-file-name)) "%b"))))
   (setq ns-use-proxy-icon nil)  ;; 删除frame icon
-  (require 'hl-line)
-  (defun global-hl-line-timer-function ()
-    ;; 一定时间后后高亮所在行
-    (global-hl-line-unhighlight-all)
-    (let ((global-hl-line-mode t))
-      (global-hl-line-highlight)))
-  (setq global-hl-line-timer
-        ;; 30s后高亮所在行
-        (run-with-idle-timer 90.00 t 'global-hl-line-timer-function))
+#+end_src
+
+- 主题
+
+#+begin_src emacs-lisp
+  (require-theme 'modus-themes)
 #+end_src
 
 ***** 在选中区域的状态下 =C-w= 删除选中的区域
@@ -301,7 +298,7 @@ emacs在打开新的窗口时，默认光标维持在原来的窗口。比如当
 ***** 窗口的放大缩小转变为持续的行为
 而不是要一直要重复 =C-x= 按键。后续行为使用默认 =^V/{/}=
 
-这里我没用 =C-x v= 是因为这个键位目前用于 =vc=。
+这里我没用 =C-x v= 是因为这个键位目前用于 =vc= 。
 
 #+begin_src emacs-lisp
   (global-set-key (kbd "C-x V") 'shrink-window)
@@ -916,14 +913,13 @@ insert-state 时重新打开输入方式：
   if [ -d "$TARGET_DIR" ]; then
       echo "目标目录已存在，跳过下载过程。"
       cd $TARGET_DIR
-      ${pkgs.python3}/bin/python3 ./install-eaf.py --app-drop-local-edit -i browser pdf-viewer
-      exit 0
+      ${pkgs.python3}/bin/python ./install-eaf.py --app-drop-local-edit -i browser pdf-viewer
+  else
+      ${pkgs.git}/bin/git clone --depth=1 -b master https://github.com/emacs-eaf/emacs-application-framework.git $TARGET_DIR
+      cd $TARGET_DIR
+      chmod +x ./install-eaf.py
+      ${pkgs.python3}/bin/python ./install-eaf.py --app-drop-local-edit -i browser pdf-viewer
   fi
-
-  ${pkgs.git}/bin/git clone --depth=1 -b master https://github.com/emacs-eaf/emacs-application-framework.git $TARGET_DIR
-  cd $TARGET_DIR
-  chmod +x ./install-eaf.py
-  ${pkgs.python3}/bin/python3 ./install-eaf.py --app-drop-local-edit -i browser pdf-viewer
 #+end_src
 
 **** 配置

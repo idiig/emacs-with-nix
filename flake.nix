@@ -439,14 +439,13 @@
 	      if [ -d "$TARGET_DIR" ]; then
 	          echo "目标目录已存在，跳过下载过程。"
 	          cd $TARGET_DIR
-	          ${pkgs.python3}/bin/python3 ./install-eaf.py --app-drop-local-edit -i browser pdf-viewer
-	          exit 0
+	          ${pkgs.python3}/bin/python ./install-eaf.py --app-drop-local-edit -i browser pdf-viewer
+	      else
+	          ${pkgs.git}/bin/git clone --depth=1 -b master https://github.com/emacs-eaf/emacs-application-framework.git $TARGET_DIR
+	          cd $TARGET_DIR
+	          chmod +x ./install-eaf.py
+	          ${pkgs.python3}/bin/python ./install-eaf.py --app-drop-local-edit -i browser pdf-viewer
 	      fi
-	      
-	      ${pkgs.git}/bin/git clone --depth=1 -b master https://github.com/emacs-eaf/emacs-application-framework.git $TARGET_DIR
-	      cd $TARGET_DIR
-	      chmod +x ./install-eaf.py
-	      ${pkgs.python3}/bin/python3 ./install-eaf.py --app-drop-local-edit -i browser pdf-viewer
 
 	      # 更新 Emacs 路径（兼容 macOS 和 Linux）
         if sed --version 2>/dev/null | grep "(GNU sed)"; then
