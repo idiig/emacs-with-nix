@@ -449,7 +449,7 @@
 	      ${pkgs.python3}/bin/python3 ./install-eaf.py --app-drop-local-edit -i browser pdf-viewer
 
 	      # 更新 Emacs 路径（兼容 macOS 和 Linux）
-	      if sed --version 2>/dev/null | grep -q GNU; then
+        if sed --version 2>/dev/null | grep "(GNU sed)"; then
 		      sed -i '/^alias ne=/d' "$HOME/.bashrc"
 	      else
 		      sed -i \"\" '/^alias ne=/d' "$HOME/.bashrc"
