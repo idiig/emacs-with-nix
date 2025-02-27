@@ -28,6 +28,28 @@
 	    (setq ring-bell-function 'ignore)
 	    (defalias 'yes-or-no-p 'y-or-n-p)
 	    (setq enable-recursive-minibuffers t)
+	    ;; 基础设置
+	    (tool-bar-mode -1) ;; 关闭工具栏
+	    (scroll-bar-mode -1) ;; 关闭文件滑动控件
+	    (setq inhibit-splash-screen 1) ;; 关闭启动帮助画面
+	    (setq initial-frame-alist (quote ((fullscreen . maximized)))) ;; 全屏
+	    (setq initial-scratch-message nil) ;; 关闭scratch message
+	    (setq inhibit-startup-message t) ;; 关闭启动信息
+	    (setq frame-title-format
+	          ;; 窗口显示文件路径/buffer名
+	          '("" " idiig - "
+	            (:eval (if (buffer-file-name)
+	                       (abbreviate-file-name (buffer-file-name)) "%b"))))
+	    (setq ns-use-proxy-icon nil)  ;; 删除frame icon
+	    (require 'hl-line)
+	    (defun global-hl-line-timer-function ()
+	      ;; 一定时间后后高亮所在行
+	      (global-hl-line-unhighlight-all)
+	      (let ((global-hl-line-mode t))
+	        (global-hl-line-highlight)))
+	    (setq global-hl-line-timer
+	          ;; 30s后高亮所在行
+	          (run-with-idle-timer 90.00 t 'global-hl-line-timer-function))
 	    (defun backward-kill-word-or-region (&optional arg)
 	      (interactive "p")
 	      (if (region-active-p)
@@ -96,7 +118,7 @@
 	    (add-hook 'after-init-hook
 	    	    (lambda ()
 	    	      (let* ((screen-height (display-pixel-height))
-	    		     (font-height (if (> screen-height 540) 220 130))  ;; 根据屏幕高度调整
+	    		     (font-height (if (> screen-height 900) 230 130))  ;; 根据屏幕高度调整
 	    		     (minibuffer-font-height (- font-height 0))
 	    		     (my-font "Sarasa Mono SC"))
 	    		(set-face-attribute 'default nil :family my-font :height font-height)
@@ -237,7 +259,10 @@
 	      ;; (require 'org-tempo)               ; 允许<Tab补齐org插入环境
 	      )
 	    (add-hook 'org-mode-hook #'visual-line-mode)
-	    (add-to-list 'auto-mode-alist '("\\.ai\\.org\\'" . gptel-mode))
+	    (add-hook 'org-mode-hook
+	              (lambda ()
+	                (when (string-match-p "\\.ai\\.org\\'" (buffer-file-name))
+	                  (gptel-mode 1))))
 	    (add-to-list 'exec-path "${pkgs.aider-chat}/bin")
 	    ;; (defalias 'meow-visit #'ctrlf-forward-default) ; 需要ctrlf
 	    
