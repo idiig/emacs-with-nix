@@ -230,6 +230,33 @@ hook，config，自定义的函数。
   (setq enable-recursive-minibuffers t)
 #+end_src
 
+***** UI
+
+#+begin_src emacs-lisp
+  ;; 基础设置
+  (tool-bar-mode -1) ;; 关闭工具栏
+  (scroll-bar-mode -1) ;; 关闭文件滑动控件
+  (setq inhibit-splash-screen 1) ;; 关闭启动帮助画面
+  (setq initial-frame-alist (quote ((fullscreen . maximized)))) ;; 全屏
+  (setq initial-scratch-message nil) ;; 关闭scratch message
+  (setq inhibit-startup-message t) ;; 关闭启动信息
+  (setq frame-title-format
+        ;; 窗口显示文件路径/buffer名
+        '("" " idiig - "
+          (:eval (if (buffer-file-name)
+                     (abbreviate-file-name (buffer-file-name)) "%b"))))
+  (setq ns-use-proxy-icon nil)  ;; 删除frame icon
+  (require 'hl-line)
+  (defun global-hl-line-timer-function ()
+    ;; 一定时间后后高亮所在行
+    (global-hl-line-unhighlight-all)
+    (let ((global-hl-line-mode t))
+      (global-hl-line-highlight)))
+  (setq global-hl-line-timer
+        ;; 30s后高亮所在行
+        (run-with-idle-timer 90.00 t 'global-hl-line-timer-function))
+#+end_src
+
 ***** 在选中区域的状态下 =C-w= 删除选中的区域
 
 而不是删除上一个合并区域。
