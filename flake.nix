@@ -41,15 +41,7 @@
 	            (:eval (if (buffer-file-name)
 	                       (abbreviate-file-name (buffer-file-name)) "%b"))))
 	    (setq ns-use-proxy-icon nil)  ;; 删除frame icon
-	    (require 'hl-line)
-	    (defun global-hl-line-timer-function ()
-	      ;; 一定时间后后高亮所在行
-	      (global-hl-line-unhighlight-all)
-	      (let ((global-hl-line-mode t))
-	        (global-hl-line-highlight)))
-	    (setq global-hl-line-timer
-	          ;; 30s后高亮所在行
-	          (run-with-idle-timer 90.00 t 'global-hl-line-timer-function))
+	    (require-theme 'modus-themes)
 	    (defun backward-kill-word-or-region (&optional arg)
 	      (interactive "p")
 	      (if (region-active-p)
@@ -118,7 +110,9 @@
 	    (add-hook 'after-init-hook
 	    	    (lambda ()
 	    	      (let* ((screen-height (display-pixel-height))
-	    		     (font-height (if (> screen-height 900) 230 130))  ;; 根据屏幕高度调整
+	    		     (font-height (if (and
+	    				       (< screen-height 1150)
+	    				       (> screen-height 1200)) 230 130))  ;; 根据屏幕高度调整
 	    		     (minibuffer-font-height (- font-height 0))
 	    		     (my-font "Sarasa Mono SC"))
 	    		(set-face-attribute 'default nil :family my-font :height font-height)
@@ -363,7 +357,7 @@
 	    	    (lambda ()
 	    	      (setq the-late-input-method current-input-method)
 	    	      (deactivate-input-method)))
-	    (setq exec-path (append exec-path '("${pkgs.python3}/bin/python3")))
+	    (setq exec-path (append exec-path '("${pkgs.python310}/bin/python")))
 	    
 	    (add-to-list 'load-path (concat user-emacs-directory "site-lisp/emacs-application-framework/"))
 	    (require 'eaf)
@@ -439,12 +433,12 @@
 	      if [ -d "$TARGET_DIR" ]; then
 	          echo "目标目录已存在，跳过下载过程。"
 	          cd $TARGET_DIR
-	          ${pkgs.python3}/bin/python ./install-eaf.py --app-drop-local-edit -i browser pdf-viewer
+	          ${pkgs.python310}/bin/python ./install-eaf.py --app-drop-local-edit -i browser pdf-viewer
 	      else
 	          ${pkgs.git}/bin/git clone --depth=1 -b master https://github.com/emacs-eaf/emacs-application-framework.git $TARGET_DIR
 	          cd $TARGET_DIR
 	          chmod +x ./install-eaf.py
-	          ${pkgs.python3}/bin/python ./install-eaf.py --app-drop-local-edit -i browser pdf-viewer
+	          ${pkgs.python310}/bin/python ./install-eaf.py --app-drop-local-edit -i browser pdf-viewer
 	      fi
 
 	      # 更新 Emacs 路径（兼容 macOS 和 Linux）

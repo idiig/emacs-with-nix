@@ -1,4 +1,4 @@
-# :PROPERTIES:
+:PROPERTIES:
 :GPTEL_MODEL: gpt-4o-mini
 :GPTEL_BACKEND: ChatGPT
 :GPTEL_SYSTEM: You are a large language model living in Emacs and a helpful assistant. Respond concisely.
@@ -423,7 +423,9 @@ emacs在打开新的窗口时，默认光标维持在原来的窗口。比如当
   (add-hook 'after-init-hook
   	    (lambda ()
   	      (let* ((screen-height (display-pixel-height))
-  		     (font-height (if (> screen-height 900) 230 130))  ;; 根据屏幕高度调整
+  		     (font-height (if (and
+  				       (< screen-height 1150)
+  				       (> screen-height 1200)) 230 130))  ;; 根据屏幕高度调整
   		     (minibuffer-font-height (- font-height 0))
   		     (my-font "Sarasa Mono SC"))
   		(set-face-attribute 'default nil :family my-font :height font-height)
@@ -913,12 +915,12 @@ insert-state 时重新打开输入方式：
   if [ -d "$TARGET_DIR" ]; then
       echo "目标目录已存在，跳过下载过程。"
       cd $TARGET_DIR
-      ${pkgs.python3}/bin/python ./install-eaf.py --app-drop-local-edit -i browser pdf-viewer
+      ${pkgs.python310}/bin/python ./install-eaf.py --app-drop-local-edit -i browser pdf-viewer
   else
       ${pkgs.git}/bin/git clone --depth=1 -b master https://github.com/emacs-eaf/emacs-application-framework.git $TARGET_DIR
       cd $TARGET_DIR
       chmod +x ./install-eaf.py
-      ${pkgs.python3}/bin/python ./install-eaf.py --app-drop-local-edit -i browser pdf-viewer
+      ${pkgs.python310}/bin/python ./install-eaf.py --app-drop-local-edit -i browser pdf-viewer
   fi
 #+end_src
 
@@ -929,7 +931,7 @@ insert-state 时重新打开输入方式：
 
 加载 EAF
 #+begin_src emacs-lisp
-  (setq exec-path (append exec-path '("${pkgs.python3}/bin/python3")))
+  (setq exec-path (append exec-path '("${pkgs.python310}/bin/python")))
 
   (add-to-list 'load-path (concat user-emacs-directory "site-lisp/emacs-application-framework/"))
   (require 'eaf)
@@ -973,7 +975,7 @@ insert-state 时重新打开输入方式：
 
     nativeBuildInputs = [
       pkgs.git
-      pkgs.python3
+      pkgs.python310
     ];
 
     installPhase = installEaf;
@@ -987,5 +989,5 @@ insert-state 时重新打开输入方式：
 #+begin_src shell
   cd ${emacsWithPackages}/share/emacs/site-lisp/emacs-application-framework
   chmod +x ./install-eaf.py
-  ${pkgs.python3} ./install-eaf.py --app-drop-local-edit -i browser
+  ${pkgs.python310} ./install-eaf.py --app-drop-local-edit -i browser
 #+end_src
