@@ -249,10 +249,10 @@
 	    
 	    (add-hook 'org-mode-hook #'idiig/load-org-babel-languages)
 	    (with-eval-after-load 'org
-	      (setq org-support-shift-select 2)  ; 允许shift用于选择
-	      ;; (require 'org-tempo)               ; 允许<Tab补齐org插入环境
-	      )
+	      (setq org-support-shift-select 2))
 	    (add-hook 'org-mode-hook #'visual-line-mode)
+	    (with-eval-after-load 'org
+	      (setq org-display-remote-inline-images t))
 	    (add-hook 'org-mode-hook
 	              (lambda ()
 	                (when (string-match-p "\\.ai\\.org\\'" (buffer-file-name))
@@ -357,10 +357,11 @@
 	    	    (lambda ()
 	    	      (setq the-late-input-method current-input-method)
 	    	      (deactivate-input-method)))
-	    (setq exec-path (append exec-path '("${pkgs.python310}/bin/python")))
+	    (setq exec-path (append exec-path '("")))
 	    
 	    (add-to-list 'load-path (concat user-emacs-directory "site-lisp/emacs-application-framework/"))
 	    (require 'eaf)
+	    (setq eaf-python-command "${pkgs.python310}/bin/python")
 	    (require 'eaf-browser)
 	    (require 'eaf-pdf-viewer)
 	    '';

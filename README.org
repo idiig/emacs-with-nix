@@ -696,19 +696,24 @@ emacs在打开新的窗口时，默认光标维持在原来的窗口。比如当
   (add-hook 'org-mode-hook #'idiig/load-org-babel-languages)
 #+end_src
 
+
 **** TODO 基础设定
 
-: 允许shift用于选择
-#+BEGIN_SRC emacs-lisp
+- 允许shift用于选择
+#+begin_src emacs-lisp 
   (with-eval-after-load 'org
-    (setq org-support-shift-select 2)  ; 允许shift用于选择
-    ;; (require 'org-tempo)               ; 允许<Tab补齐org插入环境
-    )
-#+END_SRC
+    (setq org-support-shift-select 2))
+#+end_src
 
-: 允许折行
+- 允许折行
 #+begin_src emacs-lisp
   (add-hook 'org-mode-hook #'visual-line-mode)
+#+end_src
+
+- 远程图片文件可以通过 =C-u C-c C-x C-v= 被看到
+#+begin_src emacs-lisp
+  (with-eval-after-load 'org
+    (setq org-display-remote-inline-images t))
 #+end_src
 
 ** AI辅助功能
@@ -931,13 +936,15 @@ insert-state 时重新打开输入方式：
 
 加载 EAF
 #+begin_src emacs-lisp
-  (setq exec-path (append exec-path '("${pkgs.python310}/bin/python")))
+  (setq exec-path (append exec-path '("")))
 
   (add-to-list 'load-path (concat user-emacs-directory "site-lisp/emacs-application-framework/"))
   (require 'eaf)
+  (setq eaf-python-command "${pkgs.python310}/bin/python")
   (require 'eaf-browser)
   (require 'eaf-pdf-viewer)
 #+end_src
+
 
 **** TODO 本体通过nix安装
 :PROPERTIES:
