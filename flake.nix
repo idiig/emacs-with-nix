@@ -5,15 +5,23 @@
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-24.11";
     flake-utils.url = "github:numtide/flake-utils";
     emacs-overlay.url = "github:nix-community/emacs-overlay";
-
     eaf = {
       url = "github:emacs-eaf/emacs-application-framework";
+      flake = false;
+    };
+    eaf-browser = {
+      url = "github:emacs-eaf/eaf-browser";
+      flake = false;
+    };
+    eaf-pdf-viewer = {
+      url = "github:emacs-eaf/eaf-pdf-viewer";
       flake = false;
     };
   };
 
   outputs = inputs@{ self, nixpkgs, flake-utils, emacs-overlay, ... }:
     let
+      # 用于安装非 nixpkgs 元的外部包的函数
       mkPackages = pkgs: emacsPackages: import ./externals {
         inherit inputs pkgs emacsPackages;
       };
@@ -373,7 +381,7 @@
 	    ;; (add-to-list 'load-path idiig/eaf-path)
 	    (require 'eaf)
 	    ;; (setq eaf-python-command (concat idiig/eaf-path "/eaf/bin/python"))
-	    ;; (require 'eaf-browser)
+	    (require 'eaf-browser)
 	    ;; (require 'eaf-pdf-viewer)
 	    '';
 
@@ -404,8 +412,6 @@
           
           # 创建扩展的包集合并选择包
           emacsWithPackages = ((pkgs.emacsPackagesFor emacs).overrideScope overrides).withPackages (epkgs: with epkgs; [
-            eaf
-            # 现在这里可以同时访问标准包和自定义包，不需要区分
             vundo
             ctrlf
             ddskk
@@ -421,6 +427,9 @@
             meow
             meow-tree-sitter
             nix-mode
+            eaf
+              eaf-browser
+              # eaf-pdf-viewer
           ]);
           
 	      in {

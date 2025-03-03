@@ -95,6 +95,7 @@ in (melpaBuild (finalAttrs: {
      --set LD_LIBRARY_PATH "$QT_LIB_PATH" \
      --set QT_PLUGIN_PATH "$QT_PLUGIN_PATH" \
      --set QT_QPA_PLATFORM_PLUGIN_PATH "$QT_PLUGIN_PATH/platforms" \
+     --unset QT_XCB_GL_INTEGRATION \
      --unset XDG_DATA_DIRS
 
    # 修改eaf.el使用包装的Python

@@ -16,6 +16,38 @@
         "type": "github"
       }
     },
+    "eaf-browser": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1738923885,
+        "narHash": "sha256-IW8IduYQFE6NA8SVF020K/NMSuCeTPgeKdbwWT74uwE=",
+        "owner": "emacs-eaf",
+        "repo": "eaf-browser",
+        "rev": "f75ecb25ec2ea4d083c2b74758ecfe75fdbc7527",
+        "type": "github"
+      },
+      "original": {
+        "owner": "emacs-eaf",
+        "repo": "eaf-browser",
+        "type": "github"
+      }
+    },
+    "eaf-pdf-viewer": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1740032010,
+        "narHash": "sha256-Mz7EWsSNAQKwzcoidMU8FRCxH70fNfrDtvuxiisMr3Y=",
+        "owner": "emacs-eaf",
+        "repo": "eaf-pdf-viewer",
+        "rev": "847ba71e6eb0d860c3e25e55c20857991d66a0b3",
+        "type": "github"
+      },
+      "original": {
+        "owner": "emacs-eaf",
+        "repo": "eaf-pdf-viewer",
+        "type": "github"
+      }
+    },
     "emacs-overlay": {
       "inputs": {
         "nixpkgs": "nixpkgs",
@@ -104,6 +136,8 @@
     "root": {
       "inputs": {
         "eaf": "eaf",
+        "eaf-browser": "eaf-browser",
+        "eaf-pdf-viewer": "eaf-pdf-viewer",
         "emacs-overlay": "emacs-overlay",
         "flake-utils": "flake-utils",
         "nixpkgs": "nixpkgs_2"
