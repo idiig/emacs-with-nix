@@ -5,11 +5,22 @@
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-24.11";
     flake-utils.url = "github:numtide/flake-utils";
     emacs-overlay.url = "github:nix-community/emacs-overlay";
+
+    eaf = {
+      url = "github:emacs-eaf/emacs-application-framework";
+      flake = false;
+    };
   };
 
-  outputs = { self, nixpkgs, flake-utils, emacs-overlay }:
-    flake-utils.lib.eachDefaultSystem (system:
+  outputs = inputs@{ self, nixpkgs, flake-utils, emacs-overlay, ... }:
+    let
+      mkPackages = pkgs: emacsPackages: import ./externals {
+        inherit inputs pkgs emacsPackages;
+      };
+    in
+      flake-utils.lib.eachDefaultSystem (system:
 	      let
+          
 		      pkgs = import nixpkgs {
 			      inherit system;
 			      overlays = [ emacs-overlay.overlay ];
@@ -357,13 +368,13 @@
 	    	    (lambda ()
 	    	      (setq the-late-input-method current-input-method)
 	    	      (deactivate-input-method)))
-	    (setq exec-path (append exec-path '("")))
+	    ;; (defvar idiig/eaf-path (concat user-emacs-directory "site-lisp/emacs-application-framework"))
 	    
-	    (add-to-list 'load-path (concat user-emacs-directory "site-lisp/emacs-application-framework/"))
+	    ;; (add-to-list 'load-path idiig/eaf-path)
 	    (require 'eaf)
-	    (setq eaf-python-command "${pkgs.python310}/bin/python")
-	    (require 'eaf-browser)
-	    (require 'eaf-pdf-viewer)
+	    ;; (setq eaf-python-command (concat idiig/eaf-path "/eaf/bin/python"))
+	    ;; (require 'eaf-browser)
+	    ;; (require 'eaf-pdf-viewer)
 	    '';
 
 		      # early-init 配置文件
@@ -385,29 +396,35 @@
 	    	syntax-wholeline-max 1000)
 	    '';
 
-		      # emacs 和包
-		      emacsWithPackages = pkgs.emacs30-gtk3.pkgs.withPackages (epkgs:
-		  
-		  (with epkgs; [
-		    vundo
-		    ctrlf
-		    ddskk
-		    # (pkgs.emacsPackages.pyim.overrideAttrs (old: {
-		    #     nativeComp = false;
-		    # }))
-		    pyim
-		      pyim-basedict
-		    magit
-		    ob-nix
-		    gptel
-		    # aider
-		    meow
-		    meow-tree-sitter
-		    nix-mode
-		  ])
-	  );
+          # 首先定义你的基础 Emacs
+          emacs = pkgs.emacs30-gtk3;
+
+          # 定义覆盖函数
+          overrides = final: prev: mkPackages pkgs final;
+          
+          # 创建扩展的包集合并选择包
+          emacsWithPackages = ((pkgs.emacsPackagesFor emacs).overrideScope overrides).withPackages (epkgs: with epkgs; [
+            eaf
+            # 现在这里可以同时访问标准包和自定义包，不需要区分
+            vundo
+            ctrlf
+            ddskk
+            # (pkgs.emacsPackages.pyim.overrideAttrs (old: {
+            #     nativeComp = false;
+            # }))
+            pyim
+              pyim-basedict
+            magit
+            ob-nix
+            gptel
+            # aider
+            meow
+            meow-tree-sitter
+            nix-mode
+          ]);
+          
 	      in {
-		packages.default = pkgs.writeShellScriptBin "script" ''
+		      packages.default = pkgs.writeShellScriptBin "script" ''
 	      #!/usr/bin/env bash
 	      set -e
 
@@ -429,18 +446,6 @@
 	        fc-cache -f -v ~/.local/share/fonts/
 	      fi
 	      
-	      TARGET_DIR="$EMACS_DIR/site-lisp/emacs-application-framework/"
-	      
-	      if [ -d "$TARGET_DIR" ]; then
-	          echo "目标目录已存在，跳过下载过程。"
-	          cd $TARGET_DIR
-	          ${pkgs.python310}/bin/python ./install-eaf.py --app-drop-local-edit -i browser pdf-viewer
-	      else
-	          ${pkgs.git}/bin/git clone --depth=1 -b master https://github.com/emacs-eaf/emacs-application-framework.git $TARGET_DIR
-	          cd $TARGET_DIR
-	          chmod +x ./install-eaf.py
-	          ${pkgs.python310}/bin/python ./install-eaf.py --app-drop-local-edit -i browser pdf-viewer
-	      fi
 
 	      # 更新 Emacs 路径（兼容 macOS 和 Linux）
         if sed --version 2>/dev/null | grep "(GNU sed)"; then
@@ -455,5 +460,5 @@
 	      echo "请手动运行 'source ~/.bashrc' 以使 alias 生效"
 	      echo "Emacs 配置已同步到 $EMACS_DIR"
 	      '';  
-	});
+	      });
 }

@@ -1,5 +1,21 @@
 {
   "nodes": {
+    "eaf": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1740676444,
+        "narHash": "sha256-Wcmw8DYwLfT+bYx+Xom/4/ru5LGWZHIc7qU3PmRbjss=",
+        "owner": "emacs-eaf",
+        "repo": "emacs-application-framework",
+        "rev": "d972747e7131df5fcf406dc4bf83cd9674bc7425",
+        "type": "github"
+      },
+      "original": {
+        "owner": "emacs-eaf",
+        "repo": "emacs-application-framework",
+        "type": "github"
+      }
+    },
     "emacs-overlay": {
       "inputs": {
         "nixpkgs": "nixpkgs",
@@ -87,6 +103,7 @@
     },
     "root": {
       "inputs": {
+        "eaf": "eaf",
         "emacs-overlay": "emacs-overlay",
         "flake-utils": "flake-utils",
         "nixpkgs": "nixpkgs_2"

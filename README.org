@@ -105,11 +105,22 @@ hook，config，自定义的函数。
       nixpkgs.url = "github:NixOS/nixpkgs/nixos-24.11";
       flake-utils.url = "github:numtide/flake-utils";
       emacs-overlay.url = "github:nix-community/emacs-overlay";
+
+      eaf = {
+        url = "github:emacs-eaf/emacs-application-framework";
+        flake = false;
+      };
     };
 
-    outputs = { self, nixpkgs, flake-utils, emacs-overlay }:
-      flake-utils.lib.eachDefaultSystem (system:
+    outputs = inputs@{ self, nixpkgs, flake-utils, emacs-overlay, ... }:
+      let
+        mkPackages = pkgs: emacsPackages: import ./externals {
+          inherit inputs pkgs emacsPackages;
+        };
+      in
+        flake-utils.lib.eachDefaultSystem (system:
   	      let
+            
   		      pkgs = import nixpkgs {
   			      inherit system;
   			      overlays = [ emacs-overlay.overlay ];
@@ -125,15 +136,21 @@ hook，config，自定义的函数。
   	    <<emacs-early-init-config>>
   	    '';
 
-  		      # emacs 和包
-  		      emacsWithPackages = pkgs.emacs30-gtk3.pkgs.withPackages (epkgs:
-  		  <<extra-emacs-packages>>
-  		  (with epkgs; [
-  		    <<emacs-packages>>
-  		  ])
-  	  );
+            # 首先定义你的基础 Emacs
+            emacs = pkgs.emacs30-gtk3;
+
+            # 定义覆盖函数
+            overrides = final: prev: mkPackages pkgs final;
+            
+            # 创建扩展的包集合并选择包
+            emacsWithPackages = ((pkgs.emacsPackagesFor emacs).overrideScope overrides).withPackages (epkgs: with epkgs; [
+              eaf
+              # 现在这里可以同时访问标准包和自定义包，不需要区分
+              <<emacs-packages>>
+            ]);
+            
   	      in {
-  		packages.default = pkgs.writeShellScriptBin "script" ''
+  		      packages.default = pkgs.writeShellScriptBin "script" ''
   	      #!/usr/bin/env bash
   	      set -e
 
@@ -159,7 +176,7 @@ hook，config，自定义的函数。
   	      echo "请手动运行 'source ~/.bashrc' 以使 alias 生效"
   	      echo "Emacs 配置已同步到 $EMACS_DIR"
   	      '';  
-  	});
+  	      });
   }
 #+END_SRC
 
@@ -905,28 +922,270 @@ insert-state 时重新打开输入方式：
 
 ** 扩展
 
+
+这里我无法handle nix用于安装这些不存在在 =nixpkgs= 里的包，只能暂时通
+过用手工下载的方式下载，所以不能保证工作环境。
+
+这里的python，我不直接用 =nixpkgs= 里的，我用使用 =uv= ，通过 =uv= 我
+可以分离管理依赖的包和文件。 =uv= 的基础使用如下：
+
+#+begin_src shell :noweb-ref nil
+  uv venv <虚拟环境名>  # 创建虚拟环境
+  source <虚拟环境路径>/bin activate  # 激活虚拟环境
+
+  # 直接用 uv 为当前虚拟环境下载包
+  uv pip install <包的名字>
+
+  # 或者先为当前虚拟环境下载 pip，
+  # 然后在用 pip 下载其他包，
+  # eaf 这类本身自带下载依赖代码的包适合用这个方法
+  uv pip install pip
+  python -m pip install <包名>
+
+  # 或
+  <虚拟环境路径>/bin/python -m pip install <包名>
+#+end_src
+
 *** EAF扩展
 **** 依赖
 :PROPERTIES:
 :header-args: :noweb-ref dependencies
 :END:
 
-这里我无法handle nix用于安装这些不存在在 =nixpkgs= 里的包，只能暂时通
-过用手工下载的方式下载，所以不能保证工作环境。
+注意这里需要自行运行：
 
-#+begin_src sh
-  TARGET_DIR="$EMACS_DIR/site-lisp/emacs-application-framework/"
+#+begin_src shell :tangle externals/eaf/install-env.sh :noweb-ref nil
+  nix profile install "nixpkgs#gcc.cc.lib"
+  nix profile install "nixpkgs#libGL"
+  nix profile install "nixpkgs#nss"
+  nix profile install "nixpkgs#nspr"
+  nix profile install "nixpkgs#xorg.libX11"
+  nix profile install "nixpkgs#xorg.libXcomposite"
+  nix profile install "nixpkgs#xorg.libXdamage"
+  nix profile install "nixpkgs#xorg.libXext"
+  nix profile install "nixpkgs#xorg.libXfixes"
+  nix profile install "nixpkgs#xorg.libXrender"
+  nix profile install "nixpkgs#xorg.libXrandr"
+  nix profile install "nixpkgs#xorg.libXtst"
+  nix profile install "nixpkgs#fontconfig.lib"
+  nix profile install "nixpkgs#fontconfig.out"
+  nix profile install "nixpkgs#freetype"
+  nix profile install "nixpkgs#libdrm.out"
+  nix profile install "nixpkgs#expat"
+  nix profile install "nixpkgs#xorg.libXi"
+  nix profile install "nixpkgs#alsa-lib"
+  nix profile install "nixpkgs#zlib"
+  nix profile install "nixpkgs#dbus.lib"
+  nix profile install "nixpkgs#xorg.libxkbfile"
+  nix profile install "nixpkgs#xorg.libxshmfence"
+  nix profile install "nixpkgs#glib.out"
+  nix profile install "nixpkgs#krb5"
 
+  nix profile install "nixpkgs#libxkbcommon"
+  nix profile install "nixpkgs#xorg.libxcb"
+  nix profile install "nixpkgs#xorg.xcbutilcursor"
+  nix profile install "nixpkgs#xorg.xcbutilicccm"
+  nix profile install "nixpkgs#xorg.xcbutilimage"
+  nix profile install "nixpkgs#xorg.xcbutilkeysyms"
+  nix profile install "nixpkgs#xorg.xcbutilrenderutil"
+  nix profile install "nixpkgs#xorg.xcbutilwm"
+
+  nix profile install "nixpkgs#qt6.qtbase"
+  nix profile install "nixpkgs#qt6.qtdeclarative"
+  nix profile install "nixpkgs#qt6.qtwebengine"
+
+  nix profile install "nixpkgs#python3"
+  nix profile install "nixpkgs#uv"
+#+end_src
+
+#+begin_src shell :tangle externals/eaf/install.sh :noweb-ref nil
+  #!/usr/bin/env bash
+
+  TARGET_DIR="$HOME/nix-emacs/site-lisp/emacs-application-framework"
+  mkdir -p "$HOME/nix-emacs/site-lisp"
+  cd "$HOME/nix-emacs/site-lisp" || exit 1
+
+  # --- 3. 克隆或更新 EAF 仓库 ---
   if [ -d "$TARGET_DIR" ]; then
-      echo "目标目录已存在，跳过下载过程。"
-      cd $TARGET_DIR
-      ${pkgs.python310}/bin/python ./install-eaf.py --app-drop-local-edit -i browser pdf-viewer
+      echo "目标目录已存在，跳过克隆过程。"
+      cd "$TARGET_DIR" || exit 1
   else
-      ${pkgs.git}/bin/git clone --depth=1 -b master https://github.com/emacs-eaf/emacs-application-framework.git $TARGET_DIR
-      cd $TARGET_DIR
+      echo "目标目录不存在，开始克隆 EAF 仓库……"
+      git clone --depth=1 -b master https://github.com/emacs-eaf/emacs-application-framework.git "$TARGET_DIR"
+      cd "$TARGET_DIR" || exit 1
       chmod +x ./install-eaf.py
-      ${pkgs.python310}/bin/python ./install-eaf.py --app-drop-local-edit -i browser pdf-viewer
   fi
+
+  # --- 4. 创建（或复用）Python 虚拟环境 ---
+  if [ ! -d eaf ]; then
+      # 如果不想使用 uv，可以改成 python -m venv eaf
+      uv venv eaf
+      echo "已创建虚拟环境 eaf/"
+  fi
+
+  # 进入虚拟环境
+  source eaf/bin/activate
+
+  # 升级 pip
+  uv pip install --upgrade pip
+
+  # --- 5. 执行安装 eaf ---
+  # 如果你想指定安装子功能，可加选项。例如:
+  # ./install-eaf.py -i pdf-viewer browser
+  # ./install-eaf.py --ignore-core-deps
+  ./install-eaf.py
+
+  # --- 1. 设置 Qt 环境变量 ---
+  # 使用 ~/.bashrc 作为配置文件
+  SHELL_RC="$HOME/.bashrc"
+
+  # 获取 Qt 相关路径
+  QT_LIB_PATH=$(python -c "import os, PyQt6; print(os.path.join(os.path.dirname(PyQt6.__file__), 'Qt6/lib'))" 2>/dev/null)
+  QT_PLUGIN_PATH=$(python -c "import os, PyQt6; print(os.path.join(os.path.dirname(PyQt6.__file__), 'Qt6/plugins'))" 2>/dev/null)
+
+  # 检查并添加环境变量到 .bashrc
+  if [ -n "$QT_LIB_PATH" ] && [ -d "$QT_LIB_PATH" ]; then
+      # 清除旧的 EAF 配置，防止重复添加
+      sed -i '/# EAF Qt 环境变量配置/,/^$/d' "$SHELL_RC"
+      
+      # 添加新的环境变量配置
+      echo "" >> "$SHELL_RC"
+      echo "# EAF Qt 环境变量配置" >> "$SHELL_RC"
+      
+      # 设置库路径，确保不重复
+      echo "export LD_LIBRARY_PATH=\"$QT_LIB_PATH:\$HOME/.nix-profile/lib:\$LD_LIBRARY_PATH\"" >> "$SHELL_RC"
+      
+      if [ -n "$QT_PLUGIN_PATH" ] && [ -d "$QT_PLUGIN_PATH" ]; then
+          echo "export QT_QPA_PLATFORM_PLUGIN_PATH=\"$QT_PLUGIN_PATH\"" >> "$SHELL_RC"
+          echo "export QT_PLUGIN_PATH=\"$QT_PLUGIN_PATH\"" >> "$SHELL_RC"
+          
+          # 改进的 xcb/wayland 检测逻辑
+          if [ -f "$QT_PLUGIN_PATH/platforms/libqxcb.so" ]; then
+              # 存在 xcb 插件，添加必要的 xcb 相关环境变量
+              echo "# XCB 相关配置" >> "$SHELL_RC"
+              echo "export XCURSOR_PATH=\"\$HOME/.nix-profile/share/icons:\$XCURSOR_PATH\"" >> "$SHELL_RC"
+              echo "export XDG_DATA_DIRS=\"\$HOME/.nix-profile/share:\$XDG_DATA_DIRS\"" >> "$SHELL_RC"
+              echo "export QT_XCB_GL_INTEGRATION=none" >> "$SHELL_RC"
+          elif [ -f "$QT_PLUGIN_PATH/platforms/libqwayland.so" ]; then
+              # 如果没有 xcb 但有 wayland，则使用 wayland
+              echo "export QT_QPA_PLATFORM=wayland" >> "$SHELL_RC"
+          fi
+      fi
+      
+      # Nix 环境特殊处理
+      if command -v nix >/dev/null 2>&1; then
+          echo "# Nix 特殊环境配置" >> "$SHELL_RC"
+          echo "export NIX_SKIP_LOCKING_ASSERTIONS=1" >> "$SHELL_RC"
+      fi
+      
+      # 添加调试选项（默认注释掉）
+      echo "# 取消注释以下行启用 Qt 插件调试" >> "$SHELL_RC"
+      echo "#export QT_DEBUG_PLUGINS=1" >> "$SHELL_RC"
+      
+      echo "" >> "$SHELL_RC"
+      echo "已添加 Qt 环境变量配置到 $SHELL_RC"
+  else
+      echo "警告：未找到 PyQt6 Qt 库路径"
+  fi
+
+  # 如果不想留在 venv 中，就在脚本里 deactivate；否则可以省略这行
+  deactivate
+
+  echo "EAF 安装过程结束。"
+  echo "注意：环境变量配置已添加到 $SHELL_RC，请运行 'source $SHELL_RC' 或重启终端使其生效。"
+  echo "      如果想在脚本结束后依然保持虚拟环境激活，请用 'source install-eaf.sh' 运行脚本。"
+
+  # 添加一个简单的运行测试函数到 .bashrc
+  cat >> "$SHELL_RC" << 'EOF'
+
+  # EAF 测试函数
+  eaf_test() {
+      cd $HOME/nix-emacs/site-lisp/emacs-application-framework
+      source eaf/bin/activate
+      python -c "
+  try:
+      import PyQt6.QtWidgets
+      print('PyQt6 导入成功')
+      try:
+          app = PyQt6.QtWidgets.QApplication([])
+          print('成功创建 QApplication，Qt 环境正常')
+      except Exception as e:
+          print('创建 QApplication 失败:', e)
+  except Exception as e:
+      print('PyQt6 导入失败:', e)
+  "
+      deactivate
+  }
+  EOF
+
+  echo "已添加 eaf_test 函数到 $SHELL_RC，你可以运行 'eaf_test' 来测试 Qt 环境是否正常"
+#+end_src
+
+#+begin_src nix :tangle eaf-env.nix :noweb-ref nil
+  { pkgs ? import <nixpkgs> {} }:
+
+  let
+    # Python packages needed for EAF
+    my-python-packages = python-packages: with python-packages; [
+      pandas
+      requests
+      sexpdata
+      tld
+      pyqt6
+      pyqt6-sip
+      pyqt6-webengine
+      epc
+      lxml       # for eaf
+      qrcode     # eaf-file-browser
+      pysocks    # eaf-browser
+      pymupdf    # eaf-pdf-viewer
+      pypinyin   # eaf-file-manager
+      psutil     # eaf-system-monitor
+      retry      # eaf-markdown-previewer
+      markdown
+    ];
+    python-with-packages = pkgs.python3.withPackages my-python-packages;
+  in
+  pkgs.mkShell {
+    buildInputs = with pkgs; [
+      
+      # System dependencies
+      git
+      nodejs
+      wmctrl
+      xdotool
+      aria    # for eaf-browser
+      fd      # for eaf-file-manager
+
+      # Python with required packages
+      python-with-packages
+      pkgs.qt6.qtbase
+      pkgs.qt6.qtwebengine
+
+      # OpenGL/VAAPI support
+      libvdpau-va-gl
+    ];
+
+    # 环境变量设置
+    shellHook = ''
+      TARGET_DIR="$HOME/nix-emacs/site-lisp/emacs-application-framework"
+      EAF_PYTHON_PATH="$TARGET_DIR/eaf"
+
+      export QT_QPA_PLATFORM_PLUGIN_PATH="${pkgs.qt6.qtbase.outPath}/lib/qt-6/plugins"   
+
+      if [ -d "$TARGET_DIR" ]; then
+          echo "目标目录已存在，跳过下载过程。"
+          cd $TARGET_DIR
+          ./install-eaf.py --ignore-core-deps
+      else
+          git clone --depth=1 -b master https://github.com/emacs-eaf/emacs-application-framework.git $TARGET_DIR
+          cd $TARGET_DIR
+          chmod +x ./install-eaf.py
+          ./install-eaf.py  --ignore-core-deps
+      fi
+
+    '';
+  }
 #+end_src
 
 **** 配置
@@ -936,13 +1195,13 @@ insert-state 时重新打开输入方式：
 
 加载 EAF
 #+begin_src emacs-lisp
-  (setq exec-path (append exec-path '("")))
+  ;; (defvar idiig/eaf-path (concat user-emacs-directory "site-lisp/emacs-application-framework"))
 
-  (add-to-list 'load-path (concat user-emacs-directory "site-lisp/emacs-application-framework/"))
+  ;; (add-to-list 'load-path idiig/eaf-path)
   (require 'eaf)
-  (setq eaf-python-command "${pkgs.python310}/bin/python")
-  (require 'eaf-browser)
-  (require 'eaf-pdf-viewer)
+  ;; (setq eaf-python-command (concat idiig/eaf-path "/eaf/bin/python"))
+  ;; (require 'eaf-browser)
+  ;; (require 'eaf-pdf-viewer)
 #+end_src
 
 
@@ -960,6 +1219,198 @@ insert-state 时重新打开输入方式：
 
 #+begin_src nix 
   [(pkgs.callPackage ./dependencies/eaf.nix { inherit pkgs; })] ++
+#+end_src
+
+#+begin_src nix :tangle externals/default.nix
+  { inputs, pkgs, emacsPackages }: let
+    inherit (builtins) readDir;
+    inherit (pkgs) runCommand;
+    inherit (pkgs.lib) attrNames attrsToList filter functionArgs hasAttr mergeAttrsList pipe readFile remove;
+    packagesDir = ./.;
+    packageSources = inputs // {
+      # nano = inputs.nano-emacs;
+    };
+    importFile = dir: let
+      packageFunction = import "${packagesDir}/${dir}";
+    in emacsPackages.callPackage packageFunction (
+      pipe ({
+        elispFileVersion = file: let
+          output = runCommand "${baseNameOf file}-version" { } ''
+            ${emacsPackages.emacs}/bin/emacs -Q --batch \
+              --eval "(require 'lisp-mnt)" \
+              --eval '(setq pkg-version (lm-version "${file}"))' \
+              --eval '(find-file (getenv "out"))' \
+              --eval '(insert pkg-version)' \
+              --eval '(save-buffer)'
+          '';
+        in readFile output;
+        pkgFileVersion = file: let
+          output = runCommand "${baseNameOf file}-version" { } ''
+            ${emacsPackages.emacs}/bin/emacs -Q --batch \
+              --eval '(find-file "${file}")' \
+              --eval '(setq pkg-version (caddr (read (current-buffer))))' \
+              --eval '(find-file (getenv "out"))' \
+              --eval '(insert pkg-version)' \
+              --eval '(save-buffer)'
+          '';
+        in readFile output;
+        normalizeVersion = name: version: let
+          output = runCommand "${name}-normalized-version" { } ''
+            ${emacsPackages.emacs}/bin/emacs -Q --batch \
+              --load package \
+              --eval '(setq pkg-version (package-version-join (version-to-list "${version}")))' \
+              --eval '(find-file (getenv "out"))' \
+              --eval '(insert pkg-version)' \
+              --eval '(save-buffer)'
+          '';
+        in readFile output;
+        genericBuild = emacsPackages.callPackage "${inputs.nixpkgs}/pkgs/applications/editors/emacs/build-support/generic.nix" { };
+        elpa2nix = "${inputs.nixpkgs}/pkgs/applications/editors/emacs/build-support/elpa2nix.el";
+        melpa2nix = "${inputs.nixpkgs}/pkgs/applications/editors/emacs/build-support/melpa2nix.el";
+      } // (if hasAttr dir packageSources then { package_src = packageSources.${dir}; } else { })
+      ) [
+        attrsToList
+        # => [ 
+        #      { name = "elispFileVersion"; value = <function>; }
+        #      { name = "pkgFileVersion"; value = <function>; }
+        #      { name = "normalizeVersion"; value = <function>; }
+        #      { name = "genericBuild"; value = <function>; }
+        #      { name = "elpa2nix"; value = "/path/to/elpa2nix.el"; }
+        #      { name = "melpa2nix"; value = "/path/to/melpa2nix.el"; }
+        #    ]
+        (filter ({ name, ... }: hasAttr name (functionArgs packageFunction)))
+        # => 假设 packageFunction 需要 elispFileVersion 和 genericBuild
+        # => [ 
+        #      { name = "elispFileVersion"; value = <function>; }
+        #      { name = "genericBuild"; value = <function>; }
+        #    ]
+        (map ({ name, value }: { ${name} = value; }))
+        # => [
+        #      { elispFileVersion = <function>; }
+        #      { genericBuild = <function>; }
+        #    ]
+        mergeAttrsList
+        # => { 
+        #      elispFileVersion = <function>;
+        #      genericBuild = <function>;
+        #    }
+        # 一般来讲，我们会这么写 import XXX.nix { inherit attr; };
+        # 这里相当于最后得到一个传入 XXX.nix 的一个参数集
+      ]
+    );  # Nix 中 pipe 的写法是 pipe <初始对象> [ <函数1> <函数2> ... ]
+  in pipe packagesDir [                            # => ./. (当前包目录)
+    readDir                                        # => { "package1" = "directory"; "package2" = "directory"; "default.nix" = "regular"; ... }
+    attrNames                                      # => [ "package1" "package2" "default.nix" ... ]
+    (remove "default.nix")                         # => [ "package1" "package2" ... ]
+    (map (dir: { "${dir}" = importFile dir; }))    # => [ { "package1" = <derivation>; } { "package2" = <derivation>; } ... ]
+    mergeAttrsList                                 # => { "package1" = <derivation>; "package2" = <derivation>; ... }
+  ]
+#+end_src
+
+#+begin_src nix :tangle externals/eaf/default.nix
+  { package_src
+  , elispFileVersion
+  , lib
+  , stdenv
+  , writeText
+  , melpaBuild
+  , elpa2nix
+  , melpa2nix
+  , makeWrapper
+
+  , python3
+  , qt6
+
+  , withSwayWMSupport ? stdenv.isLinux
+  , jq ? null
+
+  , withUnitySupport ? stdenv.isLinux
+  , xdotool ? null
+
+  , withX11Support ? true
+  , wmctrl ? null
+  }: let
+    inherit (lib) readFile;
+    
+    python = python3.withPackages (pkgs: [
+      pkgs.easyocr
+      pkgs.epc
+      pkgs.lxml
+      pkgs.pygetwindow
+      pkgs.pyqt6
+      pkgs.pyqt6-sip
+      pkgs.pyqt6-webengine
+      pkgs.qrcode
+      pkgs.requests
+      pkgs.sexpdata
+    ]);
+  in (melpaBuild (finalAttrs: {
+    pname = "eaf";
+    version = elispFileVersion "${finalAttrs.src}/eaf.el";
+    src = package_src;
+
+    # 在这里添加makeWrapper作为构建依赖
+    nativeBuildInputs = [ makeWrapper ];
+
+    patchPhase = ''
+      runHook prePatch
+
+      sed -i s#'defcustom eaf-python-command .*'#'defcustom eaf-python-command "${python.interpreter}"'# eaf.el
+      ${if withSwayWMSupport then "substituteInPlace eaf.el --replace jq ${jq}/bin/jq" else ""}
+      ${if withUnitySupport then "substituteInPlace eaf.el --replace xdotool ${xdotool}/bin/xdotool" else ""}
+      ${if withX11Support then "substituteInPlace eaf.el --replace wmctrl ${wmctrl}/bin/wmctrl" else ""}
+
+      mv core/eaf-epc.el .
+      mv extension/* .
+
+      runHook postPatch
+    '';
+
+    elpa2nix = writeText "elpa2nix.el" ''
+      ${readFile elpa2nix}
+      (defun byte-recompile-directory (&rest _))
+    '';
+    melpa2nix = writeText "melpa2nix.el" ''
+      ${readFile melpa2nix}
+      (defun byte-recompile-directory (&rest _))
+    '';
+  })).overrideAttrs (old: {
+    # 确保nativeBuildInputs被正确继承并添加makeWrapper
+    nativeBuildInputs = (old.nativeBuildInputs or []) ++ [ makeWrapper ];
+    
+    # Override genericBuild's postInstall
+    postInstall = ''
+      DST=$out/share/emacs/site-lisp/elpa/$ename-$melpaVersion/
+
+      mv eaf.py $DST
+      mv applications.json $DST
+      mv core $DST
+
+      # 创建包装脚本目录
+      mkdir -p $DST/bin
+
+      # 直接创建包装脚本，使用PyQt6模块路径下的Qt库
+      QT_LIB_PATH=$(${python}/bin/python -c "import os, PyQt6; print(os.path.join(os.path.dirname(PyQt6.__file__), 'Qt6/lib'))" 2>/dev/null)
+      QT_PLUGIN_PATH=$(${python}/bin/python -c "import os, PyQt6; print(os.path.join(os.path.dirname(PyQt6.__file__), 'Qt6/plugins'))" 2>/dev/null)
+
+     # 如果找不到常规路径，尝试其他可能的位置
+     if [ ! -d "$QT_LIB_PATH" ] || [ ! -d "$QT_PLUGIN_PATH" ]; then
+       QT_BASE_DIR=$(${python}/bin/python -c "import os, sys, PyQt6; print(os.path.normpath(os.path.join(os.path.dirname(PyQt6.__file__), '..', '..')))" 2>/dev/null)
+       QT_LIB_PATH="$QT_BASE_DIR/lib"
+       QT_PLUGIN_PATH="$QT_BASE_DIR/share/qt6/plugins"
+     fi
+
+     # 创建Python包装脚本
+     makeWrapper ${python}/bin/python $DST/bin/eaf-python \
+       --set LD_LIBRARY_PATH "$QT_LIB_PATH" \
+       --set QT_PLUGIN_PATH "$QT_PLUGIN_PATH" \
+       --set QT_QPA_PLATFORM_PLUGIN_PATH "$QT_PLUGIN_PATH/platforms" \
+       --unset XDG_DATA_DIRS
+
+     # 修改eaf.el使用包装的Python
+     sed -i s#'defcustom eaf-python-command .*'#'defcustom eaf-python-command "'$DST/bin/eaf-python'"'# $DST/eaf.el
+  '';
+  })
 #+end_src
 
 #+begin_src nix
@@ -998,3 +1449,4 @@ insert-state 时重新打开输入方式：
   chmod +x ./install-eaf.py
   ${pkgs.python310} ./install-eaf.py --app-drop-local-edit -i browser
 #+end_src
+
