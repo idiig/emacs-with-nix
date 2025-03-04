@@ -65,7 +65,7 @@ hook，config，自定义的函数。
   nix run <path/to/this/config>
   source ~/.bashrc
   emacs
-  #+end_src
+#+end_src
 
 ** 版本回滚
 
@@ -102,7 +102,7 @@ hook，config，自定义的函数。
     description = "idiig's Emacs Configuration with Nix Flakes";
 
     inputs = {
-      nixpkgs.url = "github:NixOS/nixpkgs/nixos-24.11";
+      nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
       flake-utils.url = "github:numtide/flake-utils";
       emacs-overlay.url = "github:nix-community/emacs-overlay";
       <<externals>>
@@ -216,10 +216,40 @@ hook，config，自定义的函数。
   (global-set-key (kbd "C-¥") 'toggle-input-method)
 #+end_src
 
-#+RESULTS:
-: toggle-input-method
+*** 包管理和其他基础
+
+这里我考虑了到底是否要使用 =use-package= 。因为我现在在使用 org mode
+写配置文件的目的是希望可以穿插自然语言的代码描述，所以需要拆分代码。
+=use-package= 这种一体成型的写法不是很适合这种风格。但考虑了实际写的过
+程，我觉得大多数情况可以在配置代码前面作完整的整理，而不需要过于细粒度
+的代码表述，然后在迁移的过程可能也比较简单。所以我最后还是决定改成使用
+=use-package= 了。
+
+**** 依赖
+:PROPERTIES:
+:header-args: :noweb-ref emacs-packages
+:END:
+
+- =use-package= ：用简介的宏语言描述包
+- =diminish= ：用于隐藏一些 minor mode
+  
+#+begin_src nix
+  use-package
+    diminish
+#+end_src
+
+**** 配置
+:PROPERTIES:
+:header-args: :noweb-ref emacs-config
+:END:
+
+#+begin_src emacs-lisp
+  (require 'use-package)
+  (require 'diminish)
+#+end_src
 
 *** 更好的默认设置
+
 **** 本体的设定
 :PROPERTIES:
 :header-args: :noweb-ref emacs-config
@@ -423,7 +453,6 @@ emacs在打开新的窗口时，默认光标维持在原来的窗口。比如当
     ${pkgs.rsync}/bin/rsync -av ${pkgs.sarasa-gothic}/share/fonts/truetype/ "$HOME/.local/share/fonts/sarasa-gothic/"
     fc-cache -f -v ~/.local/share/fonts/
   fi
-
 #+end_src
 
 *** 配置
@@ -647,38 +676,298 @@ emacs在打开新的窗口时，默认光标维持在原来的窗口。比如当
 
 **** Magit
 
-***** 基础设定
 #+BEGIN_SRC emacs-lisp
-  (require 'magit)
+  (use-package magit
+    :bind ("C-x g" . magit-status)
+    :commands magit-status)
 #+END_SRC
 
-** 编程语言
+
+** 编程工具
 *** 我有可能使用的语言
 :PROPERTIES:
 :header-args: :noweb-ref emacs-config
 :END:
 
 #+begin_src emacs-lisp
+  ;; TODO: 这里未来需要改成在每个语言的设定的节点push进来
   (defvar idiig/language-list
     '("emacs-lisp" "python" "C" "shell" "js" "clojure" "css" "nix"
       "dot" "gnuplot" "R" "sql" "awk" "haskell" "latex" "lisp"
       "org" "julia" "scheme" "sqlite")
     "支持的编程语言列表。")
+
+  (defun idiig/run-prog-mode-hooks ()
+    "Runs `prog-mode-hook'. 针对一些本该为编程语言又没自动加载prog mode的语言hook.
+  如：(add-hook 'python-hook 'idiig/run-prog-mode-hooks)
+  "
+    (run-hooks 'prog-mode-hook))
+
+  ;; 为每种语言添加钩子
+  (add-hook 'after-init-hook
+   (dolist (lang idiig/language-list)
+     (let ((mode-hook (intern (concat lang "-mode-hook"))))
+       (add-hook mode-hook 'idiig/run-prog-mode-hooks))))
 #+end_src
-** 编程语言
 
 *** 语言服务器（LSP-Bridge)
 
+语言服务器用于补全代码，提示文档，参照转跳等。这里我使用了 LSP-Bridge，
+其主要优势是通过 python 后端调用语言服务器，不卡 emacs 进程达到高速的
+补全。其他倾向的代替选项有 emacs 捆绑 =eglot= 。
 
-
-*** Nix
+**** 依赖
 :PROPERTIES:
 :header-args: :noweb-ref emacs-packages
 :END:
 
 #+begin_src nix
+  (lsp-bridge.override {
+    # 指定使用 Python 3.11 而不是 3.12
+    python3 = pkgs.python311;
+  })
+    markdown-mode
+    yasnippet
+#+end_src
+
+这里由于默认的 python (3.12.9) 版本问题导致了下面的报错：
+
+- 首先尝试导入 =SimpleXMLRPCServer= 模块失败，这是因为在 Python 3 中，
+  该模块已被移至 =xmlrpc.server=
+- 随后在导入 =xmlrpc.client= 时出现了一个奇怪的错误:
+  ~'datetime.datetime' object has no attribute 'task'~
+
+这可能是 Python 3.12.9 中的一个 bug，或者是 epc 包与 Python 3.12.9 不
+兼容的结果。因此我们在 =lsp-bridge= 的环境中使用了 311 的版本。
+
+#+begin_example
+  Traceback (most recent call last):
+    File "/nix/store/1bn994va1akp3m0jvg4fj9wzlqmn1kkq-python3-3.12.9-env/lib/python3.12/site-packages/epc/py3compat.py", line 26, in <module>
+      import SimpleXMLRPCServer
+  ModuleNotFoundError: No module named 'SimpleXMLRPCServer'
+
+  During handling of the above exception, another exception occurred:
+
+  Traceback (most recent call last):
+    File "/nix/store/4mx09lzrlahhkgv7qb2q57xmnsfwcmlx-emacs-packages-deps/share/emacs/site-lisp/elpa/lsp-bridge-20250210.0/lsp_bridge.py", line 46, in <module>
+      from epc.server import ThreadingEPCServer
+    File "/nix/store/1bn994va1akp3m0jvg4fj9wzlqmn1kkq-python3-3.12.9-env/lib/python3.12/site-packages/epc/server.py", line 20, in <module>
+      from .py3compat import SocketServer
+    File "/nix/store/1bn994va1akp3m0jvg4fj9wzlqmn1kkq-python3-3.12.9-env/lib/python3.12/site-packages/epc/py3compat.py", line 28, in <module>
+      import xmlrpc.server as SimpleXMLRPCServer
+    File "/nix/store/26yi95240650jxp5dj78xzch70i1kzlz-python3-3.12.9/lib/python3.12/xmlrpc/server.py", line 107, in <module>
+      from xmlrpc.client import Fault, dumps, loads, gzip_encode, gzip_decode
+    File "/nix/store/26yi95240650jxp5dj78xzch70i1kzlz-python3-3.12.9/lib/python3.12/xmlrpc/client.py", line 272, in <module>
+      if _try('%Y'):      # Mac OS X
+         ^^^^^^^^^^
+    File "/nix/store/26yi95240650jxp5dj78xzch70i1kzlz-python3-3.12.9/lib/python3.12/xmlrpc/client.py", line 269, in _try
+      return _day0.strftime(fmt) == '0001'
+             ^^^^^^^^^^^^^^^^^^^
+  AttributeError: 'datetime.datetime' object has no attribute 'task'
+#+end_example
+
+**** 配置
+:PROPERTIES:
+:header-args: :noweb-ref emacs-config
+:END:
+
+#+begin_src emacs-lisp
+  (defmacro idiig//setup-nix-lsp-server (language server-name executable-path &optional lib-path)
+    "配置 Nix 环境下的 LSP 服务器。
+  LANGUAGE 是语言名称，如 'python'。
+  SERVER-NAME 是服务器名称，如 'basedpyright'。
+  EXECUTABLE-PATH 是服务器可执行文件的路径。
+  LIB-PATH 是可选的库路径，添加到 LD_LIBRARY_PATH。"
+    `(with-eval-after-load 'lsp-bridge
+       ;; 设置 LSP 服务器
+       (setq ,(intern (format "lsp-bridge-%s-lsp-server" language)) ,server-name)
+       
+       ;; 添加可执行文件路径到 exec-path
+       ,(when executable-path
+          `(add-to-list 'exec-path ,executable-path))
+       
+       ;; 添加库路径到 LD_LIBRARY_PATH
+       ,(when lib-path
+          `(setenv "LD_LIBRARY_PATH" 
+                  (concat ,lib-path ":" 
+                          (or (getenv "LD_LIBRARY_PATH") ""))))))
+#+end_src
+
+上面这个宏用于生成 LSP-Bridge 的设定，因为语言服务器本身需要用户自己安
+装，而本配置又需要 Nix 保证复现，所以我们需要把 nix 路径的语言服务器传
+递给 emacs ，而且语言服务器往往需要匹配的 C++ 的库。因此我希望通过上面
+的代码生成系列配置，同时设定语言，语言服务器，语言服务器的可执行文件路
+径，依赖的 C 库。宏使用如下：
+
+#+begin_src emacs-lisp :noweb-ref -
+  (idiig/setup-nix-lsp-server 
+   "python" 
+   "basedpyright" 
+   "${pkgs.basedpyright}/bin" 
+   "${pkgs.stdenv.cc.cc.lib}/lib")
+#+end_src
+
+宏展开后如下：
+
+#+begin_src emacs-lisp :noweb-ref -
+  (with-eval-after-load 'lsp-bridge
+    (setq lsp-bridge-python-lsp-server "basedpyright")
+    (add-to-list 'exec-path "${pkgs.basedpyright}/bin")
+    (setenv "LD_LIBRARY_PATH" 
+            (concat "${pkgs.stdenv.cc.cc.lib}/lib:" 
+                    (or (getenv "LD_LIBRARY_PATH") ""))))
+#+end_src
+
+后面是 LSP-Bridge 本体的配置：
+
+#+begin_src emacs-lisp
+  (use-package lsp-bridge
+    :defer t
+    :bind
+    (:map acm-mode-map
+          ("C-j" . acm-select-next)
+          ("C-k" . acm-select-prev))
+    :custom
+    (acm-enable-yas nil)   ; 补全不包括 Yasnippet
+    (acm-enable-doc nil)   ; 不自动显示函数等文档
+    (lsp-bridge-org-babel-lang-list idiig/language-list)  ; org支持的代码也使用桥
+    (acm-enable-icon nil)  ; 不显示图标
+    :hook 
+    (prog-mode . (lambda ()
+  		 (lsp-bridge-mode)))
+    :init
+    ;; 这里是为了让语言服务器找到正确的版本的 libstdc++.so.6 库
+    (setenv "LD_LIBRARY_PATH" 
+              (concat "${pkgs.stdenv.cc.cc.lib}/lib:" 
+                      (or (getenv "LD_LIBRARY_PATH") ""))))
+#+end_src
+
+*注意* ：语言服务器不会自动安装，如果在新电脑中出现缺少个别语言服务器
+的情况，我们可以手动安装。
+
+*** TODO Treesitter
+
+用于解析语法和语法高亮
+
+**** 依赖
+:PROPERTIES:
+:header-args: :noweb-ref emacs-packages
+:END:
+#+begin_src nix
+  # treesit  # 目前 treesit 已经内置
+  treesit-auto
+#+end_src
+
+**** 配置
+:PROPERTIES:
+:header-args: :noweb-ref emacs-config
+:END:
+
+#+begin_src emacs-lisp
+  (use-package treesit-auto
+    :custom
+    (treesit-auto-install 'prompt)   ; 设置安装 tree-sitter 语法时提示用户确认
+    :hook
+    (prog-mode . treesit-auto-mode)    ; 在所有编程模式下自动启用 treesit-auto-mode
+    :config
+    (treesit-auto-add-to-auto-mode-alist 'all))  ; 将所有已知的 tree-sitter 模式添加到自动模式列表中
+#+end_src
+
+这个配置设置了 =treesit-auto= 包，这是一个帮助管理和自动启用 Emacs 内
+置 =tree-sitter= 模式的工具。会在启动 major mode 的时候自动替换为
+=<major>-ts-mode= 。比如 python-mode 会变成 python-ts-mode。
+
+*注意* ：treesit 不会自动安装，如果在新电脑中出现缺少 treesit 的情况，
+我们可以手动 =treesit-auto-install-all= 。下载目前所有可能的语言的
+treesit。
+
+*** Snippet（Yasnippet）
+
+Snippet 用于快速插入模板
+
+**** 依赖
+:PROPERTIES:
+:header-args: :noweb-ref emacs-packages
+:END:
+
+这里 =yasnippet= 本体已经作为 =lsp-bridge= 的依赖被加入，我们这里只加
+入一个 snippet 的合集 =yasnippert-snippets= 。
+
+#+begin_src nix
+  # yasnippet
+  yasnippet-snippets
+#+end_src
+
+**** 配置
+:PROPERTIES:
+:header-args: :noweb-ref emacs-config
+:END:
+
+#+begin_src emacs-lisp
+  ;; (defvar idiig/snippet-dir (concat user-emacs-directory "snippets"))
+
+  (use-package yasnippet
+    :defer t
+    ;; :diminish
+    :hook
+    (prog-mode . yas-minor-mode)
+    :init
+    ;; (setq yas-snippet-dirs <path/to/snippets>)
+    ;; (push idiig/snippet-dir yas-snippet-dirs)
+    :config
+    (yas-reload-all))
+#+end_src
+
+
+** 编程与文档语言
+
+*** Nix
+
+**** 依赖
+#+begin_src nix :noweb-ref emacs-packages
   nix-mode
 #+end_src
+
+加入 nix 的 major mode。
+
+#+begin_src emacs-lisp :noweb-ref emacs-config
+  (idiig//setup-nix-lsp-server 
+   "nix" 
+   "nixd" 
+   "${pkgs.nixd}/bin" 
+   nil)
+#+end_src
+
+设置 nix 的语言服务器。
+
+*** Python
+#+begin_src emacs-lisp :noweb-ref emacs-config
+  (idiig//setup-nix-lsp-server 
+   "python" 
+   "basedpyright" 
+   "${pkgs.basedpyright}/bin" 
+   "${pkgs.stdenv.cc.cc.lib}/lib")
+#+end_src
+
+*** R
+
+*** Elisp
+
+*** Shell
+
+*** Make
+
+*** TeX
+
+*** Typst
+
+*** Markdown
+
+*** Quarto
+
+*** XML
+
+*** Web
 
 ** Org Mode相关配置
 *** Org本体
@@ -721,7 +1010,6 @@ emacs在打开新的窗口时，默认光标维持在原来的窗口。比如当
 
   (add-hook 'org-mode-hook #'idiig/load-org-babel-languages)
 #+end_src
-
 
 **** TODO 基础设定
 
@@ -1197,7 +1485,7 @@ eaf还没有在 =nixpkgs= 中被打包，所以需要自己打包依赖。
 
 - 打包代码
   
-#+begin_src nix :tangle nil
+#+begin_src nix :tangle -
   externals/eaf-pdf-viewer/default.nix 
     { package_src
     , elispFileVersion
@@ -1231,6 +1519,7 @@ eaf还没有在 =nixpkgs= 中被打包，所以需要自己打包依赖。
         pkgs.pyqt6
         pkgs.pyqt6-sip
         pkgs.pyqt6-webengine
+        pkgs.pycookiecheat
         pkgs.qrcode
         pkgs.requests
         pkgs.sexpdata
@@ -1322,16 +1611,17 @@ eaf还没有在 =nixpkgs= 中被打包，所以需要自己打包依赖。
 
 #+begin_src emacs-lisp
   ;; (defvar idiig/eaf-path (concat user-emacs-directory "site-lisp/emacs-application-framework"))
-
   ;; (add-to-list 'load-path idiig/eaf-path)
-  (require 'eaf)
   ;; (setq eaf-python-command (concat idiig/eaf-path "/eaf/bin/python"))
+
+  (require 'eaf)
   (require 'eaf-browser)
   ;; (require 'eaf-pdf-viewer)
 
-  (setq 'eaf-browser-auto-import-chrome-cookies t  ; 自动 cookies
-        'eaf-browser-enable-autofill t             ; 自动填充密码
-        'eaf-browser-enable-tampermonkey t         ; 使用油猴
+  (setq eaf-webengine-default-zoom 2.0
+        eaf-browse-blank-page-url "https://kagi.com"
+        eaf-browser-auto-import-chrome-cookies nil   ; 非自动 cookies
+        eaf-browser-enable-autofill t                ; 自动填充密码
+        eaf-browser-enable-tampermonkey t            ; 使用油猴
         )
 #+end_src
-

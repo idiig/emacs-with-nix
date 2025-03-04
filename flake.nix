@@ -2,7 +2,7 @@
   description = "idiig's Emacs Configuration with Nix Flakes";
 
   inputs = {
-    nixpkgs.url = "github:NixOS/nixpkgs/nixos-24.11";
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
     flake-utils.url = "github:numtide/flake-utils";
     emacs-overlay.url = "github:nix-community/emacs-overlay";
     eaf = {
@@ -44,6 +44,8 @@
 	    
 	    ;; 便于使用mac的JIS日语键盘
 	    (global-set-key (kbd "C-¥") 'toggle-input-method)
+	    (require 'use-package)
+	    (require 'diminish)
 	    (setq ring-bell-function 'ignore)
 	    (defalias 'yes-or-no-p 'y-or-n-p)
 	    (setq enable-recursive-minibuffers t)
@@ -244,12 +246,93 @@
 	    	(pyim-cregexp-build result)))
 	      (advice-add 'orderless-regexp :around #'zh-orderless-regexp))
 	    (add-to-list 'exec-path "${pkgs.git}/bin")
-	    (require 'magit)
+	    (use-package magit
+	      :commands magit-status)
+	    ;; TODO: 这里未来需要改成在每个语言的设定的节点push进来
 	    (defvar idiig/language-list
 	      '("emacs-lisp" "python" "C" "shell" "js" "clojure" "css" "nix"
 	        "dot" "gnuplot" "R" "sql" "awk" "haskell" "latex" "lisp"
 	        "org" "julia" "scheme" "sqlite")
 	      "支持的编程语言列表。")
+	    
+	    (defun idiig/run-prog-mode-hooks ()
+	      "Runs `prog-mode-hook'. 针对一些本该为编程语言又没自动加载prog mode的语言hook.
+	    如：(add-hook 'python-hook 'idiig/run-prog-mode-hooks)
+	    "
+	      (run-hooks 'prog-mode-hook))
+	    
+	    ;; 为每种语言添加钩子
+	    (add-hook 'after-init-hook
+	     (dolist (lang idiig/language-list)
+	       (let ((mode-hook (intern (concat lang "-mode-hook"))))
+	         (add-hook mode-hook 'idiig/run-prog-mode-hooks))))
+	    (defmacro idiig//setup-nix-lsp-server (language server-name executable-path &optional lib-path)
+	      "配置 Nix 环境下的 LSP 服务器。
+	    LANGUAGE 是语言名称，如 'python'。
+	    SERVER-NAME 是服务器名称，如 'basedpyright'。
+	    EXECUTABLE-PATH 是服务器可执行文件的路径。
+	    LIB-PATH 是可选的库路径，添加到 LD_LIBRARY_PATH。"
+	      `(with-eval-after-load 'lsp-bridge
+	         ;; 设置 LSP 服务器
+	         (setq ,(intern (format "lsp-bridge-%s-lsp-server" language)) ,server-name)
+	         
+	         ;; 添加可执行文件路径到 exec-path
+	         ,(when executable-path
+	            `(add-to-list 'exec-path ,executable-path))
+	         
+	         ;; 添加库路径到 LD_LIBRARY_PATH
+	         ,(when lib-path
+	            `(setenv "LD_LIBRARY_PATH" 
+	                    (concat ,lib-path ":" 
+	                            (or (getenv "LD_LIBRARY_PATH") ""))))))
+	    (use-package lsp-bridge
+	      :defer t
+	      :bind
+	      (:map acm-mode-map
+	            ("C-j" . acm-select-next)
+	            ("C-k" . acm-select-prev))
+	      :custom
+	      (acm-enable-yas nil)   ; 补全不包括 Yasnippet
+	      (acm-enable-doc nil)   ; 不自动显示函数等文档
+	      (lsp-bridge-org-babel-lang-list idiig/language-list)  ; org支持的代码也使用桥
+	      (acm-enable-icon nil)  ; 不显示图标
+	      :hook 
+	      (prog-mode . (lambda ()
+	    		 (lsp-bridge-mode)))
+	      :init
+	      ;; 这里是为了让语言服务器找到正确的版本的 libstdc++.so.6 库
+	      (setenv "LD_LIBRARY_PATH" 
+	                (concat "${pkgs.stdenv.cc.cc.lib}/lib:" 
+	                        (or (getenv "LD_LIBRARY_PATH") ""))))
+	    (use-package treesit-auto
+	      :custom
+	      (treesit-auto-install 'prompt)   ; 设置安装 tree-sitter 语法时提示用户确认
+	      :hook
+	      (prog-mode . treesit-auto-mode)    ; 在所有编程模式下自动启用 treesit-auto-mode
+	      :config
+	      (treesit-auto-add-to-auto-mode-alist 'all))  ; 将所有已知的 tree-sitter 模式添加到自动模式列表中
+	    ;; (defvar idiig/snippet-dir (concat user-emacs-directory "snippets"))
+	    
+	    (use-package yasnippet
+	      :defer t
+	      ;; :diminish
+	      :hook
+	      (prog-mode . yas-minor-mode)
+	      :init
+	      ;; (setq yas-snippet-dirs <path/to/snippets>)
+	      ;; (push idiig/snippet-dir yas-snippet-dirs)
+	      :config
+	      (yas-reload-all))
+	    (idiig//setup-nix-lsp-server 
+	     "nix" 
+	     "nixd" 
+	     "${pkgs.nixd}/bin" 
+	     nil)
+	    (idiig//setup-nix-lsp-server 
+	     "python" 
+	     "basedpyright" 
+	     "${pkgs.basedpyright}/bin" 
+	     "${pkgs.stdenv.cc.cc.lib}/lib")
 	    (with-eval-after-load 'org
 	      (defun idiig/org-insert-structure-template-src-advice (orig-fun type)
 	        "Advice for org-insert-structure-template to handle src blocks."
@@ -377,12 +460,19 @@
 	    	      (setq the-late-input-method current-input-method)
 	    	      (deactivate-input-method)))
 	    ;; (defvar idiig/eaf-path (concat user-emacs-directory "site-lisp/emacs-application-framework"))
-	    
 	    ;; (add-to-list 'load-path idiig/eaf-path)
-	    (require 'eaf)
 	    ;; (setq eaf-python-command (concat idiig/eaf-path "/eaf/bin/python"))
+	    
+	    (require 'eaf)
 	    (require 'eaf-browser)
 	    ;; (require 'eaf-pdf-viewer)
+	    
+	    (setq eaf-webengine-default-zoom 2.0
+	          eaf-browse-blank-page-url "https://kagi.com"
+	          eaf-browser-auto-import-chrome-cookies nil   ; 非自动 cookies
+	          eaf-browser-enable-autofill t                ; 自动填充密码
+	          eaf-browser-enable-tampermonkey t            ; 使用油猴
+	          )
 	    '';
 
 		      # early-init 配置文件
@@ -412,6 +502,8 @@
           
           # 创建扩展的包集合并选择包
           emacsWithPackages = ((pkgs.emacsPackagesFor emacs).overrideScope overrides).withPackages (epkgs: with epkgs; [
+            use-package
+              diminish
             vundo
             ctrlf
             ddskk
@@ -421,12 +513,22 @@
             pyim
               pyim-basedict
             magit
+            (lsp-bridge.override {
+              # 指定使用 Python 3.11 而不是 3.12
+              python3 = pkgs.python311;
+            })
+              markdown-mode
+              yasnippet
+            # treesit  # 目前 treesit 已经内置
+            treesit-auto
+            # yasnippet
+            yasnippet-snippets
+            nix-mode
             ob-nix
             gptel
             # aider
             meow
             meow-tree-sitter
-            nix-mode
             eaf
               eaf-browser
               # eaf-pdf-viewer
@@ -454,7 +556,6 @@
 	        ${pkgs.rsync}/bin/rsync -av ${pkgs.sarasa-gothic}/share/fonts/truetype/ "$HOME/.local/share/fonts/sarasa-gothic/"
 	        fc-cache -f -v ~/.local/share/fonts/
 	      fi
-	      
 
 	      # 更新 Emacs 路径（兼容 macOS 和 Linux）
         if sed --version 2>/dev/null | grep "(GNU sed)"; then
