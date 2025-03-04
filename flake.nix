@@ -46,9 +46,23 @@
 	    (global-set-key (kbd "C-¥") 'toggle-input-method)
 	    (require 'use-package)
 	    (require 'diminish)
+	    ;; 关闭警告声
 	    (setq ring-bell-function 'ignore)
+	    
+	    ;; 确认使用y或n，而不是yes或no。
 	    (defalias 'yes-or-no-p 'y-or-n-p)
-	    (setq enable-recursive-minibuffers t)
+	    
+	    ;; 不自动生成备份文件
+	    (setq make-backup-files nil)
+	    
+	    ;; 选中文字能被整体替换（与其他文本编辑器相同）
+	    (delete-selection-mode 1)
+	    
+	    ;; 文件最后添加新行
+	    (setq require-final-newline t)
+	    
+	    ;; 文件在外部更新时buffer更新
+	    (global-auto-revert-mode 1)
 	    ;; 基础设置
 	    (tool-bar-mode -1) ;; 关闭工具栏
 	    (scroll-bar-mode -1) ;; 关闭文件滑动控件
@@ -125,9 +139,320 @@
 	    (advice-add 'shrink-window :around #'idiig/window-adjust)
 	    (advice-add 'enlarge-window-horizontally :around #'idiig/window-adjust)
 	    (advice-add 'shrink-window-horizontally :around #'idiig/window-adjust)
-	    (global-set-key (kbd "C-x u") 'vundo)
-	    (require 'ctrlf)
-	    (ctrlf-mode +1)
+	    ;; 不存在文档时询问是否新建
+	    (add-hook 'before-save-hook
+	              (lambda ()
+	                (when buffer-file-name
+	                  (let ((dir (file-name-directory buffer-file-name)))
+	                    (when (and (not (file-exists-p dir))
+	                               (y-or-n-p (format "Directory %s does not exist. Create it?" dir)))
+	                      (make-directory dir t))))))
+	    
+	    ;; 找文件时若无母文档则新建 
+	    (defadvice find-file (before make-directory-maybe
+	                                 (filename &optional wildcards) activate)
+	      "Create parent directory if not exists while visiting file."
+	      (unless (file-exists-p filename)
+	        (let ((dir (file-name-directory filename)))
+	          (when dir
+	            (unless (file-exists-p dir)
+	              (make-directory dir t))))))
+	    ;; 最近打开记录设置
+	    (use-package recentf
+	      :defer t
+	      :commands
+	      (recentf-open-files consult-recent-file)
+	      :bind
+	      ("C-x C-r" . recentf-open-files)
+	      :init
+	      (setq recentf-save-file (expand-file-name "recentf" user-emacs-directory)
+	            recentf-max-saved-items 500
+	            recentf-max-menu-items 25
+	            ;; recentf-auto-cleanup 'never
+	            )
+	      (setq recentf-exclude
+	            '("COMMIT_MSG"
+	              "COMMIT_EDITMSG"
+	              "github.*txt$"
+	              "/tmp/"
+	              "/ssh:"
+	              "/sudo:"
+	              "/TAGS$"
+	              "/GTAGS$"
+	              "/GRAGS$"
+	              "/GPATH$"
+	              "\\.mkv$"
+	              "\\.mp[34]$"
+	              "\\.avi$"
+	              "\\.pdf$"
+	              "\\.sub$"
+	              "\\.srt$"
+	              "\\.ass$"
+	              ".*png$"
+	              "Nutstore/org-files/"
+	              "bookmarks"))
+	      (setq recentf-max-saved-items 2048)
+	      (recentf-mode 1))
+	    
+	    ;; cleanup recent files
+	    (defun idiig/cleanup-recentf ()
+	      (progn
+	        (and (fboundp 'recentf-cleanup)
+	             (recentf-cleanup))))
+	    (add-hook 'kill-emacs-hook #'idiig/cleanup-recentf)
+	    ;; hungry delete: 连续删除空白
+	    (use-package hungry-delete
+	      :diminish hungry-delete-mode
+	      :init (setq hungry-delete-except-modes
+	                  '(help-mode minibuffer-mode minibuffer-inactive-mode calc-mode))
+	      :config
+	      (progn
+	        (setq-default hungry-delete-chars-to-skip " \t\f\v")  ;; 删除的空白符号 
+	        (global-hungry-delete-mode t)))
+	    
+	    ;; 跳到代码之前而非最前
+	    (use-package mwim
+	      :defer t
+	      :commands (mwim-beginning-of-code-or-line mwim-end-of-code-or-line))
+	    ;; 自动折行
+	    (use-package unfill
+	      :defer t
+	      :commands (unfill-region unfill-paragraph unfill-toggle)
+	      :init
+	      (global-set-key [remap fill-paragraph] #'unfill-toggle))
+	    (use-package emacs
+	      :init
+	      (progn
+	        ;; 为`completing-read-multiple'添加提示，比如[CRM<separator>]
+	        (defun crm-indicator (args)
+	          (cons (format "[CRM%s] %s"
+	                        (replace-regexp-in-string
+	                         "\\`\\[.*?]\\*\\|\\[.*?]\\*\\'" ""
+	                         crm-separator)
+	                        (car args))
+	                (cdr args)))
+	        (advice-add #'completing-read-multiple :filter-args #'crm-indicator)
+	    
+	        ;; 不允许鼠标出现在minibuffer的提示中
+	        (setq minibuffer-prompt-properties
+	              '(read-only t cursor-intangible t face minibuffer-prompt))
+	        (add-hook 'minibuffer-setup-hook #'cursor-intangible-mode)
+	    
+	        ;; 在emacs 28以后，非当前mode的指令都会被隐藏，vertico的指令也会隐藏
+	        (setq read-extended-command-predicate
+	              #'command-completion-default-include-p)
+	    
+	        ;; minibuffer可循环
+	        (setq enable-recursive-minibuffers t)))
+	    
+	    ;; http://trey-jackson.blogspot.com/2010/04/emacs-tip-36-abort-minibuffer-when.html
+	    ;; 使用鼠标时关闭minibuffer
+	    (defun idiig/stop-using-minibuffer ()
+	      "kill the minibuffer"
+	      (when (and (>= (recursion-depth) 1) (active-minibuffer-window))
+	        (abort-recursive-edit)))
+	    (add-hook 'mouse-leave-buffer-hook 'idiig/stop-using-minibuffer)
+	    
+	    (use-package vertico
+	      :after consult
+	      :init
+	      (vertico-mode)
+	      :config
+	      ;; 表示行数
+	      (setq vertico-count 30)
+	      ;; 可循环
+	      (setq vertico-cycle t))
+	    (use-package orderless
+	      :after
+	      (consult)
+	      :config
+	      (setq search-default-mode t)
+	      (defvar +orderless-dispatch-alist
+	        '((?% . char-fold-to-regexp)
+	          (?! . orderless-without-literal)
+	          (?`. orderless-initialism)
+	          (?= . orderless-literal)
+	          (?~ . orderless-flex)))
+	    
+	      (defun +orderless--suffix-regexp ()
+	        (if (and (boundp 'consult--tofu-char) (boundp 'consult--tofu-range))
+	            (format "[%c-%c]*$"
+	                    consult--tofu-char
+	                    (+ consult--tofu-char consult--tofu-range -1))
+	          "$"))
+	      ;; Recognizes the following patterns:
+	      ;; * ~flex flex~
+	      ;; * =literal literal=
+	      ;; * %char-fold char-fold%
+	      ;; * `initialism initialism`
+	      ;; * !without-literal without-literal!
+	      ;; * .ext (file extension)
+	      ;; * regexp$ (regexp matching at end)
+	      (defun +orderless-dispatch (word _index _total)
+	        (cond
+	         ;; Ensure that $ works with Consult commands, which add disambiguation suffixes
+	         ((string-suffix-p "$" word)
+	          `(orderless-regexp . ,(concat (substring word 0 -1) (+orderless--suffix-regexp))))
+	         ;; File extensions
+	         ((and (or minibuffer-completing-file-name
+	                   (derived-mode-p 'eshell-mode))
+	               (string-match-p "\\`\\.." word))
+	          `(orderless-regexp . ,(concat "\\." (substring word 1) (+orderless--suffix-regexp))))
+	         ;; Ignore single !
+	         ((equal "!" word) `(orderless-literal . ""))
+	         ;; Prefix and suffix
+	         ((if-let (x (assq (aref word 0) +orderless-dispatch-alist))
+	              (cons (cdr x) (substring word 1))
+	            (when-let (x (assq (aref word (1- (length word))) +orderless-dispatch-alist))
+	              (cons (cdr x) (substring word 0 -1)))))))
+	      
+	      ;; Define orderless style with initialism by default ; add migemo feature for japanese
+	      (orderless-define-completion-style +orderless-with-initialism
+	        (orderless-matching-styles '(orderless-initialism
+	                                     orderless-literal
+	                                     orderless-regexp)))
+	      
+	      (setq completion-styles '(orderless basic)
+	            completion-category-defaults nil
+	            ;;; Enable partial-completion for files.
+	            ;;; Either give orderless precedence or partial-completion.
+	            ;;; Note that completion-category-overrides is not really an override,
+	            ;;; but rather prepended to the default completion-styles.
+	            ;; completion-category-overrides '((file (styles orderless partial-completion))) ;; orderless is tried first
+	            completion-category-overrides '((file (styles partial-completion)) ;; partial-completion is tried first
+	                                            (buffer (styles +orderless-with-initialism))
+	                                            (consult-location (styles +orderless-with-initialism))
+	                                            ;; enable initialism by default for symbols
+	                                            (command (styles +orderless-with-initialism))
+	                                            (variable (styles +orderless-with-initialism))
+	                                            (symbol (styles +orderless-with-initialism)))
+	            orderless-component-separator #'orderless-escapable-split-on-space ;; allow escaping space with backslash!
+	            orderless-style-dispatchers '(+orderless-dispatch)))
+	    (use-package marginalia
+	      :after vertico
+	      ;; 只在minibuffer启用快捷键
+	      :bind (:map minibuffer-local-map ("M-A" . marginalia-cycle))
+	      :init
+	      (setq marginalia-align-offset 5)
+	      :config
+	      (marginalia-mode))
+	    (use-package consult
+	      :hook (after-init . (lambda () (require 'consult)))
+	      :bind (([remap M-x] . execute-extended-command)
+	             ([remap goto-line] . consult-goto-line)
+	             ([remap switch-to-buffer] . consult-buffer)
+	             ([remap find-file] . find-file)
+	             ([remap recentf-open-file] . consult-recent-file)
+	             ("C-c y" . consult-yasnippet)
+	             ("C-c f" . consult-find)
+	             ("C-s" . consult-line)
+	             ("C-c i" . consult-imenu)
+	             ("C-c o" . consult-file-externally)
+	             ("C-x p f" . consult-ripgrep)
+	             (:map minibuffer-local-map
+	                   ("C-c h" . consult-history)
+	                   ("C-s" . #'previous-history-element)))
+	      :init
+	      (defun idiig/consult-buffer-region-or-symbol ()
+	        "consult-line当前字符或选中区域."
+	        (interactive)
+	        (let ((input (if (region-active-p)
+	                         (buffer-substring-no-properties
+	                          (region-beginning) (region-end))
+	                       (thing-at-point 'symbol t))))
+	          (consult-line input)))
+	      (defun idiig/consult-project-region-or-symbol (&optional default-inputp)
+	        "consult-ripgrep 当前字符或选中区域."
+	        (interactive)
+	        (let ((input (if (region-active-p)
+	                         (buffer-substring-no-properties
+	                          (region-beginning) (region-end))
+	                       (thing-at-point 'symbol t))))
+	          (consult-ripgrep default-inputp input)))
+	      :config
+	      (progn
+	        ;; (defvar my-consult-line-map
+	        ;;   (let ((map (make-sparse-keymap)))
+	        ;;     (define-key map "C-s" #'previous-history-element)
+	        ;;     map))
+	        ;; (consult-customize consult-line :keymap my-consult-line-map)
+	        ;; ;; 禁止自动显示consult文件的内容
+	        (setq consult-preview-key "C-v")
+	        ;; 应用 Orderless 的正则解析到 consult-grep/ripgrep/find
+	        (defun consult--orderless-regexp-compiler (input type &rest _config)
+	          (setq input (orderless-pattern-compiler input))
+	          (cons
+	           (mapcar (lambda (r) (consult--convert-regexp r type)) input)
+	           (lambda (str) (orderless--highlight input str))))
+	        ;; 表示的buffer种类
+	        (defcustom consult-buffer-sources
+	          '(consult--source-hidden-buffer
+	            consult--source-buffer
+	            consult--source-file
+	            consult--source-bookmark
+	            consult--source-project-buffer
+	            consult--source-project-file)
+	          "Sources used by `consult-buffer'. See `consult--multi' for a description of the source values."
+	          :type '(repeat symbol))
+	        ;; ？提示检索buffer类型；f<SPC>=file, p<SPC>=project, etc..
+	        (define-key consult-narrow-map
+	          (vconcat consult-narrow-key "?") #'consult-narrow-help)))
+	    (use-package embark
+	      :after vertico
+	      :bind
+	      (("C-h B" . embark-bindings)  ;; alternative for `describe-bindings'
+	       (:map minibuffer-local-map
+	             ("C-;" . embark-act)         ;; 对函数进行设置操作 
+	             ("M-." . embark-dwim)        ;; 实施 
+	             ("C-c C-e" . embark-export)  ;; occur
+	             )) 
+	      :init
+	      ;; Optionally replace the key help with a completing-read interface
+	      (setq prefix-help-command #'embark-prefix-help-command)
+	      :config
+	      (add-to-list 'display-buffer-alist
+	                   '("\\`\\*Embark Collect \\(Live\\|Completions\\)\\*"
+	                     nil
+	                     (window-parameters (mode-line-format . none)))))
+	    
+	    ;; embark-export弹出occur和grep mode的buffer
+	    (use-package embark-consult
+	      :ensure t
+	      :after (consult))
+	    (use-package vundo
+	      :defer t
+	      :commands
+	      (vundo)
+	      :bind
+	      ("C-x u" . vundo))
+	    ;; 扩大选中
+	    (use-package expand-region
+	      :defer t
+	      :after (consult)
+	      :commands er/expand-region
+	      :config
+	      (with-eval-after-load 'expand-region
+	        (defadvice er/prepare-for-more-expansions-internal
+	            (around helm-ag/prepare-for-more-expansions-internal activate)
+	          ad-do-it
+	          (let ((new-msg (concat (car ad-return-value)
+	                                 ", / to search in project, "
+	                                 "b to search in buffer, "
+	                                 "cs to change quote"))
+	                (new-bindings (cdr ad-return-value)))
+	            (cl-pushnew
+	             '("/" (lambda ()
+	                     (call-interactively
+	                      'idiig/consult-project-region-or-symbol)))
+	             new-bindings)
+	            (cl-pushnew
+	             '("b" (lambda ()
+	                     (call-interactively
+	                      'idiig/consult-buffer-region-or-symbol)))
+	             new-bindings)
+	            (setq ad-return-value (cons new-msg new-bindings)))))
+	      (setq expand-region-contract-fast-key "V"
+	            expand-region-reset-fast-key "r"))
 	    (add-hook 'after-init-hook
 	    	    (lambda ()
 	    	      (let* ((screen-height (display-pixel-height))
@@ -146,9 +471,10 @@
 	    ;; 工具栏，菜单保持默认字体
 	    (set-face-attribute 'menu nil :inherit 'unspecified)
 	    (set-face-attribute 'tool-bar nil :inherit 'unspecified)
-	    (global-set-key (kbd "C-x j") 'skk-mode)
-	    
-	    (with-eval-after-load 'ddskk
+	    (use-package ddskk
+	      :defer t
+	      :bind (("C-x j" . skk-mode))
+	      :config
 	      (setq skk-server-inhibit-startup-server nil)
 	      (setq skk-server-host "localhost")
 	      (setq skk-server-portnum 55100)
@@ -167,19 +493,17 @@
 	      (setq skk-auto-insert-paren t)
 	      (setq skk-henkan-strict-okuri-precedence t)
 	    
+	      ;; 片假名转换设置
+	      (setq skk-search-katakana 'jisx0201-kana)
+	    
 	      ;; 加载额外功能
 	      (require 'skk-hint)
-	      (add-hook 'skk-load-hook
-	    	      (lambda ()
-	    		(require 'context-skk)))
-	    
-	      ;; 片假名转换设置
-	      (setq skk-search-katakana 'jisx0201-kana))
-	    
-	    ;; (require 'ddskk nil t)
+	      :hook
+	      (skk-load . (lambda ()
+	                    (require 'context-skk))))
 	    (use-package pyim
 	      :diminish pyim-isearch-mode
-	      :command
+	      :commands
 	      (toggle-input-method)
 	      :custom
 	      (default-input-method "pyim")
@@ -234,8 +558,8 @@
 	      ;; (advice-remove 'pyim-activate #'idiig/enable-pyim-region)
 	      ;; (advice-add 'pyim-deactivate :after #'idiig/disable-pyim-region)
 	      (advice-add 'pyim-activate :after #'idiig/enable-pyim-region))
-	    ;; 确保在 orderless 和 pyim 加载后再加载这些配置
-	    (with-eval-after-load '(orderless pyim)
+	    ;; 确保在 orderless 加载后再加载这些配置
+	    (with-eval-after-load 'orderless
 	      ;; 拼音检索字符串功能
 	      (defun zh-orderless-regexp (orig_func component)
 	        (call-interactively #'pyim-activate)
@@ -267,7 +591,7 @@
 	     (dolist (lang idiig/language-list)
 	       (let ((mode-hook (intern (concat lang "-mode-hook"))))
 	         (add-hook mode-hook 'idiig/run-prog-mode-hooks))))
-	    (defmacro idiig//setup-nix-lsp-server (language server-name executable-path &optional lib-path)
+	    (defmacro idiig//setup-nix-lsp-bridge-server (language server-name executable-path &optional lib-path)
 	      "配置 Nix 环境下的 LSP 服务器。
 	    LANGUAGE 是语言名称，如 'python'。
 	    SERVER-NAME 是服务器名称，如 'basedpyright'。
@@ -324,16 +648,23 @@
 	      ;; (push idiig/snippet-dir yas-snippet-dirs)
 	      :config
 	      (yas-reload-all))
-	    (idiig//setup-nix-lsp-server 
+	    (idiig//setup-nix-lsp-bridge-server 
 	     "nix" 
 	     "nixd" 
 	     "${pkgs.nixd}/bin" 
 	     nil)
-	    (idiig//setup-nix-lsp-server 
+	    (idiig//setup-nix-lsp-bridge-server 
 	     "python" 
 	     "basedpyright" 
 	     "${pkgs.basedpyright}/bin" 
 	     "${pkgs.stdenv.cc.cc.lib}/lib")
+	    (idiig//setup-nix-lsp-bridge-server 
+	     "tex" 
+	     "texlab" 
+	     "${pkgs.texlab}/bin" 
+	     nil)
+	    
+	    (add-to-list 'exec-path "${pkgs.texliveFull}/bin")
 	    (with-eval-after-load 'org
 	      (defun idiig/org-insert-structure-template-src-advice (orig-fun type)
 	        "Advice for org-insert-structure-template to handle src blocks."
@@ -505,12 +836,18 @@
           emacsWithPackages = ((pkgs.emacsPackagesFor emacs).overrideScope overrides).withPackages (epkgs: with epkgs; [
             use-package
               diminish
+            hungry-delete
+              mwim
+            unfill
+            vertico
+              orderless
+              marginalia
+              embark
+              consult
+              embark-consult
             vundo
-            ctrlf
+            expand-region
             ddskk
-            # (pkgs.emacsPackages.pyim.overrideAttrs (old: {
-            #     nativeComp = false;
-            # }))
             pyim
               pyim-basedict
             magit
@@ -525,6 +862,8 @@
             # yasnippet
             yasnippet-snippets
             nix-mode
+            auctex
+              auctex-latexmk
             ob-nix
             gptel
             # aider
