@@ -177,24 +177,22 @@
 	      (setq skk-search-katakana 'jisx0201-kana))
 	    
 	    ;; (require 'ddskk nil t)
-	    (with-eval-after-load 'pyim
-	      ;; 基本设置
-	      (setq default-input-method "pyim")
-	      (setq pyim-dcache-directory "~/.emacs.d/.cache/pyim/dcache/")
-	      ;; 输入法设置为全拼
-	      (setq pyim-default-scheme 'quanpin)
+	    (use-package pyim
+	      :diminish pyim-isearch-mode
+	      :command
+	      (toggle-input-method)
+	      :custom
+	      (default-input-method "pyim")
+	      (pyim-dcache-directory (concat user-emacs-directory "pyim/dcache"))
+	      (pyim-default-scheme 'quanpin)
+	      (pyim-page-tooltip 'popup)
+	      (pyim-page-length 4)
+	      :config
 	      ;; 启用搜索功能
 	      (pyim-isearch-mode 1)
-	      ;; 选词框设置
-	      (setq pyim-page-tooltip 'popup)
-	      (setq pyim-page-length 5)
 	      ;; 加载并启用基础词库
 	      (require 'pyim-basedict)
 	      (pyim-basedict-enable))
-	    
-	    ;; diminish 设置 (如果使用 diminish)
-	    (with-eval-after-load 'diminish
-	      (diminish 'pyim-isearch-mode))
 	    (with-eval-after-load 'pyim
 	      (require 'pyim-cstring-utils)
 	    
@@ -236,8 +234,8 @@
 	      ;; (advice-remove 'pyim-activate #'idiig/enable-pyim-region)
 	      ;; (advice-add 'pyim-deactivate :after #'idiig/disable-pyim-region)
 	      (advice-add 'pyim-activate :after #'idiig/enable-pyim-region))
-	    ;; 确保在 orderless 加载后再加载这些配置
-	    (with-eval-after-load 'orderless
+	    ;; 确保在 orderless 和 pyim 加载后再加载这些配置
+	    (with-eval-after-load '(orderless pyim)
 	      ;; 拼音检索字符串功能
 	      (defun zh-orderless-regexp (orig_func component)
 	        (call-interactively #'pyim-activate)
@@ -245,9 +243,12 @@
 	        (let ((result (funcall orig_func component)))
 	    	(pyim-cregexp-build result)))
 	      (advice-add 'orderless-regexp :around #'zh-orderless-regexp))
-	    (add-to-list 'exec-path "${pkgs.git}/bin")
 	    (use-package magit
-	      :commands magit-status)
+	      :bind ("C-x g" . magit-status)
+	      :commands magit-status
+	      :init
+	      ;; 使用nix路径中的git
+	      (add-to-list 'exec-path "${pkgs.git}/bin"))
 	    ;; TODO: 这里未来需要改成在每个语言的设定的节点push进来
 	    (defvar idiig/language-list
 	      '("emacs-lisp" "python" "C" "shell" "js" "clojure" "css" "nix"

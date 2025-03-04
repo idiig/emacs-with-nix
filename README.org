@@ -567,24 +567,22 @@ emacs在打开新的窗口时，默认光标维持在原来的窗口。比如当
 
 ***** 基础设定
 #+begin_src emacs-lisp
-  (with-eval-after-load 'pyim
-    ;; 基本设置
-    (setq default-input-method "pyim")
-    (setq pyim-dcache-directory "~/.emacs.d/.cache/pyim/dcache/")
-    ;; 输入法设置为全拼
-    (setq pyim-default-scheme 'quanpin)
+  (use-package pyim
+    :diminish pyim-isearch-mode
+    :command
+    (toggle-input-method)
+    :custom
+    (default-input-method "pyim")
+    (pyim-dcache-directory (concat user-emacs-directory "pyim/dcache"))
+    (pyim-default-scheme 'quanpin)
+    (pyim-page-tooltip 'popup)
+    (pyim-page-length 4)
+    :config
     ;; 启用搜索功能
     (pyim-isearch-mode 1)
-    ;; 选词框设置
-    (setq pyim-page-tooltip 'popup)
-    (setq pyim-page-length 5)
     ;; 加载并启用基础词库
     (require 'pyim-basedict)
     (pyim-basedict-enable))
-
-  ;; diminish 设置 (如果使用 diminish)
-  (with-eval-after-load 'diminish
-    (diminish 'pyim-isearch-mode))
 #+end_src
 
 ***** TODO 正则表达交互
@@ -640,34 +638,31 @@ emacs在打开新的窗口时，默认光标维持在原来的窗口。比如当
 #+end_src
 
 ***** Orderless交互
+
 #+begin_src emacs-lisp
-  ;; 确保在 orderless 加载后再加载这些配置
-  (with-eval-after-load 'orderless
+  ;; 确保在 orderless 和 pyim 加载后再加载这些配置
+  (with-eval-after-load '(orderless pyim)
     ;; 拼音检索字符串功能
     (defun zh-orderless-regexp (orig_func component)
       (call-interactively #'pyim-activate)
       (call-interactively #'pyim-deactivate)
       (let ((result (funcall orig_func component)))
-	(pyim-cregexp-build result)))
+  	(pyim-cregexp-build result)))
     (advice-add 'orderless-regexp :around #'zh-orderless-regexp))
 #+end_src
 
-** Git相关配置
+** Git（Magit）
+
+用 Magit 进行项目与版本的管理
 
 *** 依赖
 :PROPERTIES:
 :header-args: :noweb-ref emacs-packages
 :END:
 
-**** Magit
 #+BEGIN_SRC nix
   magit
 #+END_SRC
-
-**** Git 目录路径
-#+begin_src emacs-lisp  :noweb-ref emacs-config
-  (add-to-list 'exec-path "${pkgs.git}/bin")
-#+end_src
 
 *** 配置
 :PROPERTIES:
@@ -679,9 +674,11 @@ emacs在打开新的窗口时，默认光标维持在原来的窗口。比如当
 #+BEGIN_SRC emacs-lisp
   (use-package magit
     :bind ("C-x g" . magit-status)
-    :commands magit-status)
+    :commands magit-status
+    :init
+    ;; 使用nix路径中的git
+    (add-to-list 'exec-path "${pkgs.git}/bin"))
 #+END_SRC
-
 
 ** 编程工具
 *** 我有可能使用的语言
@@ -711,6 +708,9 @@ emacs在打开新的窗口时，默认光标维持在原来的窗口。比如当
 #+end_src
 
 *** 语言服务器（LSP-Bridge)
+:PROPERTIES:
+:CUSTOM_ID: lsp-bridge
+:END:
 
 语言服务器用于补全代码，提示文档，参照转跳等。这里我使用了 LSP-Bridge，
 其主要优势是通过 python 后端调用语言服务器，不卡 emacs 进程达到高速的
@@ -772,7 +772,7 @@ emacs在打开新的窗口时，默认光标维持在原来的窗口。比如当
 :END:
 
 #+begin_src emacs-lisp
-  (defmacro idiig//setup-nix-lsp-server (language server-name executable-path &optional lib-path)
+  (defmacro idiig//setup-nix-lsp-bridge-server (language server-name executable-path &optional lib-path)
     "配置 Nix 环境下的 LSP 服务器。
   LANGUAGE 是语言名称，如 'python'。
   SERVER-NAME 是服务器名称，如 'basedpyright'。
@@ -800,7 +800,7 @@ emacs在打开新的窗口时，默认光标维持在原来的窗口。比如当
 径，依赖的 C 库。宏使用如下：
 
 #+begin_src emacs-lisp :noweb-ref -
-  (idiig/setup-nix-lsp-server 
+  (idiig/setup-nix-lsp-bridge-server 
    "python" 
    "basedpyright" 
    "${pkgs.basedpyright}/bin" 
@@ -811,7 +811,7 @@ emacs在打开新的窗口时，默认光标维持在原来的窗口。比如当
 
 #+begin_src emacs-lisp :noweb-ref -
   (with-eval-after-load 'lsp-bridge
-    (setq lsp-bridge-python-lsp-server "basedpyright")
+    (setq lsp-bridge-python-lsp-bridge-server "basedpyright")
     (add-to-list 'exec-path "${pkgs.basedpyright}/bin")
     (setenv "LD_LIBRARY_PATH" 
             (concat "${pkgs.stdenv.cc.cc.lib}/lib:" 
@@ -931,23 +931,31 @@ Snippet 用于快速插入模板
 加入 nix 的 major mode。
 
 #+begin_src emacs-lisp :noweb-ref emacs-config
-  (idiig//setup-nix-lsp-server 
+  (idiig//setup-nix-lsp-bridge-server 
    "nix" 
    "nixd" 
    "${pkgs.nixd}/bin" 
    nil)
 #+end_src
 
-设置 nix 的语言服务器。
+设置 nix 的语言服务器。注意这里使用的是在 LSP-Bridge 节中写的宏（参看
+[[#lsp-bridge]]）。
+
+**** 配置
 
 *** Python
+
+**** 依赖
+
 #+begin_src emacs-lisp :noweb-ref emacs-config
-  (idiig//setup-nix-lsp-server 
+  (idiig//setup-nix-lsp-bridge-server 
    "python" 
    "basedpyright" 
    "${pkgs.basedpyright}/bin" 
    "${pkgs.stdenv.cc.cc.lib}/lib")
 #+end_src
+
+**** 配置
 
 *** R
 
