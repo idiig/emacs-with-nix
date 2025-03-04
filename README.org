@@ -665,6 +665,20 @@ emacs在打开新的窗口时，默认光标维持在原来的窗口。比如当
       "org" "julia" "scheme" "sqlite")
     "支持的编程语言列表。")
 #+end_src
+** 编程语言
+
+*** 语言服务器（LSP-Bridge)
+
+
+
+*** Nix
+:PROPERTIES:
+:header-args: :noweb-ref emacs-packages
+:END:
+
+#+begin_src nix
+  nix-mode
+#+end_src
 
 ** Org Mode相关配置
 *** Org本体
@@ -902,18 +916,6 @@ insert-state 时重新打开输入方式：
 	      (deactivate-input-method)))
 #+end_src
 
-** 编程语言
-
-*** 语言服务器（LSP-Bridge)
-
-*** Nix
-:PROPERTIES:
-:header-args: :noweb-ref emacs-packages
-:END:
-
-#+begin_src nix
-  nix-mode
-#+end_src
 
 ** 扩展
 
@@ -1326,5 +1328,10 @@ eaf还没有在 =nixpkgs= 中被打包，所以需要自己打包依赖。
   ;; (setq eaf-python-command (concat idiig/eaf-path "/eaf/bin/python"))
   (require 'eaf-browser)
   ;; (require 'eaf-pdf-viewer)
+
+  (setq 'eaf-browser-auto-import-chrome-cookies t  ; 自动 cookies
+        'eaf-browser-enable-autofill t             ; 自动填充密码
+        'eaf-browser-enable-tampermonkey t         ; 使用油猴
+        )
 #+end_src
 
