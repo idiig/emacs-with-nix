@@ -161,21 +161,16 @@
 	    (use-package recentf
 	      :defer t
 	      :commands
-	      (recentf-open-files consult-recent-file)
-	      :bind
-	      ("C-x C-r" . recentf-open-files)
+	      (consult-recent-file)
 	      :init
 	      (setq recentf-save-file (expand-file-name "recentf" user-emacs-directory)
 	            recentf-max-saved-items 500
-	            recentf-max-menu-items 25
-	            ;; recentf-auto-cleanup 'never
-	            )
+	            recentf-max-menu-items 20)
 	      (setq recentf-exclude
 	            '("COMMIT_MSG"
 	              "COMMIT_EDITMSG"
 	              "github.*txt$"
 	              "/tmp/"
-	              "/ssh:"
 	              "/sudo:"
 	              "/TAGS$"
 	              "/GTAGS$"
@@ -184,7 +179,6 @@
 	              "\\.mkv$"
 	              "\\.mp[34]$"
 	              "\\.avi$"
-	              "\\.pdf$"
 	              "\\.sub$"
 	              "\\.srt$"
 	              "\\.ass$"
@@ -214,7 +208,7 @@
 	    (use-package mwim
 	      :defer t
 	      :commands (mwim-beginning-of-code-or-line mwim-end-of-code-or-line))
-	    ;; 自动折行
+	    ;; 物理折行与复原
 	    (use-package unfill
 	      :defer t
 	      :commands (unfill-region unfill-paragraph unfill-toggle)
@@ -259,7 +253,7 @@
 	      (vertico-mode)
 	      :config
 	      ;; 表示行数
-	      (setq vertico-count 30)
+	      (setq vertico-count 24)
 	      ;; 可循环
 	      (setq vertico-cycle t))
 	    (use-package orderless
@@ -342,11 +336,11 @@
 	             ([remap goto-line] . consult-goto-line)
 	             ([remap switch-to-buffer] . consult-buffer)
 	             ([remap find-file] . find-file)
-	             ([remap recentf-open-file] . consult-recent-file)
+	    	 ([remap imenu] . consult-imenu)
+	             ("C-x C-r" . consult-recent-file)
 	             ("C-c y" . consult-yasnippet)
 	             ("C-c f" . consult-find)
 	             ("C-s" . consult-line)
-	             ("C-c i" . consult-imenu)
 	             ("C-c o" . consult-file-externally)
 	             ("C-x p f" . consult-ripgrep)
 	             (:map minibuffer-local-map
@@ -430,6 +424,7 @@
 	      :defer t
 	      :after (consult)
 	      :commands er/expand-region
+	      :bind ("C-=" . er/expand-region)
 	      :config
 	      (with-eval-after-load 'expand-region
 	        (defadvice er/prepare-for-more-expansions-internal
@@ -573,6 +568,29 @@
 	      :init
 	      ;; 使用nix路径中的git
 	      (add-to-list 'exec-path "${pkgs.git}/bin"))
+	    (defvar idiig/writing-environment-list '("\\.org\\'"
+	                                            "\\.md\\'"
+	                                            "\\.qmd\\'"
+	                                            "\\.rmd\\'"
+	                                            "\\.typ\\'"
+	                                            "\\.tex\\'"
+	                                            "\\.bib\\'"
+	                                            "\\.txt\\'"))
+	    
+	    (defun idiig/in-writing-environment-p ()
+	      "Check if current buffer file matches any pattern in idiig/writing-environment-list."
+	      (when (buffer-file-name)
+	        (cl-some (lambda (pattern)
+	                   (string-match-p pattern (buffer-file-name)))
+	                 idiig/writing-environment-list)))
+	    
+	    (add-hook 'find-file-hook
+	              (lambda ()
+	                (when (idiig/in-writing-environment-p)
+	                  (visual-line-mode 1))))
+	    
+	    (with-eval-after-load 'diminish
+	      (diminish 'visual-line-mode))
 	    ;; TODO: 这里未来需要改成在每个语言的设定的节点push进来
 	    (defvar idiig/language-list
 	      '("emacs-lisp" "python" "C" "shell" "js" "clojure" "css" "nix"
@@ -585,12 +603,6 @@
 	    如：(add-hook 'python-hook 'idiig/run-prog-mode-hooks)
 	    "
 	      (run-hooks 'prog-mode-hook))
-	    
-	    ;; 为每种语言添加钩子
-	    (add-hook 'after-init-hook
-	     (dolist (lang idiig/language-list)
-	       (let ((mode-hook (intern (concat lang "-mode-hook"))))
-	         (add-hook mode-hook 'idiig/run-prog-mode-hooks))))
 	    (defmacro idiig//setup-nix-lsp-bridge-server (language server-name executable-path &optional lib-path)
 	      "配置 Nix 环境下的 LSP 服务器。
 	    LANGUAGE 是语言名称，如 'python'。
@@ -640,7 +652,6 @@
 	    
 	    (use-package yasnippet
 	      :defer t
-	      ;; :diminish
 	      :hook
 	      (prog-mode . yas-minor-mode)
 	      :init
@@ -648,6 +659,10 @@
 	      ;; (push idiig/snippet-dir yas-snippet-dirs)
 	      :config
 	      (yas-reload-all))
+	    (use-package consult
+	      :after
+	      (consult
+	       yas-minor-mode))
 	    (idiig//setup-nix-lsp-bridge-server 
 	     "nix" 
 	     "nixd" 
@@ -665,6 +680,7 @@
 	     nil)
 	    
 	    (add-to-list 'exec-path "${pkgs.texliveFull}/bin")
+	    (add-hook 'org-mode-hook 'idiig/run-prog-mode-hooks)
 	    (with-eval-after-load 'org
 	      (defun idiig/org-insert-structure-template-src-advice (orig-fun type)
 	        "Advice for org-insert-structure-template to handle src blocks."
@@ -684,7 +700,6 @@
 	    (add-hook 'org-mode-hook #'idiig/load-org-babel-languages)
 	    (with-eval-after-load 'org
 	      (setq org-support-shift-select 2))
-	    (add-hook 'org-mode-hook #'visual-line-mode)
 	    (with-eval-after-load 'org
 	      (setq org-display-remote-inline-images t))
 	    (add-hook 'org-mode-hook
@@ -861,6 +876,7 @@
             treesit-auto
             # yasnippet
             yasnippet-snippets
+              consult-yasnippet
             nix-mode
             auctex
               auctex-latexmk

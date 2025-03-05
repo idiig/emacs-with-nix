@@ -440,21 +440,16 @@ emacs在打开新的窗口时，默认光标维持在原来的窗口。比如当
   (use-package recentf
     :defer t
     :commands
-    (recentf-open-files consult-recent-file)
-    :bind
-    ("C-x C-r" . recentf-open-files)
+    (consult-recent-file)
     :init
     (setq recentf-save-file (expand-file-name "recentf" user-emacs-directory)
           recentf-max-saved-items 500
-          recentf-max-menu-items 25
-          ;; recentf-auto-cleanup 'never
-          )
+          recentf-max-menu-items 20)
     (setq recentf-exclude
           '("COMMIT_MSG"
             "COMMIT_EDITMSG"
             "github.*txt$"
             "/tmp/"
-            "/ssh:"
             "/sudo:"
             "/TAGS$"
             "/GTAGS$"
@@ -463,7 +458,6 @@ emacs在打开新的窗口时，默认光标维持在原来的窗口。比如当
             "\\.mkv$"
             "\\.mp[34]$"
             "\\.avi$"
-            "\\.pdf$"
             "\\.sub$"
             "\\.srt$"
             "\\.ass$"
@@ -532,13 +526,15 @@ emacs在打开新的窗口时，默认光标维持在原来的窗口。比如当
 :END:
 
 #+begin_src emacs-lisp
-  ;; 自动折行
+  ;; 物理折行与复原
   (use-package unfill
     :defer t
     :commands (unfill-region unfill-paragraph unfill-toggle)
     :init
     (global-set-key [remap fill-paragraph] #'unfill-toggle))
 #+end_src
+
+#+RESULTS:
 
 **** 更好的minibuffer
 :PROPERTIES:
@@ -610,7 +606,7 @@ emacs在打开新的窗口时，默认光标维持在原来的窗口。比如当
     (vertico-mode)
     :config
     ;; 表示行数
-    (setq vertico-count 30)
+    (setq vertico-count 24)
     ;; 可循环
     (setq vertico-cycle t))
 #+end_src
@@ -708,11 +704,11 @@ emacs在打开新的窗口时，默认光标维持在原来的窗口。比如当
            ([remap goto-line] . consult-goto-line)
            ([remap switch-to-buffer] . consult-buffer)
            ([remap find-file] . find-file)
-           ([remap recentf-open-file] . consult-recent-file)
+  	 ([remap imenu] . consult-imenu)
+           ("C-x C-r" . consult-recent-file)
            ("C-c y" . consult-yasnippet)
            ("C-c f" . consult-find)
            ("C-s" . consult-line)
-           ("C-c i" . consult-imenu)
            ("C-c o" . consult-file-externally)
            ("C-x p f" . consult-ripgrep)
            (:map minibuffer-local-map
@@ -764,9 +760,6 @@ emacs在打开新的窗口时，默认光标维持在原来的窗口。比如当
       (define-key consult-narrow-map
         (vconcat consult-narrow-key "?") #'consult-narrow-help)))
 #+end_src
-
-#+RESULTS:
-: previous-history-element
 
 - *Embark*: minibuffer action 和自适应的context menu
 
@@ -848,6 +841,7 @@ emacs在打开新的窗口时，默认光标维持在原来的窗口。比如当
     :defer t
     :after (consult)
     :commands er/expand-region
+    :bind ("C-=" . er/expand-region)
     :config
     (with-eval-after-load 'expand-region
       (defadvice er/prepare-for-more-expansions-internal
@@ -1117,6 +1111,38 @@ emacs在打开新的窗口时，默认光标维持在原来的窗口。比如当
     (add-to-list 'exec-path "${pkgs.git}/bin"))
 #+END_SRC
 
+
+** 文档写作
+:PROPERTIES:
+:header-args: :noweb-ref emacs-config
+:END:
+
+#+begin_src emacs-lisp
+  (defvar idiig/writing-environment-list '("\\.org\\'"
+                                          "\\.md\\'"
+                                          "\\.qmd\\'"
+                                          "\\.rmd\\'"
+                                          "\\.typ\\'"
+                                          "\\.tex\\'"
+                                          "\\.bib\\'"
+                                          "\\.txt\\'"))
+
+  (defun idiig/in-writing-environment-p ()
+    "Check if current buffer file matches any pattern in idiig/writing-environment-list."
+    (when (buffer-file-name)
+      (cl-some (lambda (pattern)
+                 (string-match-p pattern (buffer-file-name)))
+               idiig/writing-environment-list)))
+
+  (add-hook 'find-file-hook
+            (lambda ()
+              (when (idiig/in-writing-environment-p)
+                (visual-line-mode 1))))
+
+  (with-eval-after-load 'diminish
+    (diminish 'visual-line-mode))
+#+end_src
+
 ** 编程工具
 *** 我有可能使用的语言
 :PROPERTIES:
@@ -1136,12 +1162,6 @@ emacs在打开新的窗口时，默认光标维持在原来的窗口。比如当
   如：(add-hook 'python-hook 'idiig/run-prog-mode-hooks)
   "
     (run-hooks 'prog-mode-hook))
-
-  ;; 为每种语言添加钩子
-  (add-hook 'after-init-hook
-   (dolist (lang idiig/language-list)
-     (let ((mode-hook (intern (concat lang "-mode-hook"))))
-       (add-hook mode-hook 'idiig/run-prog-mode-hooks))))
 #+end_src
 
 *** 语言服务器（LSP-Bridge)
@@ -1333,6 +1353,7 @@ Snippet 用于快速插入模板
 #+begin_src nix
   # yasnippet
   yasnippet-snippets
+    consult-yasnippet
 #+end_src
 
 **** 配置
@@ -1345,7 +1366,6 @@ Snippet 用于快速插入模板
 
   (use-package yasnippet
     :defer t
-    ;; :diminish
     :hook
     (prog-mode . yas-minor-mode)
     :init
@@ -1353,6 +1373,15 @@ Snippet 用于快速插入模板
     ;; (push idiig/snippet-dir yas-snippet-dirs)
     :config
     (yas-reload-all))
+#+end_src
+
+加载用于yasnippet的的合集
+
+#+begin_src emacs-lisp
+  (use-package consult
+    :after
+    (consult
+     yas-minor-mode))
 #+end_src
 
 ** 编程与文档语言
@@ -1404,13 +1433,16 @@ Snippet 用于快速插入模板
 *** TeX
 
 **** 依赖
+:PROPERTIES:
+:header-args: :noweb-ref emacs-config
+:END:
 
 #+begin_src nix :noweb-ref emacs-packages
   auctex
     auctex-latexmk
 #+end_src
 
-#+begin_src emacs-lisp :noweb-ref emacs-config
+#+begin_src emacs-lisp
   (idiig//setup-nix-lsp-bridge-server 
    "tex" 
    "texlab" 
@@ -1421,6 +1453,15 @@ Snippet 用于快速插入模板
 #+end_src
 
 **** 配置
+
+#+begin_src emacs-lisp
+  (add-hook 'TeX-mode-hook 'idiig/run-prog-mode-hooks)
+#+end_src
+
+#+begin_src emacs-lisp
+  (use-package auctex
+    :defer t)
+#+end_src
 
 *** Typst
 
@@ -1438,9 +1479,14 @@ Snippet 用于快速插入模板
 :header-args: :noweb-ref emacs-config
 :END:
 
-**** 函数与advice
+**** 绑定 prog mode
 
-=org-insert-structure-template= 后选择 =s= (src block) 时自动提示插入代码块的语言
+#+begin_src emacs-lisp
+  (add-hook 'org-mode-hook 'idiig/run-prog-mode-hooks)
+#+end_src
+
+**** 函数与advice
+=org-insert-structure-template= 后选择 =s= (src block) 时自动提示插入代码块的语言。
 
 #+begin_src emacs-lisp
   (with-eval-after-load 'org
@@ -1480,11 +1526,6 @@ Snippet 用于快速插入模板
 #+begin_src emacs-lisp 
   (with-eval-after-load 'org
     (setq org-support-shift-select 2))
-#+end_src
-
-- 允许折行
-#+begin_src emacs-lisp
-  (add-hook 'org-mode-hook #'visual-line-mode)
 #+end_src
 
 - 远程图片文件可以通过 =C-u C-c C-x C-v= 被看到
