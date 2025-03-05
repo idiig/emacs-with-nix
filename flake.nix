@@ -38,9 +38,9 @@
 		      emacsConfig = pkgs.writeText "init.el" ''
 	    ;; 在mac中使用Command key作为meta
 	    (setq mac-option-key-is-meta nil
-	    	mac-command-key-is-meta t
-	    	mac-command-modifier 'meta
-	    	mac-option-modifier 'none)
+	          mac-command-key-is-meta t
+	          mac-command-modifier 'meta
+	          mac-option-modifier 'none)
 	    
 	    ;; 便于使用mac的JIS日语键盘
 	    (global-set-key (kbd "C-¥") 'toggle-input-method)
@@ -80,8 +80,8 @@
 	    (setq switch-to-buffer-obey-display-actions t)
 	    (setq switch-to-buffer-in-dedicated-window 'pop)
 	    (customize-set-variable 'display-buffer-base-action
-	    			  '((display-buffer-reuse-window display-buffer-same-window)
-	    			    (reusable-frames . t)))
+	    			'((display-buffer-reuse-window display-buffer-same-window)
+	    			  (reusable-frames . t)))
 	    (defadvice split-window-below (after split-window-below-and-switch activate)
 	      "切换到新分割的窗口"
 	      (when (called-interactively-p 'any)
@@ -93,47 +93,55 @@
 	        (other-window 1)))
 	    (global-set-key (kbd "C-x V") 'shrink-window)
 	    
-	    (defun idiig/window-adjust (orig-fun &rest args)
+	    (defun idiig/window-adjust-advice (orig-fun &rest args)
 	      "使用 Emacs 风格按键 (^, V, {, }, +) 持续调整窗口大小。"
 	      (let* ((ev last-command-event)
-	    	   (echo-keystrokes nil))
+	    	 (echo-keystrokes nil))
 	        ;; 执行初始调整
 	        (apply orig-fun args)
 	    
 	        ;; 设置 transient map
 	        (let ((delta (car args))) 
-	    	(set-transient-map
-	    	 (let ((map (make-sparse-keymap)))
-	    	   ;; 垂直调整
-	    	   (define-key map (kbd "^")
-	    		       `(lambda () (interactive) (enlarge-window ,delta nil)))
-	    	   (define-key map (kbd "V")
-	    		       `(lambda () (interactive) (shrink-window ,delta nil)))
+	          (set-transient-map
+	           (let ((map (make-sparse-keymap)))
+	    	 ;; 垂直调整
+	    	 (define-key map (kbd "^")
+	    		     `(lambda () (interactive) (enlarge-window ,delta nil)))
+	    	 (define-key map (kbd "V")
+	    		     `(lambda () (interactive) (shrink-window ,delta nil)))
 	    
-	    	   ;; 水平调整
-	    	   (define-key map (kbd "{")
-	    		       `(lambda () (interactive) (shrink-window ,delta t)))
-	    	   (define-key map (kbd "}")
-	    		       `(lambda () (interactive) (enlarge-window ,delta t)))
+	    	 ;; 水平调整
+	    	 (define-key map (kbd "{")
+	    		     `(lambda () (interactive) (shrink-window ,delta t)))
+	    	 (define-key map (kbd "}")
+	    		     `(lambda () (interactive) (enlarge-window ,delta t)))
 	    
-	    	   ;; 平衡窗口
-	    	   (define-key map (kbd "+")
-	    		       (lambda () (interactive) (balance-windows)))
-	    	   map)
-	    	 nil nil
-	    	 "Use %k for further adjustment"))))
+	    	 ;; 平衡窗口
+	    	 (define-key map (kbd "+")
+	    		     (lambda () (interactive) (balance-windows)))
+	    	 ;; 最大化窗口
+	    	 (define-key map (kbd "M")
+	    		     (lambda () (interactive) (maximize-window)))
+	    	 ;; 最小化窗口
+	    	 (define-key map (kbd "m")
+	    		     (lambda () (interactive) (minimize-window)))
+	    	 map)
+	           nil nil
+	           "Use %k for further adjustment"))))
 	    
 	    ;; ;; 如果需要移除 advice:
-	    ;; (advice-remove 'enlarge-window #'idiig/window-adjust)
-	    ;; (advice-remove 'shrink-window #'idiig/window-adjust)
-	    ;; (advice-remove 'enlarge-window-horizontally #'idiig/window-adjust)
-	    ;; (advice-remove 'shrink-window-horizontally #'idiig/window-adjust)
+	    ;; (advice-remove 'enlarge-window #'idiig/window-adjust-advice)
+	    ;; (advice-remove 'shrink-window #'idiig/window-adjust-advice)
+	    ;; (advice-remove 'enlarge-window-horizontally #'idiig/window-adjust-advice)
+	    ;; (advice-remove 'shrink-window-horizontally #'idiig/window-adjust-advice)
 	    
 	    ;; 添加 advice
-	    (advice-add 'enlarge-window :around #'idiig/window-adjust)
-	    (advice-add 'shrink-window :around #'idiig/window-adjust)
-	    (advice-add 'enlarge-window-horizontally :around #'idiig/window-adjust)
-	    (advice-add 'shrink-window-horizontally :around #'idiig/window-adjust)
+	    (advice-add 'enlarge-window :around #'idiig/window-adjust-advice)
+	    (advice-add 'shrink-window :around #'idiig/window-adjust-advice)
+	    (advice-add 'enlarge-window-horizontally :around #'idiig/window-adjust-advice)
+	    (advice-add 'shrink-window-horizontally :around #'idiig/window-adjust-advice)
+	    (advice-add 'maximize-window :around #'idiig/window-adjust-advice)
+	    (advice-add 'minimize-window :around #'idiig/window-adjust-advice)
 	    ;; 不存在文档时询问是否新建
 	    (add-hook 'before-save-hook
 	              (lambda ()
@@ -199,21 +207,13 @@
 	            savehist-file (expand-file-name "savehist" user-emacs-directory))
 	      (savehist-mode t))
 	    (use-package bookmark
-	      :config
+	      :init
 	      (setq bookmark-default-file (expand-file-name "bookmarks" user-emacs-directory)
 	            bookmark-save-flag 1))
 	    (use-package saveplace
-	      :config
+	      :init
 	      (setq save-place-file (expand-file-name "place" user-emacs-directory))
 	      (save-place-mode 1))
-	    (use-package hungry-delete
-	      :after puni
-	      :diminish hungry-delete-mode
-	      :init (setq hungry-delete-except-modes
-	                  '(help-mode minibuffer-mode minibuffer-inactive-mode calc-mode))
-	      :config
-	      (setq-default hungry-delete-chars-to-skip " \t\f\v")  ;; 删除的空白符号 
-	      (global-hungry-delete-mode t))
 	    (use-package mwim
 	      :bind
 	      ("C-a" . mwim-beginning-of-code-or-line-or-comment)
@@ -400,7 +400,7 @@
 	          :type '(repeat symbol))
 	        ;; ？提示检索buffer类型；f<SPC>=file, p<SPC>=project, etc..
 	        (define-key consult-narrow-map
-	          (vconcat consult-narrow-key "?") #'consult-narrow-help)))
+	    		(vconcat consult-narrow-key "?") #'consult-narrow-help)))
 	    (use-package embark
 	      :after vertico
 	      :bind
@@ -475,9 +475,12 @@
 	      :defer t
 	      :bind
 	      (:map puni-mode-map
-	    	([remap puni-kill-line] . idiig/puni-kill-line)
-	    	("C-=" . puni-expand-region)
-	    	("C--" . puni-contract-region))
+	      	([remap puni-kill-line] . idiig/puni-kill-line)
+	      	([remap puni-kill-region] . idiig/puni-backward-kill-word-or-region)
+	    	([remap puni-forward-delete-char] . idiig/puni-hungry-delete)
+	    	([remap puni-backward-delete-char] . idiig/puni-hungry-backspace)
+	      	("C-=" . puni-expand-region)
+	      	("C--" . puni-contract-region))
 	      :init
 	      ;; The autoloads of Puni are set up so you can enable `puni-mode` or
 	      ;; `puni-global-mode` before `puni` is actually loaded. Only after you press
@@ -487,20 +490,43 @@
 	      :config
 	      (defun idiig/puni-kill-line ()
 	        "Kill a line forward while keeping expressions balanced.
-	    If nothing can be deleted, kill backward.  If still nothing can be
-	    deleted, kill the pairs around point."
+	      If nothing can be deleted, kill backward.  If still nothing can be
+	      deleted, kill the pairs around point."
 	        (interactive)
 	        (let ((bounds (puni-bounds-of-list-around-point)))
 	          (if (eq (car bounds) (cdr bounds))
 	              (when-let ((sexp-bounds (puni-bounds-of-sexp-around-point)))
 	                (puni-delete-region (car sexp-bounds) (cdr sexp-bounds) 'kill))
-	    	(if (eq (point) (cdr bounds))
+	      	(if (eq (point) (cdr bounds))
 	                (puni-backward-kill-line)
-	              (puni-kill-line))))))
+	              (puni-kill-line)))))
+	    
+	      (defun idiig/puni-backward-kill-word-or-region (&optional arg)
+	        "如无选中则杀掉前面的单词，如有选中则杀掉选中区域"
+	        (interactive "p")
+	        (if (region-active-p)
+	      	(call-interactively #'puni-kill-region)
+	          (puni-backward-kill-word arg)))
+	    
+	      (defun idiig/puni-hungry-backspace ()
+	        "Smart backspace function."
+	        (interactive)
+	        (if (looking-back (rx line-start (+ blank)))
+	    	(delete-region (line-beginning-position) (point))
+	          (puni-backward-delete-char)))
+	    
+	      (defun idiig/puni-hungry-delete ()
+	        "Smart delete function."
+	        (interactive)
+	        (if (looking-at (rx (+ blank) (not blank)))
+	    	(delete-region (point) (progn 
+	    				 (skip-chars-forward " \t\f\v")
+	    				 (point)))
+	          (puni-forward-delete-char))))
 	    ;; 添加 advice
 	    (with-eval-after-load 'puni
 	      (defun idiig/puni-expand-region-advice (orig-fun &rest args)
-	        "使用 Emacs 风格按键 (^, V, {, }, +) 持续调整窗口大小。"
+	        "使用选中后的操作"
 	        
 	        (let* ((ev last-command-event)
 	               (echo-keystrokes nil))
@@ -529,19 +555,19 @@
 	    	 "Use %k for further adjustment"))))
 	      (advice-add 'puni-expand-region :around #'idiig/puni-expand-region-advice))
 	    (add-hook 'after-init-hook
-	    	    (lambda ()
-	    	      (let* ((screen-height (display-pixel-height))
-	    		     (font-height (if (and
-	    				       (< screen-height 1150)
-	    				       (> screen-height 1200)) 230 130))  ;; 根据屏幕高度调整
-	    		     (minibuffer-font-height (- font-height 0))
-	    		     (my-font "Sarasa Mono SC"))
-	    		(set-face-attribute 'default nil :family my-font :height font-height)
-	    		;; 设置 mode-line 字体
-	    		(set-face-attribute 'mode-line nil :family my-font :height font-height)
-	    		(set-face-attribute 'mode-line-inactive nil :family my-font :height font-height)
-	    		;; 设置 minibuffer 字体
-	    		(set-face-attribute 'minibuffer-prompt nil :family my-font :height minibuffer-font-height))))
+	    	  (lambda ()
+	    	    (let* ((screen-height (display-pixel-height))
+	    		   (font-height (if (and
+	    				     (< screen-height 1150)
+	    				     (> screen-height 1200)) 230 130))  ;; 根据屏幕高度调整
+	    		   (minibuffer-font-height (- font-height 0))
+	    		   (my-font "Sarasa Mono SC"))
+	    	      (set-face-attribute 'default nil :family my-font :height font-height)
+	    	      ;; 设置 mode-line 字体
+	    	      (set-face-attribute 'mode-line nil :family my-font :height font-height)
+	    	      (set-face-attribute 'mode-line-inactive nil :family my-font :height font-height)
+	    	      ;; 设置 minibuffer 字体
+	    	      (set-face-attribute 'minibuffer-prompt nil :family my-font :height minibuffer-font-height))))
 	    
 	    ;; 工具栏，菜单保持默认字体
 	    (set-face-attribute 'menu nil :inherit 'unspecified)
@@ -609,14 +635,14 @@
 	        (call-interactively #'pyim-activate)
 	        (call-interactively #'pyim-deactivate)
 	        (if idiig/pyim-region-enabled
-	    	  (progn
-	    	    (idiig/disable-pyim-region)
-	    	    (setq idiig/pyim-region-enabled nil)
-	    	    (message "已禁用pyim区域功能"))
 	    	(progn
-	    	  (idiig/enable-pyim-region)
-	    	  (setq idiig/pyim-region-enabled t)
-	    	  (message "已启用pyim区域功能"))))
+	    	  (idiig/disable-pyim-region)
+	    	  (setq idiig/pyim-region-enabled nil)
+	    	  (message "已禁用pyim区域功能"))
+	          (progn
+	    	(idiig/enable-pyim-region)
+	    	(setq idiig/pyim-region-enabled t)
+	    	(message "已启用pyim区域功能"))))
 	    
 	      (defun idiig/enable-pyim-region (&rest _)
 	        "启用pyim的单词移动建议。"
@@ -640,7 +666,7 @@
 	        (call-interactively #'pyim-activate)
 	        (call-interactively #'pyim-deactivate)
 	        (let ((result (funcall orig_func component)))
-	    	(pyim-cregexp-build result)))
+	          (pyim-cregexp-build result)))
 	      (advice-add 'orderless-regexp :around #'zh-orderless-regexp))
 	    (use-package magit
 	      :bind ("C-x g" . magit-status)
@@ -649,13 +675,13 @@
 	      ;; 使用nix路径中的git
 	      (add-to-list 'exec-path "${pkgs.git}/bin"))
 	    (defvar idiig/writing-environment-list '("\\.org\\'"
-	                                            "\\.md\\'"
-	                                            "\\.qmd\\'"
-	                                            "\\.rmd\\'"
-	                                            "\\.typ\\'"
-	                                            "\\.tex\\'"
-	                                            "\\.bib\\'"
-	                                            "\\.txt\\'"))
+	                                             "\\.md\\'"
+	                                             "\\.qmd\\'"
+	                                             "\\.rmd\\'"
+	                                             "\\.typ\\'"
+	                                             "\\.tex\\'"
+	                                             "\\.bib\\'"
+	                                             "\\.txt\\'"))
 	    (defun idiig/in-writing-environment-p ()
 	      "Check if current buffer file matches any pattern in idiig/writing-environment-list."
 	      (when (buffer-file-name)
@@ -670,13 +696,14 @@
 	    
 	    (with-eval-after-load 'diminish
 	      (diminish 'visual-line-mode))
-	    (defun idiig/backward-kill-word-or-region (&optional arg)
-	      (interactive "p")
-	      (if (region-active-p)
-	    	(call-interactively #'kill-region)
-	        (backward-kill-word arg)))
+	    (with-eval-after-load 'puni
+	      (defun idiig/backward-kill-word-or-region (&optional arg)
+	        (interactive "p")
+	        (if (region-active-p)
+	    	(call-interactively #'puni-kill-active-region)
+	          (backward-kill-word arg)))
 	    
-	    (global-set-key (kbd "C-w") 'idiig/backward-kill-word-or-region) 
+	      (global-set-key (kbd "C-w") 'idiig/backward-kill-word-or-region))
 	    (defun idiig/indent-buffer()
 	      (interactive)
 	      (indent-region (point-min) (point-max)))
@@ -739,8 +766,8 @@
 	         ;; 添加库路径到 LD_LIBRARY_PATH
 	         ,(when lib-path
 	            `(setenv "LD_LIBRARY_PATH" 
-	                    (concat ,lib-path ":" 
-	                            (or (getenv "LD_LIBRARY_PATH") ""))))))
+	                     (concat ,lib-path ":" 
+	                             (or (getenv "LD_LIBRARY_PATH") ""))))))
 	    (use-package lsp-bridge
 	      :defer t
 	      :diminish lsp-bridge-mode
@@ -759,8 +786,8 @@
 	      :init
 	      ;; 这里是为了让语言服务器找到正确的版本的 libstdc++.so.6 库
 	      (setenv "LD_LIBRARY_PATH" 
-	                (concat "${pkgs.stdenv.cc.cc.lib}/lib:" 
-	                        (or (getenv "LD_LIBRARY_PATH") ""))))
+	              (concat "${pkgs.stdenv.cc.cc.lib}/lib:" 
+	                      (or (getenv "LD_LIBRARY_PATH") ""))))
 	    (use-package treesit-auto
 	      :custom
 	      (treesit-auto-install 'prompt)   ; 设置安装 tree-sitter 语法时提示用户确认
@@ -806,16 +833,16 @@
 	      (defun idiig/org-insert-structure-template-src-advice (orig-fun type)
 	        "Advice for org-insert-structure-template to handle src blocks."
 	        (if (string= type "src")  ; 判断条件为 "src"
-	    	  (let ((selected-type (ido-completing-read "Source code type: " idiig/language-list)))
-	    	    (funcall orig-fun (format "src %s" selected-type)))
-	    	(funcall orig-fun type)))
+	    	(let ((selected-type (ido-completing-read "Source code type: " idiig/language-list)))
+	    	  (funcall orig-fun (format "src %s" selected-type)))
+	          (funcall orig-fun type)))
 	    
 	      (advice-add 'org-insert-structure-template :around #'idiig/org-insert-structure-template-src-advice))
 	    (defun idiig/load-org-babel-languages ()
 	      "根据 `idiig/language-list` 启用 `org-babel` 语言。"
 	      (let ((languages '()))
 	        (dolist (lang idiig/language-list)
-	    	(push (cons (intern lang) t) languages)) ;; 将字符串转换为符号
+	          (push (cons (intern lang) t) languages)) ;; 将字符串转换为符号
 	        (org-babel-do-load-languages 'org-babel-load-languages languages)))
 	    
 	    (add-hook 'org-mode-hook #'idiig/load-org-babel-languages)
@@ -828,105 +855,107 @@
 	                (when (string-match-p "\\.ai\\.org\\'" (buffer-file-name))
 	                  (gptel-mode 1))))
 	    (add-to-list 'exec-path "${pkgs.aider-chat}/bin")
-	    ;; (defalias 'meow-visit #'ctrlf-forward-default) ; 需要ctrlf
-	    
-	    ;; https://github.com/meow-edit/meow/blob/master/KEYBINDING_QWERTY.org
-	    (defun meow-setup ()
-	      (setq meow-cheatsheet-layout meow-cheatsheet-layout-qwerty)
-	      (meow-motion-define-key
-	       '("j" . meow-next)
-	       '("k" . meow-prev)
-	       '("<escape>" . ignore))
-	      (meow-leader-define-key
-	       ;; Use SPC (0-9) for digit arguments.
-	       '("1" . meow-digit-argument)
-	       '("2" . meow-digit-argument)
-	       '("3" . meow-digit-argument)
-	       '("4" . meow-digit-argument)
-	       '("5" . meow-digit-argument)
-	       '("6" . meow-digit-argument)
-	       '("7" . meow-digit-argument)
-	       '("8" . meow-digit-argument)
-	       '("9" . meow-digit-argument)
-	       '("0" . meow-digit-argument)
-	       '("/" . meow-keypad-describe-key)
-	       '("?" . meow-cheatsheet))
-	      (meow-normal-define-key
-	       '("0" . meow-expand-0)
-	       '("9" . meow-expand-9)
-	       '("8" . meow-expand-8)
-	       '("7" . meow-expand-7)
-	       '("6" . meow-expand-6)
-	       '("5" . meow-expand-5)
-	       '("4" . meow-expand-4)
-	       '("3" . meow-expand-3)
-	       '("2" . meow-expand-2)
-	       '("1" . meow-expand-1)
-	       '("-" . negative-argument)
-	       '(";" . meow-reverse)
-	       '("," . meow-inner-of-thing)
-	       '("." . meow-bounds-of-thing)
-	       '("[" . meow-beginning-of-thing)
-	       '("]" . meow-end-of-thing)
-	       '("a" . meow-append)
-	       '("A" . meow-open-below)
-	       '("b" . meow-back-word)
-	       '("B" . meow-back-symbol)
-	       '("c" . meow-change)
-	       '("d" . meow-delete)
-	       '("D" . meow-backward-delete)
-	       '("e" . meow-next-word)
-	       '("E" . meow-next-symbol)
-	       '("f" . meow-find)
-	       '("g" . meow-cancel-selection)
-	       '("G" . meow-grab)
-	       '("h" . meow-left)
-	       '("H" . meow-left-expand)
-	       '("i" . meow-insert)
-	       '("I" . meow-open-above)
-	       '("j" . meow-next)
-	       '("J" . meow-next-expand)
-	       '("k" . meow-prev)
-	       '("K" . meow-prev-expand)
-	       '("l" . meow-right)
-	       '("L" . meow-right-expand)
-	       '("m" . meow-join)
-	       '("n" . meow-search)
-	       '("o" . meow-block)
-	       '("O" . meow-to-block)
-	       '("p" . meow-yank)
-	       '("q" . meow-quit)
-	       '("Q" . meow-goto-line)
-	       '("r" . meow-replace)
-	       '("R" . meow-swap-grab)
-	       '("s" . meow-kill)
-	       '("t" . meow-till)
-	       '("u" . meow-undo)
-	       '("U" . meow-undo-in-selection)
-	       '("v" . meow-visit)
-	       '("w" . meow-mark-word)
-	       '("W" . meow-mark-symbol)
-	       '("x" . meow-line)
-	       '("X" . meow-goto-line)
-	       '("y" . meow-save)
-	       '("Y" . meow-sync-grab)
-	       '("z" . meow-pop-selection)
-	       '("'" . repeat)
-	       '("<escape>" . ignore)))
-	    
-	    (require 'meow)
-	    (meow-setup)
-	    (meow-global-mode 1)
+	    (use-package meow
+	      :bind
+	      ("C-M-s" . meow-visit)
+	      :init
+	      ;; https://github.com/meow-edit/meow/blob/master/KEYBINDING_QWERTY.org
+	      (require 'meow)
+	      (defun meow-setup ()
+	        (setq meow-cheatsheet-layout meow-cheatsheet-layout-qwerty)
+	        (meow-motion-define-key
+	         '("j" . meow-next)
+	         '("k" . meow-prev)
+	         '("<escape>" . ignore))
+	        (meow-leader-define-key
+	         ;; Use SPC (0-9) for digit arguments.
+	         '("1" . meow-digit-argument)
+	         '("2" . meow-digit-argument)
+	         '("3" . meow-digit-argument)
+	         '("4" . meow-digit-argument)
+	         '("5" . meow-digit-argument)
+	         '("6" . meow-digit-argument)
+	         '("7" . meow-digit-argument)
+	         '("8" . meow-digit-argument)
+	         '("9" . meow-digit-argument)
+	         '("0" . meow-digit-argument)
+	         '("/" . meow-keypad-describe-key)
+	         '("?" . meow-cheatsheet))
+	        (meow-normal-define-key
+	         '("0" . meow-expand-0)
+	         '("9" . meow-expand-9)
+	         '("8" . meow-expand-8)
+	         '("7" . meow-expand-7)
+	         '("6" . meow-expand-6)
+	         '("5" . meow-expand-5)
+	         '("4" . meow-expand-4)
+	         '("3" . meow-expand-3)
+	         '("2" . meow-expand-2)
+	         '("1" . meow-expand-1)
+	         '("-" . negative-argument)
+	         '(";" . meow-reverse)
+	         '("," . meow-inner-of-thing)
+	         '("." . meow-bounds-of-thing)
+	         '("[" . meow-beginning-of-thing)
+	         '("]" . meow-end-of-thing)
+	         '("a" . meow-append)
+	         '("A" . meow-open-below)
+	         '("b" . meow-back-word)
+	         '("B" . meow-back-symbol)
+	         '("c" . meow-change)
+	         '("d" . meow-delete)
+	         '("D" . meow-backward-delete)
+	         '("e" . meow-next-word)
+	         '("E" . meow-next-symbol)
+	         '("f" . meow-find)
+	         '("g" . meow-cancel-selection)
+	         '("G" . meow-grab)
+	         '("h" . meow-left)
+	         '("H" . meow-left-expand)
+	         '("i" . meow-insert)
+	         '("I" . meow-open-above)
+	         '("j" . meow-next)
+	         '("J" . meow-next-expand)
+	         '("k" . meow-prev)
+	         '("K" . meow-prev-expand)
+	         '("l" . meow-right)
+	         '("L" . meow-right-expand)
+	         '("m" . meow-join)
+	         '("n" . meow-search)
+	         '("o" . meow-block)
+	         '("O" . meow-to-block)
+	         '("p" . meow-yank)
+	         '("q" . meow-quit)
+	         '("Q" . meow-goto-line)
+	         '("r" . meow-replace)
+	         '("R" . meow-swap-grab)
+	         '("s" . meow-kill)
+	         '("t" . meow-till)
+	         '("u" . meow-undo)
+	         '("U" . meow-undo-in-selection)
+	         '("v" . meow-visit)
+	         '("w" . meow-mark-word)
+	         '("W" . meow-mark-symbol)
+	         '("x" . meow-line)
+	         '("X" . meow-goto-line)
+	         '("y" . meow-save)
+	         '("Y" . meow-sync-grab)
+	         '("z" . meow-pop-selection)
+	         '("'" . repeat)
+	         '("<escape>" . ignore)))
+	      (meow-setup)
+	      :config
+	      (meow-global-mode 1))
 	    (require 'meow-tree-sitter)
 	    (meow-tree-sitter-register-defaults)  
 	    (defvar-local the-late-input-method nil)
 	    (add-hook 'meow-insert-enter-hook
-	    	    (lambda ()
-	    	      (activate-input-method the-late-input-method)))
+	    	  (lambda ()
+	    	    (activate-input-method the-late-input-method)))
 	    (add-hook 'meow-insert-exit-hook
-	    	    (lambda ()
-	    	      (setq the-late-input-method current-input-method)
-	    	      (deactivate-input-method)))
+	    	  (lambda ()
+	    	    (setq the-late-input-method current-input-method)
+	    	    (deactivate-input-method)))
 	    ;; (defvar idiig/eaf-path (concat user-emacs-directory "site-lisp/emacs-application-framework"))
 	    ;; (add-to-list 'load-path idiig/eaf-path)
 	    ;; (setq eaf-python-command (concat idiig/eaf-path "/eaf/bin/python"))
@@ -950,16 +979,16 @@
 	    
 	    ;; 启动完成后恢复正常 GC 设定
 	    (add-hook 'emacs-startup-hook
-	    	    (lambda ()
-	    	      (setq gc-cons-threshold 10485760
-	    		    gc-cons-percentage 0.1)))
+	    	  (lambda ()
+	    	    (setq gc-cons-threshold 10485760
+	    		  gc-cons-percentage 0.1)))
 	    
 	    ;; 禁用bidi，加速大文件
 	    (setq-default bidi-display-reordering nil)
 	    (setq bidi-inhibit-bpa t
-	    	long-line-threshold 1000
-	    	large-hscroll-threshold 1000
-	    	syntax-wholeline-max 1000)
+	          long-line-threshold 1000
+	          large-hscroll-threshold 1000
+	          syntax-wholeline-max 1000)
 	    '';
 
           # 首先定义你的基础 Emacs
@@ -972,8 +1001,7 @@
           emacsWithPackages = ((pkgs.emacsPackagesFor emacs).overrideScope overrides).withPackages (epkgs: with epkgs; [
             use-package
               diminish
-            hungry-delete
-              mwim
+            mwim
             unfill
             vertico
               orderless
@@ -1006,7 +1034,7 @@
             gptel
             # aider
             meow
-            meow-tree-sitter
+              meow-tree-sitter
             eaf
               eaf-browser
               # eaf-pdf-viewer
@@ -1025,14 +1053,14 @@
 
 	      # 路径
 	      if [ "$(uname)" = "Darwin" ]; then
-	        # macOS
-	        mkdir -p "$HOME/Library/Fonts/"
-	        ${pkgs.rsync}/bin/rsync -av ${pkgs.sarasa-gothic}/share/fonts/truetype/ "$HOME/Library/Fonts/"
+	          # macOS
+	          mkdir -p "$HOME/Library/Fonts/"
+	          ${pkgs.rsync}/bin/rsync -av ${pkgs.sarasa-gothic}/share/fonts/truetype/ "$HOME/Library/Fonts/"
 	      else
-	        # Assume Linux
-	        mkdir -p "$HOME/.local/share/fonts/truetype/"
-	        ${pkgs.rsync}/bin/rsync -av ${pkgs.sarasa-gothic}/share/fonts/truetype/ "$HOME/.local/share/fonts/sarasa-gothic/"
-	        fc-cache -f -v ~/.local/share/fonts/
+	          # Assume Linux
+	          mkdir -p "$HOME/.local/share/fonts/truetype/"
+	          ${pkgs.rsync}/bin/rsync -av ${pkgs.sarasa-gothic}/share/fonts/truetype/ "$HOME/.local/share/fonts/sarasa-gothic/"
+	          fc-cache -f -v ~/.local/share/fonts/
 	      fi
 
 	      # 更新 Emacs 路径（兼容 macOS 和 Linux）
