@@ -77,11 +77,6 @@
 	                       (abbreviate-file-name (buffer-file-name)) "%b"))))
 	    (setq ns-use-proxy-icon nil)  ;; 删除frame icon
 	    (require-theme 'modus-themes)
-	    (defun backward-kill-word-or-region (&optional arg)
-	      (interactive "p")
-	      (if (region-active-p)
-	    	(call-interactively #'kill-region)
-	        (backward-kill-word arg)))
 	    (setq switch-to-buffer-obey-display-actions t)
 	    (setq switch-to-buffer-in-dedicated-window 'pop)
 	    (customize-set-variable 'display-buffer-base-action
@@ -157,7 +152,6 @@
 	          (when dir
 	            (unless (file-exists-p dir)
 	              (make-directory dir t))))))
-	    ;; 最近打开记录设置
 	    (use-package recentf
 	      :defer t
 	      :commands
@@ -165,7 +159,7 @@
 	      :init
 	      (setq recentf-save-file (expand-file-name "recentf" user-emacs-directory)
 	            recentf-max-saved-items 500
-	            recentf-max-menu-items 20)
+	            recentf-max-menu-items 10)
 	      (setq recentf-exclude
 	            '("COMMIT_MSG"
 	              "COMMIT_EDITMSG"
@@ -194,26 +188,44 @@
 	        (and (fboundp 'recentf-cleanup)
 	             (recentf-cleanup))))
 	    (add-hook 'kill-emacs-hook #'idiig/cleanup-recentf)
-	    ;; hungry delete: 连续删除空白
+	    (use-package savehist
+	      :init
+	      (setq savehist-additional-variables
+	            ;; search entries
+	            '(search-ring regexp-search-ring)
+	            ;; 每一分钟保存一次
+	            savehist-autosave-interval 60
+	            ;; keep the home clean
+	            savehist-file (expand-file-name "savehist" user-emacs-directory))
+	      (savehist-mode t))
+	    (use-package bookmark
+	      :config
+	      (setq bookmark-default-file (expand-file-name "bookmarks" user-emacs-directory)
+	            bookmark-save-flag 1))
+	    (use-package saveplace
+	      :config
+	      (setq save-place-file (expand-file-name "place" user-emacs-directory))
+	      (save-place-mode 1))
 	    (use-package hungry-delete
+	      :after puni
 	      :diminish hungry-delete-mode
 	      :init (setq hungry-delete-except-modes
 	                  '(help-mode minibuffer-mode minibuffer-inactive-mode calc-mode))
 	      :config
-	      (progn
-	        (setq-default hungry-delete-chars-to-skip " \t\f\v")  ;; 删除的空白符号 
-	        (global-hungry-delete-mode t)))
-	    
-	    ;; 跳到代码之前而非最前
+	      (setq-default hungry-delete-chars-to-skip " \t\f\v")  ;; 删除的空白符号 
+	      (global-hungry-delete-mode t))
 	    (use-package mwim
-	      :defer t
-	      :commands (mwim-beginning-of-code-or-line mwim-end-of-code-or-line))
-	    ;; 物理折行与复原
+	      :bind
+	      ("C-a" . mwim-beginning-of-code-or-line-or-comment)
+	      ("C-e" . mwim-end-of-code-or-line)
+	      :commands
+	      (mwim-beginning-of-code-or-line-or-comment
+	       mwim-end-of-code-or-line))
 	    (use-package unfill
-	      :defer t
-	      :commands (unfill-region unfill-paragraph unfill-toggle)
-	      :init
-	      (global-set-key [remap fill-paragraph] #'unfill-toggle))
+	      :bind
+	      ("M-q" . unfill-toggle)
+	      :commands
+	      (unfill-toggle))
 	    (use-package emacs
 	      :init
 	      (progn
@@ -249,13 +261,11 @@
 	    
 	    (use-package vertico
 	      :after consult
+	      :custom
+	      (vertico-count 9)
+	      (vertico-cycle t)
 	      :init
-	      (vertico-mode)
-	      :config
-	      ;; 表示行数
-	      (setq vertico-count 24)
-	      ;; 可循环
-	      (setq vertico-cycle t))
+	      (vertico-mode))
 	    (use-package orderless
 	      :after
 	      (consult)
@@ -419,35 +429,105 @@
 	      (vundo)
 	      :bind
 	      ("C-x u" . vundo))
-	    ;; 扩大选中
-	    (use-package expand-region
-	      :defer t
-	      :after (consult)
-	      :commands er/expand-region
-	      :bind ("C-=" . er/expand-region)
+	    (use-package emacs
+	      :init
+	      ;; 启用自动括号配对
+	      (electric-pair-mode t)
+	      
 	      :config
-	      (with-eval-after-load 'expand-region
-	        (defadvice er/prepare-for-more-expansions-internal
-	            (around helm-ag/prepare-for-more-expansions-internal activate)
-	          ad-do-it
-	          (let ((new-msg (concat (car ad-return-value)
-	                                 ", / to search in project, "
-	                                 "b to search in buffer, "
-	                                 "cs to change quote"))
-	                (new-bindings (cdr ad-return-value)))
-	            (cl-pushnew
-	             '("/" (lambda ()
-	                     (call-interactively
-	                      'idiig/consult-project-region-or-symbol)))
-	             new-bindings)
-	            (cl-pushnew
-	             '("b" (lambda ()
-	                     (call-interactively
-	                      'idiig/consult-buffer-region-or-symbol)))
-	             new-bindings)
-	            (setq ad-return-value (cons new-msg new-bindings)))))
-	      (setq expand-region-contract-fast-key "V"
-	            expand-region-reset-fast-key "r"))
+	      ;; 配置 electric-pair-mode 行为
+	      (setq electric-pair-preserve-balance nil)
+	      ;; 使用保守的抑制策略
+	      ;; https://www.reddit.com/r/emacs/comments/4xhxfw/how_to_tune_the_behavior_of_eletricpairmode/
+	      (setq electric-pair-inhibit-predicate 'electric-pair-conservative-inhibit)
+	      
+	      ;; 保存默认的配对括号设置，以便创建模式特定的本地设置
+	      (defconst idiig/default-electric-pairs electric-pair-pairs)
+	      
+	      ;; 为特定模式添加本地电子配对
+	      (defun idiig/add-local-electric-pairs (pairs)
+	        "为当前缓冲区添加本地电子配对括号。
+	         
+	         参数:
+	           PAIRS: 要添加的括号对列表
+	         
+	         示例用法:
+	           (add-hook 'jupyter-org-interaction-mode-hook
+	                     (lambda () (idiig/add-local-electric-pairs '((?$ . ?$)))))"
+	        (setq-local electric-pair-pairs (append idiig/default-electric-pairs pairs))
+	        (setq-local electric-pair-text-pairs electric-pair-pairs))
+	      
+	      ;; 禁止自动配对尖括号 <>
+	      (add-function :before-until electric-pair-inhibit-predicate
+	                    (lambda (c) (eq c ?<)))
+	      
+	      ;; 增强的括号匹配高亮——即使光标在括号内也能高亮匹配的括号
+	      (define-advice show-paren-function (:around (fn) fix-show-paren-function)
+	        "即使光标不直接位于括号上，也能高亮匹配的括号。"
+	        (cond ((looking-at-p "\\s(") (funcall fn))
+	              (t (save-excursion
+	                   (ignore-errors (backward-up-list))
+	                   (funcall fn)))))
+	      
+	      ;; 启用括号匹配高亮
+	      (show-paren-mode t))
+	    (use-package puni
+	      :defer t
+	      :bind
+	      (:map puni-mode-map
+	    	([remap puni-kill-line] . idiig/puni-kill-line)
+	    	("C-=" . puni-expand-region)
+	    	("C--" . puni-contract-region))
+	      :init
+	      ;; The autoloads of Puni are set up so you can enable `puni-mode` or
+	      ;; `puni-global-mode` before `puni` is actually loaded. Only after you press
+	      ;; any key that calls Puni commands, it's loaded.
+	      (puni-global-mode)
+	      (add-hook 'term-mode-hook #'puni-disable-puni-mode)
+	      :config
+	      (defun idiig/puni-kill-line ()
+	        "Kill a line forward while keeping expressions balanced.
+	    If nothing can be deleted, kill backward.  If still nothing can be
+	    deleted, kill the pairs around point."
+	        (interactive)
+	        (let ((bounds (puni-bounds-of-list-around-point)))
+	          (if (eq (car bounds) (cdr bounds))
+	              (when-let ((sexp-bounds (puni-bounds-of-sexp-around-point)))
+	                (puni-delete-region (car sexp-bounds) (cdr sexp-bounds) 'kill))
+	    	(if (eq (point) (cdr bounds))
+	                (puni-backward-kill-line)
+	              (puni-kill-line))))))
+	    ;; 添加 advice
+	    (with-eval-after-load 'puni
+	      (defun idiig/puni-expand-region-advice (orig-fun &rest args)
+	        "使用 Emacs 风格按键 (^, V, {, }, +) 持续调整窗口大小。"
+	        
+	        (let* ((ev last-command-event)
+	               (echo-keystrokes nil))
+	          ;; 执行初始调整
+	          (apply orig-fun args)
+	    
+	          ;; 设置 transient map
+	          (let ((delta (car args))) 
+	    	(set-transient-map
+	    	 (let ((map (make-sparse-keymap)))
+	               ;; 持续扩大
+	               (define-key map (kbd "=") 'puni-expand-region)
+	               ;; 缩小范围
+	               (define-key map (kbd "-") 'puni-contract-region)
+	    	   ;; 其他操作
+	    	   ;; 检索
+	               (define-key map (kbd "/") 'idiig/consult-project-region-or-symbol)
+	               (define-key map (kbd "b") 'idiig/consult-buffer-region-or-symbol)
+	    	   ;; 加包围
+	    	   (define-key map (kbd ")") 'puni-wrap-round)
+	               (define-key map (kbd "]") 'puni-wrap-square)
+	    	   (define-key map (kbd "}") 'puni-wrap-curly)
+	    	   (define-key map (kbd ">") 'puni-wrap-angle)
+	    	   map)
+	    	 nil nil
+	    	 "Use %k for further adjustment"))))
+	      (advice-add 'puni-expand-region :around #'idiig/puni-expand-region-advice))
 	    (add-hook 'after-init-hook
 	    	    (lambda ()
 	    	      (let* ((screen-height (display-pixel-height))
@@ -505,12 +585,12 @@
 	      (pyim-dcache-directory (concat user-emacs-directory "pyim/dcache"))
 	      (pyim-default-scheme 'quanpin)
 	      (pyim-page-tooltip 'popup)
-	      (pyim-page-length 4)
+	      (pyim-page-length 4))
+	    
+	    ;; 加载并启用基础词库
+	    (use-package pyim-basedict
+	      :after pyim
 	      :config
-	      ;; 启用搜索功能
-	      (pyim-isearch-mode 1)
-	      ;; 加载并启用基础词库
-	      (require 'pyim-basedict)
 	      (pyim-basedict-enable))
 	    (with-eval-after-load 'pyim
 	      (require 'pyim-cstring-utils)
@@ -576,7 +656,6 @@
 	                                            "\\.tex\\'"
 	                                            "\\.bib\\'"
 	                                            "\\.txt\\'"))
-	    
 	    (defun idiig/in-writing-environment-p ()
 	      "Check if current buffer file matches any pattern in idiig/writing-environment-list."
 	      (when (buffer-file-name)
@@ -591,6 +670,46 @@
 	    
 	    (with-eval-after-load 'diminish
 	      (diminish 'visual-line-mode))
+	    (defun idiig/backward-kill-word-or-region (&optional arg)
+	      (interactive "p")
+	      (if (region-active-p)
+	    	(call-interactively #'kill-region)
+	        (backward-kill-word arg)))
+	    
+	    (global-set-key (kbd "C-w") 'idiig/backward-kill-word-or-region) 
+	    (defun idiig/indent-buffer()
+	      (interactive)
+	      (indent-region (point-min) (point-max)))
+	    
+	    (defun idiig/indent-region-or-buffer()
+	      (interactive)
+	      (save-excursion
+	        (if (region-active-p)
+	            (progn
+	              (indent-region (region-beginning) (region-end)))
+	          (progn
+	            (idiig/indent-buffer)))))
+	    
+	    (global-set-key (kbd "C-M-\\") 'idiig/indent-region-or-buffer)
+	    (global-set-key (kbd "C-M-¥") 'idiig/indent-region-or-buffer)  ;; JIS keyboard
+	    (global-set-key [(shift return)] 'idiig/smart-open-line)
+	    (defun idiig/goto-match-paren (arg)
+	      "Go to the matching if on (){}[], similar to vi style of % "
+	      (interactive "p")
+	      ;; first, check for "outside of bracket" positions expected by forward-sexp, etc
+	      (cond ((looking-at "[\[\(\{]") (evil-jump-item))
+	            ((looking-back "[\]\)\}]" 1) (evil-jump-item))
+	            ;; now, try to succeed from inside of a bracket
+	            ((looking-at "[\]\)\}]") (forward-char) (evil-jump-item))
+	            ((looking-back "[\[\(\{]" 1) (backward-char) (evil-jump-item))
+	            (t nil)))
+	    
+	    (bind-key* "M--" 'idiig/goto-match-paren)
+	    (defun idiig/insert-space-after-point ()
+	      (interactive)
+	      (save-excursion (insert " ")))
+	    
+	    (bind-key* "C-." 'idiig/insert-space-after-point)
 	    ;; TODO: 这里未来需要改成在每个语言的设定的节点push进来
 	    (defvar idiig/language-list
 	      '("emacs-lisp" "python" "C" "shell" "js" "clojure" "css" "nix"
@@ -624,6 +743,7 @@
 	                            (or (getenv "LD_LIBRARY_PATH") ""))))))
 	    (use-package lsp-bridge
 	      :defer t
+	      :diminish lsp-bridge-mode
 	      :bind
 	      (:map acm-mode-map
 	            ("C-j" . acm-select-next)
@@ -649,9 +769,9 @@
 	      :config
 	      (treesit-auto-add-to-auto-mode-alist 'all))  ; 将所有已知的 tree-sitter 模式添加到自动模式列表中
 	    ;; (defvar idiig/snippet-dir (concat user-emacs-directory "snippets"))
-	    
 	    (use-package yasnippet
 	      :defer t
+	      :diminish yas-minor-mode
 	      :hook
 	      (prog-mode . yas-minor-mode)
 	      :init
@@ -663,6 +783,7 @@
 	      :after
 	      (consult
 	       yas-minor-mode))
+	    
 	    (idiig//setup-nix-lsp-bridge-server 
 	     "nix" 
 	     "nixd" 
@@ -861,7 +982,7 @@
               consult
               embark-consult
             vundo
-            expand-region
+            puni
             ddskk
             pyim
               pyim-basedict
@@ -877,6 +998,7 @@
             # yasnippet
             yasnippet-snippets
               consult-yasnippet
+            
             nix-mode
             auctex
               auctex-latexmk

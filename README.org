@@ -1,34 +1,4 @@
-:PROPERTIES:
-:GPTEL_MODEL: gpt-4o-mini
-:GPTEL_BACKEND: ChatGPT
-:GPTEL_SYSTEM: You are a large language model living in Emacs and a helpful assistant. Respond concisely.
-:GPTEL_BOUNDS: nil
-:END:
 #+TITLE: 基于 Nix Flakes 的 Emacs 配置
-
-* 本配置的用法
-:PROPERTIES:
-:header-args: :tangle no
-:END:
-
-这份配置文件使用Nix Flakes管理包。使用Nix的这类系统管理的包的目的主要
-是因为
-
-- emacs内置的包管理器无法处理系统工具的依存：如 =ripgrep=, 特定版本的
-  =python=
-
-- 使用gitsubmodule相同
-
-- 完全使用Nix的话，写配置和尝试包的体验感比较差
-
-这份配置的解决法如下：
-
-- 通过org-babel同时写作Nix和elisp。前者用于版本和包的管理，后者用于包
-  的配置
-
-- 可以在elisp中用 =$pkgs.git= 的方式直接引用Nix的包
-  
-- 提供一个函数加入一个新包时使用这个函数更新包列表
 
 * 实现方式
 :PROPERTIES:
@@ -45,7 +15,7 @@ hook，config，自定义的函数。
 =pkgs.emacs.pkgs.withPackages= ]
 
 这里稍微多做一些解释。在配置节里面，我们利用了org-babel的一些特性。首
-先我们在一个汇总代码块中使用了 =:noweb=yes= [fn:noweb:关于文学编程中
+先我们在一个汇总代码块中使用了 =:noweb=yes= [fn:noweb: 关于文学编程中
 =noweb= 的解释可以参考 [[https://www.cs.tufts.edu/~nr/noweb/][这个链接]] 。本身我们还有一个 =:session= 的方式更
 适合一些数据科学的工作流。这里我们主要为了和 =:tangle= 引起使用。]，然
 后在后面的代码块中我们使用 =:noweb-ref= 参照汇总代码块，最后后续的这些
@@ -125,7 +95,7 @@ hook，config，自定义的函数。
 
   		      # 主配置文件
   		      emacsConfig = pkgs.writeText "init.el" ''
-  	    <<emacs-config>>
+  	    <<ecfg>>
   	    '';
 
   		      # early-init 配置文件
@@ -141,7 +111,7 @@ hook，config，自定义的函数。
             
             # 创建扩展的包集合并选择包
             emacsWithPackages = ((pkgs.emacsPackagesFor emacs).overrideScope overrides).withPackages (epkgs: with epkgs; [
-              <<emacs-packages>>
+              <<epkgs>>
             ]);
             
   	      in {
@@ -199,10 +169,9 @@ hook，config，自定义的函数。
 #+end_src
 
 ** Emacs基建
-
 *** Mac OS 键位设定
 :PROPERTIES:
-:header-args: :noweb-ref emacs-config
+:header-args: :noweb-ref ecfg
 :END:
 
 #+begin_src emacs-lisp
@@ -227,7 +196,7 @@ hook，config，自定义的函数。
 
 **** 依赖
 :PROPERTIES:
-:header-args: :noweb-ref emacs-packages
+:header-args: :noweb-ref epkgs
 :END:
 
 - =use-package= ：用简介的宏语言描述包
@@ -240,7 +209,7 @@ hook，config，自定义的函数。
 
 **** 配置
 :PROPERTIES:
-:header-args: :noweb-ref emacs-config
+:header-args: :noweb-ref ecfg
 :END:
 
 #+begin_src emacs-lisp
@@ -252,7 +221,7 @@ hook，config，自定义的函数。
 
 **** 本体的设定
 :PROPERTIES:
-:header-args: :noweb-ref emacs-config
+:header-args: :noweb-ref ecfg
 :END:
 
 #+begin_src emacs-lisp
@@ -277,7 +246,7 @@ hook，config，自定义的函数。
 
 **** UI
 :PROPERTIES:
-:header-args: :noweb-ref emacs-config
+:header-args: :noweb-ref ecfg
 :END:
 
 #+begin_src emacs-lisp
@@ -302,23 +271,9 @@ hook，config，自定义的函数。
   (require-theme 'modus-themes)
 #+end_src
 
-**** 在选中区域的状态下 =C-w= 删除选中的区域
-:PROPERTIES:
-:header-args: :noweb-ref emacs-config
-:END:
-
-而不是删除上一个合并区域。
-#+begin_src emacs-lisp
-  (defun backward-kill-word-or-region (&optional arg)
-    (interactive "p")
-    (if (region-active-p)
-	(call-interactively #'kill-region)
-      (backward-kill-word arg)))
-#+end_src
-
 **** 光标跳到新窗口
 :PROPERTIES:
-:header-args: :noweb-ref emacs-config
+:header-args: :noweb-ref ecfg
 :END:
 
 emacs在打开新的窗口时，默认光标维持在原来的窗口。比如当你使用
@@ -328,6 +283,7 @@ emacs在打开新的窗口时，默认光标维持在原来的窗口。比如当
 - 专用buffer（display-buffer行为；主要影响 Emacs 自动创建的窗口（如
   help、compilation 等）。注意这里也会影响到 =magit= 这类 transient 窗
   口
+  
 #+begin_src emacs-lisp
   (setq switch-to-buffer-obey-display-actions t)
   (setq switch-to-buffer-in-dedicated-window 'pop)
@@ -337,6 +293,7 @@ emacs在打开新的窗口时，默认光标维持在原来的窗口。比如当
 #+end_src
 
 - split-window时转跳到新窗口
+  
 #+begin_src emacs-lisp
   (defadvice split-window-below (after split-window-below-and-switch activate)
     "切换到新分割的窗口"
@@ -351,10 +308,10 @@ emacs在打开新的窗口时，默认光标维持在原来的窗口。比如当
 
 **** 窗口的放大缩小转变为持续的行为
 :PROPERTIES:
-:header-args: :noweb-ref emacs-config
+:header-args: :noweb-ref ecfg
 :END:
 
-而不是要一直要重复 =C-x= 按键。后续行为使用默认 =^V/{/}=
+而不是要一直要重复 =C-x= 按键。后续行为使用默认 =^, V, {, }= 。
 
 这里我没用 =C-x v= 是因为这个键位目前用于 =vc= 。
 
@@ -406,7 +363,7 @@ emacs在打开新的窗口时，默认光标维持在原来的窗口。比如当
 
 **** 文件的保存与新建
 :PROPERTIES:
-:header-args: :noweb-ref emacs-config
+:header-args: :noweb-ref ecfg
 :END:
 
 #+begin_src emacs-lisp
@@ -432,11 +389,12 @@ emacs在打开新的窗口时，默认光标维持在原来的窗口。比如当
 
 **** 最近文件
 :PROPERTIES:
-:header-args: :noweb-ref emacs-config
+:header-args: :noweb-ref ecfg
 :END:
 
+打开最近文件。
+
 #+begin_src emacs-lisp
-  ;; 最近打开记录设置
   (use-package recentf
     :defer t
     :commands
@@ -444,7 +402,7 @@ emacs在打开新的窗口时，默认光标维持在原来的窗口。比如当
     :init
     (setq recentf-save-file (expand-file-name "recentf" user-emacs-directory)
           recentf-max-saved-items 500
-          recentf-max-menu-items 20)
+          recentf-max-menu-items 10)
     (setq recentf-exclude
           '("COMMIT_MSG"
             "COMMIT_EDITMSG"
@@ -475,11 +433,44 @@ emacs在打开新的窗口时，默认光标维持在原来的窗口。比如当
   (add-hook 'kill-emacs-hook #'idiig/cleanup-recentf)
 #+end_src
 
+- 自动保存文件设置
+  
+#+begin_src emacs-lisp
+  (use-package savehist
+    :init
+    (setq savehist-additional-variables
+          ;; search entries
+          '(search-ring regexp-search-ring)
+          ;; 每一分钟保存一次
+          savehist-autosave-interval 60
+          ;; keep the home clean
+          savehist-file (expand-file-name "savehist" user-emacs-directory))
+    (savehist-mode t))
+#+end_src
+
+- 书签功能，打开时自动到原先编辑的位置
+
+#+begin_src emacs-lisp
+  (use-package bookmark
+    :config
+    (setq bookmark-default-file (expand-file-name "bookmarks" user-emacs-directory)
+          bookmark-save-flag 1))
+#+end_src
+
+- 保存文件的编辑位置
+
+#+begin_src emacs-lisp
+  (use-package saveplace
+    :config
+    (setq save-place-file (expand-file-name "place" user-emacs-directory))
+    (save-place-mode 1))
+#+end_src
+
 **** 便利的光标移动与删除规则
 
 ***** 依赖
 :PROPERTIES:
-:header-args: :noweb-ref emacs-packages
+:header-args: :noweb-ref epkgs
 :END:
 
 #+begin_src nix
@@ -489,31 +480,39 @@ emacs在打开新的窗口时，默认光标维持在原来的窗口。比如当
 
 ***** 配置
 :PROPERTIES:
-:header-args: :noweb-ref emacs-config
+:header-args: :noweb-ref ecfg
 :END:
 
+- *hungry delete*: 连续删除空白
+
 #+begin_src emacs-lisp
-  ;; hungry delete: 连续删除空白
   (use-package hungry-delete
+    :after puni
     :diminish hungry-delete-mode
     :init (setq hungry-delete-except-modes
                 '(help-mode minibuffer-mode minibuffer-inactive-mode calc-mode))
     :config
-    (progn
-      (setq-default hungry-delete-chars-to-skip " \t\f\v")  ;; 删除的空白符号 
-      (global-hungry-delete-mode t)))
+    (setq-default hungry-delete-chars-to-skip " \t\f\v")  ;; 删除的空白符号 
+    (global-hungry-delete-mode t))
+#+end_src
 
-  ;; 跳到代码之前而非最前
+- *mwim*: 跳到代码之前而非最前，或者代码后面而不是最后
+
+#+begin_src emacs-lisp
   (use-package mwim
-    :defer t
-    :commands (mwim-beginning-of-code-or-line mwim-end-of-code-or-line))
+    :bind
+    ("C-a" . mwim-beginning-of-code-or-line-or-comment)
+    ("C-e" . mwim-end-of-code-or-line)
+    :commands
+    (mwim-beginning-of-code-or-line-or-comment
+     mwim-end-of-code-or-line))
 #+end_src
 
 **** 折行与复原
 
 ***** 依赖
 :PROPERTIES:
-:header-args: :noweb-ref emacs-packages
+:header-args: :noweb-ref epkgs
 :END:
 
 #+begin_src nix
@@ -522,23 +521,21 @@ emacs在打开新的窗口时，默认光标维持在原来的窗口。比如当
 
 ***** 配置
 :PROPERTIES:
-:header-args: :noweb-ref emacs-config
+:header-args: :noweb-ref ecfg
 :END:
 
+- 物理折行与复原
 #+begin_src emacs-lisp
-  ;; 物理折行与复原
   (use-package unfill
-    :defer t
-    :commands (unfill-region unfill-paragraph unfill-toggle)
-    :init
-    (global-set-key [remap fill-paragraph] #'unfill-toggle))
+    :bind
+    ("M-q" . unfill-toggle)
+    :commands
+    (unfill-toggle))
 #+end_src
-
-#+RESULTS:
 
 **** 更好的minibuffer
 :PROPERTIES:
-:header-args: :noweb-ref emacs-config
+:header-args: :noweb-ref ecfg
 :END:
 
 ***** 原生设定
@@ -583,7 +580,7 @@ emacs在打开新的窗口时，默认光标维持在原来的窗口。比如当
 
 ****** 依赖
 :PROPERTIES:
-:header-args: :noweb-ref emacs-packages
+:header-args: :noweb-ref epkgs
 :END:
 
 #+begin_src nix
@@ -602,13 +599,11 @@ emacs在打开新的窗口时，默认光标维持在原来的窗口。比如当
 #+begin_src emacs-lisp
   (use-package vertico
     :after consult
+    :custom
+    (vertico-count 9)
+    (vertico-cycle t)
     :init
-    (vertico-mode)
-    :config
-    ;; 表示行数
-    (setq vertico-count 24)
-    ;; 可循环
-    (setq vertico-cycle t))
+    (vertico-mode))
 #+end_src
 
 - *Orderless*: 提供补全格式选择
@@ -795,7 +790,7 @@ emacs在打开新的窗口时，默认光标维持在原来的窗口。比如当
 
 ***** 依赖
 :PROPERTIES:
-:header-args: :noweb-ref emacs-packages
+:header-args: :noweb-ref epkgs
 :END:
 
 #+BEGIN_SRC nix 
@@ -804,7 +799,7 @@ emacs在打开新的窗口时，默认光标维持在原来的窗口。比如当
 
 ***** 配置
 :PROPERTIES:
-:header-args: :noweb-ref emacs-config
+:header-args: :noweb-ref ecfg
 :END:
 
 #+begin_src emacs-lisp
@@ -816,61 +811,138 @@ emacs在打开新的窗口时，默认光标维持在原来的窗口。比如当
     ("C-x u" . vundo))
 #+end_src
 
-**** 区域选中（expand-region) 
+**** 括号匹配
+:PROPERTIES:
+:header-args: :noweb-ref ecfg
+:END:
+#+begin_src emacs-lisp
+  (use-package emacs
+    :init
+    ;; 启用自动括号配对
+    (electric-pair-mode t)
+    
+    :config
+    ;; 配置 electric-pair-mode 行为
+    (setq electric-pair-preserve-balance nil)
+    ;; 使用保守的抑制策略
+    ;; https://www.reddit.com/r/emacs/comments/4xhxfw/how_to_tune_the_behavior_of_eletricpairmode/
+    (setq electric-pair-inhibit-predicate 'electric-pair-conservative-inhibit)
+    
+    ;; 保存默认的配对括号设置，以便创建模式特定的本地设置
+    (defconst idiig/default-electric-pairs electric-pair-pairs)
+    
+    ;; 为特定模式添加本地电子配对
+    (defun idiig/add-local-electric-pairs (pairs)
+      "为当前缓冲区添加本地电子配对括号。
+       
+       参数:
+         PAIRS: 要添加的括号对列表
+       
+       示例用法:
+         (add-hook 'jupyter-org-interaction-mode-hook
+                   (lambda () (idiig/add-local-electric-pairs '((?$ . ?$)))))"
+      (setq-local electric-pair-pairs (append idiig/default-electric-pairs pairs))
+      (setq-local electric-pair-text-pairs electric-pair-pairs))
+    
+    ;; 禁止自动配对尖括号 <>
+    (add-function :before-until electric-pair-inhibit-predicate
+                  (lambda (c) (eq c ?<)))
+    
+    ;; 增强的括号匹配高亮——即使光标在括号内也能高亮匹配的括号
+    (define-advice show-paren-function (:around (fn) fix-show-paren-function)
+      "即使光标不直接位于括号上，也能高亮匹配的括号。"
+      (cond ((looking-at-p "\\s(") (funcall fn))
+            (t (save-excursion
+                 (ignore-errors (backward-up-list))
+                 (funcall fn)))))
+    
+    ;; 启用括号匹配高亮
+    (show-paren-mode t))
+#+end_src
 
-- TODO: 未来打算改为 puni 和结构式编辑的包
-- TODO: 选中后续操作可以参考 transient 的 map
+**** 语言无关的结构化编程
 
 ***** 依赖
 :PROPERTIES:
-:header-args: :noweb-ref emacs-packages
+:header-args: :noweb-ref epkgs
 :END:
-
-#+BEGIN_SRC nix 
-  expand-region
-#+END_SRC
+#+begin_src nix
+  puni
+#+end_src
 
 ***** 配置
 :PROPERTIES:
-:header-args: :noweb-ref emacs-config
+:header-args: :noweb-ref ecfg
 :END:
+#+begin_src emacs-lisp
+  (use-package puni
+    :defer t
+    :bind
+    (:map puni-mode-map
+  	([remap puni-kill-line] . idiig/puni-kill-line)
+  	("C-=" . puni-expand-region)
+  	("C--" . puni-contract-region))
+    :init
+    ;; The autoloads of Puni are set up so you can enable `puni-mode` or
+    ;; `puni-global-mode` before `puni` is actually loaded. Only after you press
+    ;; any key that calls Puni commands, it's loaded.
+    (puni-global-mode)
+    (add-hook 'term-mode-hook #'puni-disable-puni-mode)
+    :config
+    (defun idiig/puni-kill-line ()
+      "Kill a line forward while keeping expressions balanced.
+  If nothing can be deleted, kill backward.  If still nothing can be
+  deleted, kill the pairs around point."
+      (interactive)
+      (let ((bounds (puni-bounds-of-list-around-point)))
+        (if (eq (car bounds) (cdr bounds))
+            (when-let ((sexp-bounds (puni-bounds-of-sexp-around-point)))
+              (puni-delete-region (car sexp-bounds) (cdr sexp-bounds) 'kill))
+  	(if (eq (point) (cdr bounds))
+              (puni-backward-kill-line)
+            (puni-kill-line))))))
+#+end_src
 
 #+begin_src emacs-lisp
-  ;; 扩大选中
-  (use-package expand-region
-    :defer t
-    :after (consult)
-    :commands er/expand-region
-    :bind ("C-=" . er/expand-region)
-    :config
-    (with-eval-after-load 'expand-region
-      (defadvice er/prepare-for-more-expansions-internal
-          (around helm-ag/prepare-for-more-expansions-internal activate)
-        ad-do-it
-        (let ((new-msg (concat (car ad-return-value)
-                               ", / to search in project, "
-                               "b to search in buffer, "
-                               "cs to change quote"))
-              (new-bindings (cdr ad-return-value)))
-          (cl-pushnew
-           '("/" (lambda ()
-                   (call-interactively
-                    'idiig/consult-project-region-or-symbol)))
-           new-bindings)
-          (cl-pushnew
-           '("b" (lambda ()
-                   (call-interactively
-                    'idiig/consult-buffer-region-or-symbol)))
-           new-bindings)
-          (setq ad-return-value (cons new-msg new-bindings)))))
-    (setq expand-region-contract-fast-key "V"
-          expand-region-reset-fast-key "r"))
+  ;; 添加 advice
+  (with-eval-after-load 'puni
+    (defun idiig/puni-expand-region-advice (orig-fun &rest args)
+      "使用 Emacs 风格按键 (^, V, {, }, +) 持续调整窗口大小。"
+      
+      (let* ((ev last-command-event)
+             (echo-keystrokes nil))
+        ;; 执行初始调整
+        (apply orig-fun args)
+
+        ;; 设置 transient map
+        (let ((delta (car args))) 
+  	(set-transient-map
+  	 (let ((map (make-sparse-keymap)))
+             ;; 持续扩大
+             (define-key map (kbd "=") 'puni-expand-region)
+             ;; 缩小范围
+             (define-key map (kbd "-") 'puni-contract-region)
+  	   ;; 其他操作
+  	   ;; 检索
+             (define-key map (kbd "/") 'idiig/consult-project-region-or-symbol)
+             (define-key map (kbd "b") 'idiig/consult-buffer-region-or-symbol)
+  	   ;; 加包围
+  	   (define-key map (kbd ")") 'puni-wrap-round)
+             (define-key map (kbd "]") 'puni-wrap-square)
+  	   (define-key map (kbd "}") 'puni-wrap-curly)
+  	   (define-key map (kbd ">") 'puni-wrap-angle)
+  	   map)
+  	 nil nil
+  	 "Use %k for further adjustment"))))
+    (advice-add 'puni-expand-region :around #'idiig/puni-expand-region-advice))
 #+end_src
 
 ** CJK字体
 
 这里我统一使用的是Sarasa的等宽字体，可以避免2个问题：
+
 - 输入latin以后输入cjk文字以后，由于字体高度不等导致行高抖动
+
 - 方便org等表格等宽表示
 
 *** 依赖
@@ -892,7 +964,7 @@ emacs在打开新的窗口时，默认光标维持在原来的窗口。比如当
 
 *** 配置
 :PROPERTIES:
-:header-args: :noweb-ref emacs-config
+:header-args: :noweb-ref ecfg
 :END:
 
 #+begin_src emacs-lisp
@@ -922,7 +994,7 @@ emacs在打开新的窗口时，默认光标维持在原来的窗口。比如当
 
 **** 依赖
 :PROPERTIES:
-:header-args: :noweb-ref emacs-packages
+:header-args: :noweb-ref epkgs
 :END:
 
 #+BEGIN_SRC nix 
@@ -931,7 +1003,7 @@ emacs在打开新的窗口时，默认光标维持在原来的窗口。比如当
 
 **** 配置
 :PROPERTIES:
-:header-args: :noweb-ref emacs-config
+:header-args: :noweb-ref ecfg
 :END:
 
 #+begin_src emacs-lisp
@@ -968,13 +1040,15 @@ emacs在打开新的窗口时，默认光标维持在原来的窗口。比如当
 #+end_src
 
 *** TODO 检索（Migemo）
+
 **** 依赖
 :PROPERTIES:
-:header-args: :noweb-ref emacs-packages
+:header-args: :noweb-ref epkgs
 :END:
+
 **** 配置
 :PROPERTIES:
-:header-args: :noweb-ref emacs-config
+:header-args: :noweb-ref ecfg
 :END:
 
 ** 中文
@@ -983,7 +1057,7 @@ emacs在打开新的窗口时，默认光标维持在原来的窗口。比如当
 
 **** 依赖
 :PROPERTIES:
-:header-args: :noweb-ref emacs-packages
+:header-args: :noweb-ref epkgs
 :END:
 
 #+BEGIN_SRC nix 
@@ -993,7 +1067,7 @@ emacs在打开新的窗口时，默认光标维持在原来的窗口。比如当
 
 **** 配置
 :PROPERTIES:
-:header-args: :noweb-ref emacs-config
+:header-args: :noweb-ref ecfg
 :END:
 
 ***** 基础设定
@@ -1007,12 +1081,12 @@ emacs在打开新的窗口时，默认光标维持在原来的窗口。比如当
     (pyim-dcache-directory (concat user-emacs-directory "pyim/dcache"))
     (pyim-default-scheme 'quanpin)
     (pyim-page-tooltip 'popup)
-    (pyim-page-length 4)
+    (pyim-page-length 4))
+
+  ;; 加载并启用基础词库
+  (use-package pyim-basedict
+    :after pyim
     :config
-    ;; 启用搜索功能
-    (pyim-isearch-mode 1)
-    ;; 加载并启用基础词库
-    (require 'pyim-basedict)
     (pyim-basedict-enable))
 #+end_src
 
@@ -1088,7 +1162,7 @@ emacs在打开新的窗口时，默认光标维持在原来的窗口。比如当
 
 *** 依赖
 :PROPERTIES:
-:header-args: :noweb-ref emacs-packages
+:header-args: :noweb-ref epkgs
 :END:
 
 #+BEGIN_SRC nix
@@ -1097,7 +1171,7 @@ emacs在打开新的窗口时，默认光标维持在原来的窗口。比如当
 
 *** 配置
 :PROPERTIES:
-:header-args: :noweb-ref emacs-config
+:header-args: :noweb-ref ecfg
 :END:
 
 **** Magit
@@ -1111,12 +1185,13 @@ emacs在打开新的窗口时，默认光标维持在原来的窗口。比如当
     (add-to-list 'exec-path "${pkgs.git}/bin"))
 #+END_SRC
 
-
 ** 文档写作
 :PROPERTIES:
-:header-args: :noweb-ref emacs-config
+:header-args: :noweb-ref ecfg
 :END:
 
+*** 文档后缀
+  
 #+begin_src emacs-lisp
   (defvar idiig/writing-environment-list '("\\.org\\'"
                                           "\\.md\\'"
@@ -1126,7 +1201,11 @@ emacs在打开新的窗口时，默认光标维持在原来的窗口。比如当
                                           "\\.tex\\'"
                                           "\\.bib\\'"
                                           "\\.txt\\'"))
+#+end_src
 
+*** 文档状态折行
+  
+#+begin_src emacs-lisp
   (defun idiig/in-writing-environment-p ()
     "Check if current buffer file matches any pattern in idiig/writing-environment-list."
     (when (buffer-file-name)
@@ -1143,10 +1222,82 @@ emacs在打开新的窗口时，默认光标维持在原来的窗口。比如当
     (diminish 'visual-line-mode))
 #+end_src
 
+*** 在选中区域的状态下 =C-w= 删除选中的区域
+
+在没选中的状态下删除上一个单词。
+
+#+begin_src emacs-lisp
+  (defun idiig/backward-kill-word-or-region (&optional arg)
+    (interactive "p")
+    (if (region-active-p)
+  	(call-interactively #'kill-region)
+      (backward-kill-word arg)))
+
+  (global-set-key (kbd "C-w") 'idiig/backward-kill-word-or-region) 
+#+end_src
+
+*** =C-M-\= 全局缩进
+
+全局缩进
+
+#+begin_src emacs-lisp
+  (defun idiig/indent-buffer()
+    (interactive)
+    (indent-region (point-min) (point-max)))
+
+  (defun idiig/indent-region-or-buffer()
+    (interactive)
+    (save-excursion
+      (if (region-active-p)
+          (progn
+            (indent-region (region-beginning) (region-end)))
+        (progn
+          (idiig/indent-buffer)))))
+
+  (global-set-key (kbd "C-M-\\") 'idiig/indent-region-or-buffer)
+  (global-set-key (kbd "C-M-¥") 'idiig/indent-region-or-buffer)  ;; JIS keyboard
+#+end_src
+
+*** =Shift-Ret= 下方插入空白行
+
+#+begin_src emacs-lisp
+  (global-set-key [(shift return)] 'idiig/smart-open-line)
+#+end_src
+
+*** =M--= 匹配到括号 
+
+TODO: 把 evil-jump-item 换成别的函数。
+
+#+begin_src emacs-lisp
+  (defun idiig/goto-match-paren (arg)
+    "Go to the matching if on (){}[], similar to vi style of % "
+    (interactive "p")
+    ;; first, check for "outside of bracket" positions expected by forward-sexp, etc
+    (cond ((looking-at "[\[\(\{]") (evil-jump-item))
+          ((looking-back "[\]\)\}]" 1) (evil-jump-item))
+          ;; now, try to succeed from inside of a bracket
+          ((looking-at "[\]\)\}]") (forward-char) (evil-jump-item))
+          ((looking-back "[\[\(\{]" 1) (backward-char) (evil-jump-item))
+          (t nil)))
+
+  (bind-key* "M--" 'idiig/goto-match-paren)
+#+end_src
+
+*** 点后插入空白
+
+#+begin_src emacs-lisp
+  (defun idiig/insert-space-after-point ()
+    (interactive)
+    (save-excursion (insert " ")))
+
+  (bind-key* "C-." 'idiig/insert-space-after-point)
+#+end_src
+
 ** 编程工具
+
 *** 我有可能使用的语言
 :PROPERTIES:
-:header-args: :noweb-ref emacs-config
+:header-args: :noweb-ref ecfg
 :END:
 
 #+begin_src emacs-lisp
@@ -1175,7 +1326,7 @@ emacs在打开新的窗口时，默认光标维持在原来的窗口。比如当
 
 **** 依赖
 :PROPERTIES:
-:header-args: :noweb-ref emacs-packages
+:header-args: :noweb-ref epkgs
 :END:
 
 #+begin_src nix
@@ -1225,7 +1376,7 @@ emacs在打开新的窗口时，默认光标维持在原来的窗口。比如当
 
 **** 配置
 :PROPERTIES:
-:header-args: :noweb-ref emacs-config
+:header-args: :noweb-ref ecfg
 :END:
 
 #+begin_src emacs-lisp
@@ -1280,6 +1431,7 @@ emacs在打开新的窗口时，默认光标维持在原来的窗口。比如当
 #+begin_src emacs-lisp
   (use-package lsp-bridge
     :defer t
+    :diminish lsp-bridge-mode
     :bind
     (:map acm-mode-map
           ("C-j" . acm-select-next)
@@ -1308,7 +1460,7 @@ emacs在打开新的窗口时，默认光标维持在原来的窗口。比如当
 
 **** 依赖
 :PROPERTIES:
-:header-args: :noweb-ref emacs-packages
+:header-args: :noweb-ref epkgs
 :END:
 #+begin_src nix
   # treesit  # 目前 treesit 已经内置
@@ -1317,7 +1469,7 @@ emacs在打开新的窗口时，默认光标维持在原来的窗口。比如当
 
 **** 配置
 :PROPERTIES:
-:header-args: :noweb-ref emacs-config
+:header-args: :noweb-ref ecfg
 :END:
 
 #+begin_src emacs-lisp
@@ -1344,7 +1496,7 @@ Snippet 用于快速插入模板
 
 **** 依赖
 :PROPERTIES:
-:header-args: :noweb-ref emacs-packages
+:header-args: :noweb-ref epkgs
 :END:
 
 这里 =yasnippet= 本体已经作为 =lsp-bridge= 的依赖被加入，我们这里只加
@@ -1358,14 +1510,14 @@ Snippet 用于快速插入模板
 
 **** 配置
 :PROPERTIES:
-:header-args: :noweb-ref emacs-config
+:header-args: :noweb-ref ecfg
 :END:
 
 #+begin_src emacs-lisp
   ;; (defvar idiig/snippet-dir (concat user-emacs-directory "snippets"))
-
   (use-package yasnippet
     :defer t
+    :diminish yas-minor-mode
     :hook
     (prog-mode . yas-minor-mode)
     :init
@@ -1384,18 +1536,34 @@ Snippet 用于快速插入模板
      yas-minor-mode))
 #+end_src
 
+*** 基于 tresitter 的结构化编程
+
+**** 依赖
+:PROPERTIES:
+:header-args: :noweb-ref epkgs
+:END:
+#+begin_src nix
+#+end_src
+
+**** 配置
+:PROPERTIES:
+:header-args: :noweb-ref ecfg
+:END:
+#+begin_src emacs-lisp
+#+end_src
+
 ** 编程与文档语言
 
 *** Nix
 
 **** 依赖
-#+begin_src nix :noweb-ref emacs-packages
+#+begin_src nix :noweb-ref epkgs
   nix-mode
 #+end_src
 
 加入 nix 的 major mode。
 
-#+begin_src emacs-lisp :noweb-ref emacs-config
+#+begin_src emacs-lisp :noweb-ref ecfg
   (idiig//setup-nix-lsp-bridge-server 
    "nix" 
    "nixd" 
@@ -1412,7 +1580,7 @@ Snippet 用于快速插入模板
 
 **** 依赖
 
-#+begin_src emacs-lisp :noweb-ref emacs-config
+#+begin_src emacs-lisp :noweb-ref ecfg
   (idiig//setup-nix-lsp-bridge-server 
    "python" 
    "basedpyright" 
@@ -1426,6 +1594,11 @@ Snippet 用于快速插入模板
 
 *** Elisp
 
+- =M-:= 时的 eval expression minibuffer 的时候加入 prog mode。
+#+begin_src emacs-lisp
+  (add-hook 'eval-expression-minibuffer-setup 'idiig/run-prog-mode-hooks)
+#+end_src
+
 *** Shell
 
 *** Make
@@ -1434,10 +1607,10 @@ Snippet 用于快速插入模板
 
 **** 依赖
 :PROPERTIES:
-:header-args: :noweb-ref emacs-config
+:header-args: :noweb-ref ecfg
 :END:
 
-#+begin_src nix :noweb-ref emacs-packages
+#+begin_src nix :noweb-ref epkgs
   auctex
     auctex-latexmk
 #+end_src
@@ -1476,7 +1649,7 @@ Snippet 用于快速插入模板
 ** Org Mode相关配置
 *** Org本体
 :PROPERTIES:
-:header-args: :noweb-ref emacs-config
+:header-args: :noweb-ref ecfg
 :END:
 
 **** 绑定 prog mode
@@ -1504,7 +1677,7 @@ Snippet 用于快速插入模板
 ***** 依赖
 由于 =ob-nix= 还没有默认。我们需要添加这些依赖
 
-#+begin_src nix :noweb-ref emacs-packages
+#+begin_src nix :noweb-ref epkgs
   ob-nix
 #+end_src
 
@@ -1542,7 +1715,7 @@ Snippet 用于快速插入模板
 
 ***** 依赖
 :PROPERTIES:
-:header-args: :noweb-ref emacs-packages
+:header-args: :noweb-ref epkgs
 :END:
 
 #+BEGIN_SRC nix
@@ -1551,7 +1724,7 @@ Snippet 用于快速插入模板
 
 ***** TODO 配置
 :PROPERTIES:
-:header-args: :noweb-ref emacs-config
+:header-args: :noweb-ref ecfg
 :END:
 #+begin_src emacs-lisp
   (add-hook 'org-mode-hook
@@ -1564,7 +1737,7 @@ Snippet 用于快速插入模板
 
 **** 依赖
 :PROPERTIES:
-:header-args: :noweb-ref emacs-packages
+:header-args: :noweb-ref epkgs
 :END:
 
 ***** TODO Aider.el
@@ -1573,19 +1746,19 @@ Snippet 用于快速插入模板
 #+END_SRC
 
 ***** Aider 目录路径
-#+begin_src emacs-lisp  :noweb-ref emacs-config
+#+begin_src emacs-lisp  :noweb-ref ecfg
   (add-to-list 'exec-path "${pkgs.aider-chat}/bin")
 #+end_src
 
 **** TODO 配置
 :PROPERTIES:
-:header-args: :noweb-ref emacs-config
+:header-args: :noweb-ref ecfg
 :END:
 
 ** 模态编辑（Meow）
 *** 依赖
 :PROPERTIES:
-:header-args: :noweb-ref emacs-packages
+:header-args: :noweb-ref epkgs
 :END:
 #+begin_src nix
   meow
@@ -1594,7 +1767,7 @@ Snippet 用于快速插入模板
 
 *** 配置
 :PROPERTIES:
-:header-args: :noweb-ref emacs-config
+:header-args: :noweb-ref ecfg
 :END:
 
 #+begin_src emacs-lisp
@@ -1707,7 +1880,6 @@ insert-state 时重新打开输入方式：
 	      (setq the-late-input-method current-input-method)
 	      (deactivate-input-method)))
 #+end_src
-
 
 ** 扩展
 
@@ -2099,7 +2271,7 @@ eaf还没有在 =nixpkgs= 中被打包，所以需要自己打包依赖。
 
 **** 依赖
 :PROPERTIES:
-:header-args: :noweb-ref emacs-packages
+:header-args: :noweb-ref epkgs
 :END:
 
 #+begin_src nix
@@ -2110,7 +2282,7 @@ eaf还没有在 =nixpkgs= 中被打包，所以需要自己打包依赖。
 
 **** 配置
 :PROPERTIES:
-:header-args: :noweb-ref emacs-config
+:header-args: :noweb-ref ecfg
 :END:
 
 #+begin_src emacs-lisp
