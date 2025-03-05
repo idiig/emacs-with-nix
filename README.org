@@ -1,5 +1,29 @@
 #+TITLE: 基于 Nix Flakes 的 Emacs 配置
 
+* 本配置的用法
+:PROPERTIES:
+:header-args: :tangle no
+:END:
+
+这份配置文件使用Nix Flakes管理包。使用Nix的这类系统管理的包的目的主要
+是因为
+
+- emacs内置的包管理器无法处理系统工具的依存：如 =ripgrep=, 特定版本的
+  =python=
+
+- 使用gitsubmodule相同
+
+- 完全使用Nix的话，写配置和尝试包的体验感比较差
+
+这份配置的解决法如下：
+
+- 通过org-babel同时写作Nix和elisp。前者用于版本和包的管理，后者用于包
+  的配置
+
+- 可以在elisp中用 =$pkgs.git= 的方式直接引用Nix的包
+  
+- 提供一个函数加入一个新包时使用这个函数更新包列表
+
 * 实现方式
 :PROPERTIES:
 :header-args: :tangle no
