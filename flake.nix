@@ -741,7 +741,7 @@
 	    (bind-key* "C-." 'idiig/insert-space-after-point)
 	    ;; TODO: 这里未来需要改成在每个语言的设定的节点push进来
 	    (defvar idiig/language-list
-	      '("emacs-lisp" "python" "ditta" "shell" "css" "nix"
+	      '("emacs-lisp" "python" "ditaa" "shell" "css" "nix"
 	        "R" "awk" "haskell" "latex")
 	      "支持的编程语言列表。")
 	    
@@ -851,6 +851,53 @@
 	      (setq org-support-shift-select 2))
 	    (with-eval-after-load 'org
 	      (setq org-display-remote-inline-images t))
+	    (use-package org-bullets
+	      :after org
+	      :hook (org-mode . org-bullets-mode)
+	      :custom
+	      (org-bullets-bullet-list '("◉" "○" "●" "○" "●" "○" "●")))
+	    
+	    (font-lock-add-keywords 'org-mode
+	                            '(("^ *\\([-]\\) "
+	                               (0 (prog1 () (compose-region (match-beginning 1) (match-end 1) "•"))))))
+	    
+	    (with-eval-after-load 'org
+	      (setq org-ellipsis " ▾"
+	            org-hide-emphasis-markers t))
+	    (defun idiig/org-mode-face-settings ()
+	      "Set custom face attributes for Org mode headings in current buffer only."
+	    
+	      (auto-fill-mode 0)
+	      (require 'org-indent)
+	      (org-indent-mode)
+	      (variable-pitch-mode 1)
+	      (visual-line-mode 1)
+	      
+	      (let ((my-font "Sarasa Mono SC")
+	    	(faces '((org-level-1 . 1.2)
+	                     (org-level-2 . 1.1)
+	                     (org-level-3 . 1.05)
+	                     (org-level-4 . 1.0)
+	                     (org-level-5 . 1.1)
+	                     (org-level-6 . 1.1)
+	                     (org-level-7 . 1.1)
+	                     (org-level-8 . 1.1))))
+	        (dolist (face faces)
+	          (face-remap-add-relative (car face) :family my-font :weight 'regular :height (cdr face))))
+	      
+	      (set-face-attribute 'org-block nil :foreground nil :inherit 'fixed-pitch)
+	      (set-face-attribute 'org-code nil   :inherit '(shadow fixed-pitch))
+	      (set-face-attribute 'org-indent nil :inherit '(org-hide fixed-pitch))
+	      (set-face-attribute 'org-verbatim nil :inherit '(shadow fixed-pitch))
+	      (set-face-attribute 'org-special-keyword nil :inherit '(font-lock-comment-face fixed-pitch))
+	      (set-face-attribute 'org-meta-line nil :inherit '(font-lock-comment-face fixed-pitch))
+	      (set-face-attribute 'org-checkbox nil :inherit 'fixed-pitch)
+	    
+	      (with-eval-after-load 'diminish
+	        (diminish 'org-indent-mode)
+	        (diminish 'buffer-face-mode)))
+	    
+	    (add-hook 'org-mode-hook 'idiig/org-mode-face-settings)
 	    (add-hook 'org-mode-hook
 	              (lambda ()
 	                (when (string-match-p "\\.ai\\.org\\'" (buffer-file-name))
@@ -1032,6 +1079,7 @@
             auctex
               auctex-latexmk
             ob-nix
+            org-bullets
             gptel
             # aider
             meow
