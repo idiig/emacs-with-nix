@@ -357,6 +357,8 @@
 	                   ("C-c h" . consult-history)
 	                   ("C-s" . #'previous-history-element)))
 	      :init
+	      (add-to-list 'exec-path "${pkgs.fd}/bin")
+	      (add-to-list 'exec-path "${pkgs.ripgrep}/bin")
 	      (defun idiig/consult-buffer-region-or-symbol ()
 	        "consult-line当前字符或选中区域."
 	        (interactive)
@@ -739,9 +741,8 @@
 	    (bind-key* "C-." 'idiig/insert-space-after-point)
 	    ;; TODO: 这里未来需要改成在每个语言的设定的节点push进来
 	    (defvar idiig/language-list
-	      '("emacs-lisp" "python" "C" "shell" "js" "clojure" "css" "nix"
-	        "dot" "gnuplot" "R" "sql" "awk" "haskell" "latex" "lisp"
-	        "org" "julia" "scheme" "sqlite")
+	      '("emacs-lisp" "python" "ditta" "shell" "css" "nix"
+	        "R" "awk" "haskell" "latex")
 	      "支持的编程语言列表。")
 	    
 	    (defun idiig/run-prog-mode-hooks ()
@@ -806,7 +807,7 @@
 	      ;; (push idiig/snippet-dir yas-snippet-dirs)
 	      :config
 	      (yas-reload-all))
-	    (use-package consult
+	    (use-package consult-yasnippet
 	      :after
 	      (consult
 	       yas-minor-mode))

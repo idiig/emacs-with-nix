@@ -1353,9 +1353,8 @@ TODO: 把 evil-jump-item 换成别的函数。
 #+begin_src emacs-lisp
   ;; TODO: 这里未来需要改成在每个语言的设定的节点push进来
   (defvar idiig/language-list
-    '("emacs-lisp" "python" "C" "shell" "js" "clojure" "css" "nix"
-      "dot" "gnuplot" "R" "sql" "awk" "haskell" "latex" "lisp"
-      "org" "julia" "scheme" "sqlite")
+    '("emacs-lisp" "python" "ditta" "shell" "css" "nix"
+      "R" "awk" "haskell" "latex")
     "支持的编程语言列表。")
 
   (defun idiig/run-prog-mode-hooks ()
@@ -1724,6 +1723,7 @@ Snippet 用于快速插入模板
 #+end_src
 
 **** 代码块支持语言
+
 ***** 依赖
 由于 =ob-nix= 还没有默认。我们需要添加这些依赖
 
