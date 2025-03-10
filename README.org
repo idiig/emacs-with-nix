@@ -954,10 +954,6 @@ emacs在打开新的窗口时，默认光标维持在原来的窗口。比如当
         (negative-argument arg)))
 #+end_src
 
-#+RESULTS:
-: idiig/puni-contract-region
-
-
 #+begin_src emacs-lisp
   ;; 添加 advice
   (with-eval-after-load 'puni
@@ -1165,8 +1161,6 @@ emacs在打开新的窗口时，默认光标维持在原来的窗口。比如当
   当启用时，会将forward-word和backward-word重映射为pyim的相应函数；
   当禁用时，会恢复原来的映射。"
       (interactive)
-      (call-interactively #'pyim-activate)
-      (call-interactively #'pyim-deactivate)
       (if idiig/pyim-region-enabled
   	(progn
   	  (idiig/disable-pyim-region)
@@ -1193,6 +1187,8 @@ emacs在打开新的窗口时，默认光标维持在原来的窗口。比如当
     ;; (advice-add 'pyim-deactivate :after #'idiig/disable-pyim-region)
     (advice-add 'pyim-activate :after #'idiig/enable-pyim-region))
 #+end_src
+
+#+RESULTS:
 
 ***** Orderless交互
 
