@@ -900,8 +900,8 @@ emacs在打开新的窗口时，默认光标维持在原来的窗口。比如当
     	([remap puni-kill-region] . idiig/puni-backward-kill-word-or-region)
   	([remap puni-forward-delete-char] . idiig/puni-hungry-delete)
   	([remap puni-backward-delete-char] . idiig/puni-hungry-backspace)
-    	("C-=" . puni-expand-region)
-    	("C--" . puni-contract-region))
+    	("C--" . idiig/puni-contract-region)
+    	("C-=" . puni-expand-region))
     :init
     ;; The autoloads of Puni are set up so you can enable `puni-mode` or
     ;; `puni-global-mode` before `puni` is actually loaded. Only after you press
@@ -944,10 +944,19 @@ emacs在打开新的窗口时，默认光标维持在原来的窗口。比如当
   				 (skip-chars-forward " \t\f\v")
   				 (point)))
         (puni-forward-delete-char))))
+
+
+    (defun idiig/puni-contract-region (&optional arg)
+      "如无选中则保持 negative-argument,如有选中则缩小范围"
+      (interactive "p")
+      (if (region-active-p)
+    	(call-interactively #'puni-contract-region)
+        (negative-argument arg)))
 #+end_src
 
 #+RESULTS:
-: puni-contract-region
+: idiig/puni-contract-region
+
 
 #+begin_src emacs-lisp
   ;; 添加 advice
