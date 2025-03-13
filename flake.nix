@@ -481,8 +481,8 @@
 	      	([remap puni-kill-region] . idiig/puni-backward-kill-word-or-region)
 	    	([remap puni-forward-delete-char] . idiig/puni-hungry-delete)
 	    	([remap puni-backward-delete-char] . idiig/puni-hungry-backspace)
-	      	("C-=" . puni-expand-region)
-	      	("C--" . puni-contract-region))
+	      	("C--" . idiig/puni-contract-region)
+	      	("C-=" . puni-expand-region))
 	      :init
 	      ;; The autoloads of Puni are set up so you can enable `puni-mode` or
 	      ;; `puni-global-mode` before `puni` is actually loaded. Only after you press
@@ -525,6 +525,14 @@
 	    				 (skip-chars-forward " \t\f\v")
 	    				 (point)))
 	          (puni-forward-delete-char))))
+	    
+	    
+	      (defun idiig/puni-contract-region (&optional arg)
+	        "如无选中则保持 negative-argument,如有选中则缩小范围"
+	        (interactive "p")
+	        (if (region-active-p)
+	      	(call-interactively #'puni-contract-region)
+	          (negative-argument arg)))
 	    ;; 添加 advice
 	    (with-eval-after-load 'puni
 	      (defun idiig/puni-expand-region-advice (orig-fun &rest args)
@@ -634,8 +642,6 @@
 	    当启用时，会将forward-word和backward-word重映射为pyim的相应函数；
 	    当禁用时，会恢复原来的映射。"
 	        (interactive)
-	        (call-interactively #'pyim-activate)
-	        (call-interactively #'pyim-deactivate)
 	        (if idiig/pyim-region-enabled
 	    	(progn
 	    	  (idiig/disable-pyim-region)
@@ -741,8 +747,8 @@
 	    (bind-key* "C-." 'idiig/insert-space-after-point)
 	    ;; TODO: 这里未来需要改成在每个语言的设定的节点push进来
 	    (defvar idiig/language-list
-	      '("emacs-lisp" "python" "ditaa" "shell" "css" "nix"
-	        "R" "awk" "haskell" "latex")
+	      '("emacs-lisp" "python" "ditaa" "plantuml" "shell" "nix"
+	        "R" "haskell" "latex"  "css")
 	      "支持的编程语言列表。")
 	    
 	    (defun idiig/run-prog-mode-hooks ()
@@ -822,6 +828,7 @@
 	     "basedpyright" 
 	     "${pkgs.basedpyright}/bin" 
 	     "${pkgs.stdenv.cc.cc.lib}/lib")
+	    (add-hook 'eval-expression-minibuffer-setup 'idiig/run-prog-mode-hooks)
 	    (idiig//setup-nix-lsp-bridge-server 
 	     "tex" 
 	     "texlab" 
@@ -829,6 +836,11 @@
 	     nil)
 	    
 	    (add-to-list 'exec-path "${pkgs.texliveFull}/bin")
+	    (add-hook 'TeX-mode-hook 'idiig/run-prog-mode-hooks)
+	    (use-package auctex
+	      :defer t)
+	    (add-to-list 'exec-path "${pkgs.plantuml}/bin")
+	    (add-to-list 'exec-path "${pkgs.graphviz}/bin")
 	    (add-hook 'org-mode-hook 'idiig/run-prog-mode-hooks)
 	    (with-eval-after-load 'org
 	      (defun idiig/org-insert-structure-template-src-advice (orig-fun type)
@@ -1078,8 +1090,10 @@
             nix-mode
             auctex
               auctex-latexmk
+            plantuml-mode
             ob-nix
             org-bullets
+            org-tree-slide
             gptel
             # aider
             meow

@@ -1348,8 +1348,8 @@ TODO: 把 evil-jump-item 换成别的函数。
 #+begin_src emacs-lisp
   ;; TODO: 这里未来需要改成在每个语言的设定的节点push进来
   (defvar idiig/language-list
-    '("emacs-lisp" "python" "ditaa" "shell" "css" "nix"
-      "R" "awk" "haskell" "latex")
+    '("emacs-lisp" "python" "ditaa" "plantuml" "shell" "nix"
+      "R" "haskell" "latex"  "css")
     "支持的编程语言列表。")
 
   (defun idiig/run-prog-mode-hooks ()
@@ -1636,6 +1636,9 @@ Snippet 用于快速插入模板
 *** R
 
 *** Elisp
+:PROPERTIES:
+:header-args: :noweb-ref ecfg
+:END:
 
 - =M-:= 时的 eval expression minibuffer 的时候加入 prog mode。
 #+begin_src emacs-lisp
@@ -1669,6 +1672,9 @@ Snippet 用于快速插入模板
 #+end_src
 
 **** 配置
+:PROPERTIES:
+:header-args: :noweb-ref ecfg
+:END:
 
 #+begin_src emacs-lisp
   (add-hook 'TeX-mode-hook 'idiig/run-prog-mode-hooks)
@@ -1688,6 +1694,28 @@ Snippet 用于快速插入模板
 *** XML
 
 *** Web
+
+*** PlantUML
+
+**** 依赖
+:PROPERTIES:
+:header-args: :noweb-ref epkgs
+:END:
+
+#+begin_src nix
+  plantuml-mode
+#+end_src
+
+#+begin_src emacs-lisp :noweb-ref ecfg
+  (add-to-list 'exec-path "${pkgs.plantuml}/bin")
+#+end_src
+
+*** GraphViz
+
+**** 依赖
+#+begin_src emacs-lisp :noweb-ref ecfg
+  (add-to-list 'exec-path "${pkgs.graphviz}/bin")
+#+end_src
 
 ** Org Mode相关配置
 *** Org本体
@@ -1716,7 +1744,6 @@ Snippet 用于快速插入模板
 #+end_src
 
 **** 代码块支持语言
-
 ***** 依赖
 由于 =ob-nix= 还没有默认。我们需要添加这些依赖
 
@@ -1820,8 +1847,15 @@ Snippet 用于快速插入模板
 
   (add-hook 'org-mode-hook 'idiig/org-mode-face-settings)
 #+end_src
-
-  
+*** 幻灯片
+用 =org-tree-slide= 作幻灯片发表
+**** 依赖
+:PROPERTIES:
+:header-args: :noweb-ref epkgs
+:END:
+#+begin_src nix
+  org-tree-slide
+#+end_src
 ** AI辅助功能
 
 *** 文档写作
