@@ -1877,6 +1877,15 @@ Snippet 用于快速插入模板
 
   (add-hook 'org-mode-hook 'idiig/org-mode-face-settings)
 #+end_src
+*** Citation 工具： =citeproc-el=
+**** 依赖
+:PROPERTIES:
+:header-args: :noweb-ref epkgs
+:END:
+#+begin_src nix
+  citeproc
+#+end_src
+
 *** 幻灯片
 用 =org-tree-slide= 作幻灯片发表
 **** 依赖

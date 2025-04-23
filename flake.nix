@@ -1112,6 +1112,7 @@
             plantuml-mode
             ob-nix
             org-bullets
+            citeproc
             org-tree-slide
             gptel
             # aider
