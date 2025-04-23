@@ -829,17 +829,24 @@
 	     "${pkgs.basedpyright}/bin" 
 	     "${pkgs.stdenv.cc.cc.lib}/lib")
 	    (add-hook 'eval-expression-minibuffer-setup 'idiig/run-prog-mode-hooks)
+	    ;; (setq shell-command-switch "-ic")
+	    (setq-default explicit-shell-file-name "${pkgs.bashInteractive
+	    }/bin/bash")
+	    (setq shell-file-name "${pkgs.bashInteractive
+	    }/bin/bash")
 	    (idiig//setup-nix-lsp-bridge-server 
 	     "tex" 
 	     "texlab" 
 	     "${pkgs.texlab}/bin" 
 	     nil)
-	    
-	    (add-to-list 'exec-path "${pkgs.texliveFull}/bin")
 	    (add-hook 'TeX-mode-hook 'idiig/run-prog-mode-hooks)
 	    (use-package auctex
 	      :defer t)
 	    (add-to-list 'exec-path "${pkgs.plantuml}/bin")
+	    (with-eval-after-load 'org
+	      (setq org-plantuml-jar-path "${pkgs.plantuml}/lib/plantuml.jar")
+	      (setq org-plantuml-executable-path "${pkgs.plantuml}/bin/plantuml")
+	      (setq org-plantuml-exec-mode 'plantuml))
 	    (add-to-list 'exec-path "${pkgs.graphviz}/bin")
 	    (add-hook 'org-mode-hook 'idiig/run-prog-mode-hooks)
 	    (with-eval-after-load 'org
@@ -858,7 +865,19 @@
 	          (push (cons (intern lang) t) languages)) ;; 将字符串转换为符号
 	        (org-babel-do-load-languages 'org-babel-load-languages languages)))
 	    
+	    (defun idiig/set-org-babel-language-commands ()
+	      "根据 `idiig/language-list` 甚至语言的命令。"
+	      (dolist (lang idiig/language-list)
+	        (let ((var-name (intern (format "org-babel-%s-command" lang))))
+	          (when (boundp var-name)
+	    	(set var-name (executable-find lang))))))
+	    
 	    (add-hook 'org-mode-hook #'idiig/load-org-babel-languages)
+	    (add-hook 'org-mode-hook #'idiig/set-org-babel-language-commands)
+	    
+	    ;; 特殊
+	    (setq org-babel-shell-command (executable-find "bash"))
+	    
 	    (with-eval-after-load 'org
 	      (setq org-support-shift-select 2))
 	    (with-eval-after-load 'org
@@ -1100,6 +1119,7 @@
               meow-tree-sitter
             eaf
               eaf-browser
+              (pkgs.crow-translate)
               # eaf-pdf-viewer
           ]);
           
