@@ -1885,7 +1885,18 @@ Snippet 用于快速插入模板
 #+begin_src nix
   citeproc
 #+end_src
-
+**** 配置
+:PROPERTIES:
+:header-args: :noweb-ref ecfg
+:END:
+#+begin_src emacs-lisp
+  (with-eval-after-load 'org
+    (setq org-cite-export-processors
+        '((latex biblatex)
+          (html csl)
+          (odt  csl)
+          (t    biblatex))))
+#+end_src
 *** 幻灯片
 用 =org-tree-slide= 作幻灯片发表
 **** 依赖
@@ -1895,6 +1906,7 @@ Snippet 用于快速插入模板
 #+begin_src nix
   org-tree-slide
 #+end_src
+
 ** AI辅助功能
 
 *** 文档写作

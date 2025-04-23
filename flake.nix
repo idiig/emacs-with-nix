@@ -929,6 +929,12 @@
 	        (diminish 'buffer-face-mode)))
 	    
 	    (add-hook 'org-mode-hook 'idiig/org-mode-face-settings)
+	    (with-eval-after-load 'org
+	      (setq org-cite-export-processors
+	          '((latex biblatex)
+	            (html csl)
+	            (odt  csl)
+	            (t    biblatex))))
 	    (add-hook 'org-mode-hook
 	              (lambda ()
 	                (when (string-match-p "\\.ai\\.org\\'" (buffer-file-name))
