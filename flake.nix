@@ -479,8 +479,8 @@
 	      (:map puni-mode-map
 	      	([remap puni-kill-line] . idiig/puni-kill-line)
 	      	([remap puni-kill-region] . idiig/puni-backward-kill-word-or-region)
-	    	([remap puni-forward-delete-char] . idiig/puni-hungry-delete)
-	    	([remap puni-backward-delete-char] . idiig/puni-hungry-backspace)
+	    	([remap puni-forward-delete-char] . idiig/puni-forward-hungry-delete)
+	    	([remap puni-backward-delete-char] . idiig/puni-backward-hungry-delete)
 	      	("C--" . idiig/puni-contract-region)
 	      	("C-=" . puni-expand-region))
 	      :init
@@ -490,18 +490,25 @@
 	      (puni-global-mode)
 	      (add-hook 'term-mode-hook #'puni-disable-puni-mode)
 	      :config
-	      (defun idiig/puni-kill-line ()
+	      (defun idiig/puni-kill-line (&optional n)
 	        "Kill a line forward while keeping expressions balanced.
-	      If nothing can be deleted, kill backward.  If still nothing can be
-	      deleted, kill the pairs around point."
-	        (interactive)
+	    If forward kill is not possible, try backward. If still nothing
+	    can be deleted, kill the balanced expression around point."
+	        (interactive "p")
 	        (let ((bounds (puni-bounds-of-list-around-point)))
-	          (if (eq (car bounds) (cdr bounds))
-	              (when-let ((sexp-bounds (puni-bounds-of-sexp-around-point)))
-	                (puni-delete-region (car sexp-bounds) (cdr sexp-bounds) 'kill))
-	      	(if (eq (point) (cdr bounds))
-	                (puni-backward-kill-line)
-	              (puni-kill-line)))))
+	          (cond
+	           ;; Case 1: No list bounds found, try deleting surrounding sexp
+	           ((null bounds)
+	    	(when-let ((sexp-bounds (puni-bounds-of-sexp-around-point)))
+	              (puni-delete-region (car sexp-bounds) (cdr sexp-bounds) 'kill)))
+	    
+	           ;; Case 2: Point is at end of bounds, try backward kill
+	           ((eq (point) (cdr bounds))
+	    	(puni-backward-kill-line))
+	    
+	           ;; Case 3: Default forward kill
+	           (t
+	    	(puni-kill-line n)))))
 	    
 	      (defun idiig/puni-backward-kill-word-or-region (&optional arg)
 	        "如无选中则杀掉前面的单词，如有选中则杀掉选中区域"
@@ -510,29 +517,37 @@
 	      	(call-interactively #'puni-kill-region)
 	          (puni-backward-kill-word arg)))
 	    
-	      (defun idiig/puni-hungry-backspace ()
-	        "Smart backspace function."
-	        (interactive)
-	        (if (looking-back (rx line-start (+ blank)))
-	    	(delete-region (line-beginning-position) (point))
-	          (puni-backward-delete-char)))
+	      (defun idiig/puni-backward-hungry-delete (&optional n)
+	        "Delete contiguous whitespace characters backward.
+	    If not on leading whitespace, delete backward with balanced structure using `puni'."
+	        (interactive "p")
+	        (let ((n (or n 1)))
+	          (if (and (eq (point) (line-beginning-position))
+	                   (looking-back (rx (* blank)) (line-beginning-position)))
+	              nil ;; Nothing to delete at line-start
+	    	(if (looking-back (rx (+ blank)) (line-beginning-position))
+	                (let ((start (save-excursion (skip-chars-backward " \t\f\v") (point))))
+	                  (delete-region start (point)))
+	              (dotimes (_ n)
+	                (puni-backward-delete-char))))))
 	    
-	      (defun idiig/puni-hungry-delete ()
-	        "Smart delete function."
-	        (interactive)
-	        (if (looking-at (rx (+ blank) (not blank)))
-	    	(delete-region (point) (progn 
-	    				 (skip-chars-forward " \t\f\v")
-	    				 (point)))
-	          (puni-forward-delete-char))))
-	    
+	      (defun idiig/puni-forward-hungry-delete (&optional n)
+	        "Delete contiguous whitespace characters forward.
+	    If not on whitespace, delete forward with balanced structure using `puni'."
+	        (interactive "p")
+	        (let ((n (or n 1)))
+	          (if (looking-at (rx (+ blank)))
+	              (let ((end (save-excursion (skip-chars-forward " \t\f\v") (point))))
+	                (delete-region (point) end))
+	    	(dotimes (_ n)
+	              (puni-forward-delete-char)))))
 	    
 	      (defun idiig/puni-contract-region (&optional arg)
 	        "如无选中则保持 negative-argument,如有选中则缩小范围"
 	        (interactive "p")
 	        (if (region-active-p)
 	      	(call-interactively #'puni-contract-region)
-	          (negative-argument arg)))
+	          (negative-argument arg))))
 	    ;; 添加 advice
 	    (with-eval-after-load 'puni
 	      (defun idiig/puni-expand-region-advice (orig-fun &rest args)
