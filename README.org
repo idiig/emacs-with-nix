@@ -891,7 +891,7 @@ emacs在打开新的窗口时，默认光标维持在原来的窗口。比如当
 :PROPERTIES:
 :header-args: :noweb-ref ecfg
 :END:
-#+begin_src emacs-lisp
+#+begin_src emacs-lisp :noweb yes
   (use-package puni
     :defer t
     :bind
@@ -909,64 +909,48 @@ emacs在打开新的窗口时，默认光标维持在原来的窗口。比如当
     (puni-global-mode)
     (add-hook 'term-mode-hook #'puni-disable-puni-mode)
     :config
-    (defun idiig/puni-kill-line (&optional n)
-      "Kill a line forward while keeping expressions balanced.
+    <<idiig/puni-kill-line>>
+    <<idiig/puni-backward-kill-word-or-region>>
+    <<idiig/puni-backward-hungry-delete>>
+    <<idiig/puni-forward-hungry-delete>>  
+    <<idiig/puni-contract-region>>
+    <<idiig/puni-expand-region-advice>>
+  )
+#+end_src
+****** =puni-kill-line=
+基于 =puni= 更改 =kill-line= ，在删除行的时候可以确认是否被包围在某个环境
+中。如果被包围在某个环境中则删除到该环境的最后，如果没有则正常执行
+=kill-line= 。
+#+begin_src emacs-lisp :noweb-ref idiig/puni-kill-line
+  (defun idiig/puni-kill-line (&optional n)
+    "Kill a line forward while keeping expressions balanced.
   If forward kill is not possible, try backward. If still nothing
   can be deleted, kill the balanced expression around point."
-      (interactive "p")
-      (let ((bounds (puni-bounds-of-list-around-point)))
-        (cond
-         ;; Case 1: No list bounds found, try deleting surrounding sexp
-         ((null bounds)
-  	(when-let ((sexp-bounds (puni-bounds-of-sexp-around-point)))
-            (puni-delete-region (car sexp-bounds) (cdr sexp-bounds) 'kill)))
+    (interactive "p")
+    (let ((bounds (puni-bounds-of-list-around-point)))
+      (cond
+       ;; Case 1: No list bounds found, try deleting surrounding sexp
+       ((null bounds)
+        (when-let ((sexp-bounds (puni-bounds-of-sexp-around-point)))
+          (puni-delete-region (car sexp-bounds) (cdr sexp-bounds) 'kill)))
 
-         ;; Case 2: Point is at end of bounds, try backward kill
-         ((eq (point) (cdr bounds))
-  	(puni-backward-kill-line))
+       ;; Case 2: Point is at end of bounds, try backward kill
+       ((eq (point) (cdr bounds))
+        (puni-backward-kill-line))
 
-         ;; Case 3: Default forward kill
-         (t
-  	(puni-kill-line n)))))
-
-    (defun idiig/puni-backward-kill-word-or-region (&optional arg)
-      "如无选中则杀掉前面的单词，如有选中则杀掉选中区域"
-      (interactive "p")
-      (if (region-active-p)
-    	(call-interactively #'puni-kill-region)
-        (puni-backward-kill-word arg)))
-
-    (defun idiig/puni-backward-hungry-delete (&optional n)
-      "Delete contiguous whitespace characters backward.
-  If not on leading whitespace, delete backward with balanced structure using `puni'."
-      (interactive "p")
-      (let ((n (or n 1)))
-        (if (and (eq (point) (line-beginning-position))
-                 (looking-back (rx (* blank)) (line-beginning-position)))
-            nil ;; Nothing to delete at line-start
-  	(if (looking-back (rx (+ blank)) (line-beginning-position))
-              (let ((start (save-excursion (skip-chars-backward " \t\f\v") (point))))
-                (delete-region start (point)))
-            (dotimes (_ n)
-              (puni-backward-delete-char))))))
-
-    (defun idiig/puni-forward-hungry-delete (&optional n)
-      "Delete contiguous whitespace characters forward.
-  If not on whitespace, delete forward with balanced structure using `puni'."
-      (interactive "p")
-      (let ((n (or n 1)))
-        (if (looking-at (rx (+ blank)))
-            (let ((end (save-excursion (skip-chars-forward " \t\f\v") (point))))
-              (delete-region (point) end))
-  	(dotimes (_ n)
-            (puni-forward-delete-char)))))
-
-    (defun idiig/puni-contract-region (&optional arg)
-      "如无选中则保持 negative-argument,如有选中则缩小范围"
-      (interactive "p")
-      (if (region-active-p)
-    	(call-interactively #'puni-contract-region)
-        (negative-argument arg))))
+       ;; Case 3: Default forward kill
+       (t
+        (puni-kill-line n)))))
+#+end_src
+****** =idiig/puni-contract-region=
+如无选中则保持 negative-argument,如有选中则缩小范围
+#+begin_src emacs-lisp  :noweb-ref idiig/puni-contract-region 
+  (defun idiig/puni-contract-region (&optional arg)
+    "如无选中则保持 negative-argument,如有选中则缩小范围"
+    (interactive "p")
+    (if (region-active-p)
+        (call-interactively #'puni-contract-region)
+      (negative-argument arg)))
 #+end_src
 
 #+begin_src emacs-lisp
@@ -1001,6 +985,66 @@ emacs在打开新的窗口时，默认光标维持在原来的窗口。比如当
   	 nil nil
   	 "Use %k for further adjustment"))))
     (advice-add 'puni-expand-region :around #'idiig/puni-expand-region-advice))
+#+end_src
+****** =idiig/puni-forward-hungry-delete=
+向前删除时向前贪婪地删除连续的空白值。同时考虑对称的结构。
+
+- 检查光标后的字符：
+  - 使用 =looking-at= 判断光标后面的字符是否是一个或多个空白字符或换行符。
+  - 如果匹配到，使用 =skip-chars-forward= 跳过所有这些字符并记录结束位置。
+  - 使用 =delete-region= 删除从当前光标位置到记录的结束位置之间的所有空白。
+
+- 字符删除逻辑：
+  - 如果光标后没有多余的空白字符，使用 =dotimes= 循环和 =puni-forward-delete-char= 删除 =n= 个普通字符。
+  - =unless (eobp)=: 确保在没有到达缓冲区末尾时进行字符删除，防止出现试图超出缓冲区范围的错误。
+
+#+begin_src emacs-lisp :noweb-ref idiig/puni-forward-hungry-delete
+  (defun idiig/puni-forward-hungry-delete (&optional n)
+    "Delete contiguous whitespace characters forward.
+  If not on whitespace, delete forward with balanced structure using `puni'."
+    (interactive "p")
+    (let ((n (or n 1)))
+      (if (looking-at (rx (or (1+ blank) "\n")))  ; 匹配一个或多个空白字符或单个换行符
+          (let ((end (save-excursion
+                       (skip-chars-forward " \t\f\v\n\r")
+                       (point))))
+            (delete-region (point) end))
+        (dotimes (_ n)
+          (unless (eobp)
+  	  (puni-forward-delete-char))))))
+#+end_src
+****** =idiig/puni-backward-hungry-delete=
+向后删除时向后贪婪地删除连续的空白值。同时考虑对称的结构。
+
+- 首先检查光标前面是否有连续的空白字符。
+- 使用 =looking-back= 用于判断光标之前是否有符合正则表达式 =(+ blank)= 的字符序列。 =(line-beginning-position)= 确保不会查看超出行首的内容。
+- 如果有连续的空白字符：
+  - 使用 =skip-chars-backward= 向后跳过这些字符，并记录开始位置 =start= 。
+  - 然后 =delete-region= 用于删除从 =start= 到当前光标位置之间的字符。
+  - 如果光标前面不是连续空白字符，就调用 =puni-backward-delete-char= ，这是来自 =puni= 的函数，用于以结构化方式进行删除操作。
+
+#+begin_src emacs-lisp :noweb-ref idiig/puni-backward-hungry-delete
+  (defun idiig/puni-backward-hungry-delete (&optional n)
+    "Delete contiguous whitespace characters backward.
+  If not on whitespace, delete backward with balanced structure using `puni'."
+    (interactive "p")
+    (let ((n (or n 1)))
+      (if (looking-back (rx (+ blank)) (line-beginning-position))
+          (let ((start (save-excursion (skip-chars-backward " \t\f\n\r\v") (point))))
+            (delete-region start (point)))
+        (dotimes (_ n)
+          (unless (bobp)
+            (puni-backward-delete-char))))))
+#+end_src
+****** =idiig/puni-backward-kill-word-or-region=
+如无选中则杀掉前面的单词，如有选中则杀掉选中区域。
+#+begin_src emacs-lisp ::noweb-ref idiig/puni-backward-kill-word-or-region
+  (defun idiig/puni-backward-kill-word-or-region (&optional arg)
+    "如无选中则杀掉前面的单词，如有选中则杀掉选中区域"
+    (interactive "p")
+    (if (region-active-p)
+        (call-interactively #'puni-kill-region)
+      (puni-backward-kill-word arg)))
 #+end_src
 
 ** CJK字体
