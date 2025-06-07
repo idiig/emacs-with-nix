@@ -478,9 +478,6 @@
 	      :bind
 	      (:map puni-mode-map
 	      	([remap puni-kill-line] . idiig/puni-kill-line)
-	      	([remap puni-kill-region] . idiig/puni-backward-kill-word-or-region)
-	    	([remap puni-forward-delete-char] . idiig/puni-forward-hungry-delete)
-	    	([remap puni-backward-delete-char] . idiig/puni-backward-hungry-delete)
 	      	("C--" . idiig/puni-contract-region)
 	      	("C-=" . puni-expand-region))
 	      :init
@@ -509,31 +506,6 @@
 	           ;; Case 3: Default forward kill
 	           (t
 	            (puni-kill-line n)))))
-	      
-	      (defun idiig/puni-backward-hungry-delete (&optional n)
-	        "Delete contiguous whitespace characters backward.
-	      If not on whitespace, delete backward with balanced structure using `puni'."
-	        (interactive "p")
-	        (let ((n (or n 1)))
-	          (if (or (looking-back (rx (+ blank))) (bolp))
-	          (let ((start (save-excursion (skip-chars-backward " \t\f\n\r\v") (point))))
-	                (delete-region start (point)))
-	            (dotimes (_ n)
-	              (unless (bobp)
-	                (puni-backward-delete-char))))))
-	      (defun idiig/puni-forward-hungry-delete (&optional n)
-	        "Delete contiguous whitespace characters forward.
-	      If not on whitespace, delete forward with balanced structure using `puni'."
-	        (interactive "p")
-	        (let ((n (or n 1)))
-	          (if (looking-at (rx (or (1+ blank) "\n")))  ; 匹配一个或多个空白字符或单个换行符
-	      	(let ((end (save-excursion
-	                           (skip-chars-forward " \t\f\v\n\r")
-	                           (point))))
-	                (delete-region (point) end))
-	            (dotimes (_ n)
-	              (unless (eobp)
-	      	  (puni-forward-delete-char))))))  
 	      (defun idiig/puni-contract-region (&optional arg)
 	        "如无选中则保持 negative-argument,如有选中则缩小范围"
 	        (interactive "p")
@@ -573,12 +545,66 @@
 	    	 nil nil
 	    	 "Use %k for further adjustment"))))
 	      (advice-add 'puni-expand-region :around #'idiig/puni-expand-region-advice))
-	    (defun idiig/puni-backward-kill-word-or-region (&optional arg)
-	      "如无选中则杀掉前面的单词，如有选中则杀掉选中区域"
-	      (interactive "p")
+	    (defun idiig/backward-hungry-delete-advice (orig-fun &rest args)
+	      "Advice function to provide hungry delete functionality."
+	      (if (or (looking-back (rx (+ blank))) (bolp))
+	          (let ((start (save-excursion (skip-chars-backward " \t\f\n\r\v") (point))))
+	            (delete-region start (point)))
+	        (apply orig-fun args)))
+	    
+	    (defun idiig/apply-backward-hungry-delete-advice ()
+	      "Reapply the hungry delete advice to the current DEL key binding function."
+	      (let ((current-fun (key-binding (kbd "DEL"))))
+	        (advice-remove current-fun #'idiig/backward-hungry-delete-advice)    ; 移除旧的 advice
+	        (advice-add current-fun :around #'idiig/backward-hungry-delete-advice))) ; 应用新的 advice
+	    
+	    ;; 在 emacs-startup 时应用 advice
+	    (add-hook 'emacs-startup-hook #'idiig/apply-backward-hungry-delete-advice)
+	    
+	    ;; 如果你有其他 hook 如打开某种模式时，需要重新应用 advice，可添加对应 hook，例如：
+	    ;; (add-hook 'your-major-mode-hook #'idiig/reapply-backward-hungry-delete-advice)
+	    (defun idiig/forward-hungry-delete-advice (orig-fun &rest args)
+	      "Advice function to provide forward hungry delete functionality."
+	      (if (looking-at (rx (or (1+ blank) "\n")))
+	          (let ((end (save-excursion
+	                       (skip-chars-forward " \t\f\v\n\r")
+	                       (point))))
+	            (delete-region (point) end))
+	        (apply orig-fun args)))
+	    
+	    (defun idiig/apply-forward-hungry-delete-advice ()
+	      "Apply the forward hungry delete advice to the current forward delete key binding function."
+	      (let ((current-fun (key-binding (kbd "C-d"))))
+	        (advice-remove current-fun #'idiig/forward-hungry-delete-advice) ; 移除旧的 advice
+	        (advice-add current-fun :around #'idiig/forward-hungry-delete-advice))) ; 应用新的 advice
+	    
+	    ;; 在 emacs-startup 时应用 advice
+	    (add-hook 'emacs-startup-hook #'idiig/apply-forward-hungry-delete-advice)
+	    
+	    ;; 如果你有其他 hook 需要重新应用 advice，可添加对应 hook，例如：
+	    ;; (add-hook 'your-major-mode-hook #'idiig/apply-forward-hungry-delete-advice)
+	    (defun idiig/backward-kill-word-or-region-advice (orig-fun &rest args)
+	      "Enhance the C-w function to handle region more flexibly."
 	      (if (region-active-p)
-	          (call-interactively #'puni-kill-region)
-	        (puni-backward-kill-word arg)))
+	          ;; 当有选中区域时，使用传递的参数调用原始C-w功能（例如 `puni-kill-region`）
+	          (apply orig-fun args)
+	        ;; 当没有选中区域时，执行删除单词操作
+	        (let ((backward-kill-word-fun (or (key-binding (kbd "M-<DEL>"))
+	                                          (key-binding (kbd "S-<delete>"))
+	                                          'backward-kill-word))) ; 默认删除单词函数
+	          (if (fboundp backward-kill-word-fun)
+	              (call-interactively backward-kill-word-fun) ; 交互式调用删除单词
+	            (message "No word kill bound function found for M-<DEL> or S-<delete>")))))
+	    
+	    (defun idiig/apply-backward-kill-word-or-region-advice ()
+	      "Advice C-w to optionally kill region or word."
+	      ;; 通过 `key-binding` 得到当前与 C-w 绑定的函数
+	      (let ((current-fun (key-binding (kbd "C-w"))))
+	        (advice-remove current-fun #'idiig/backward-kill-word-or-region-advice)
+	        (advice-add current-fun :around #'idiig/backward-kill-word-or-region-advice)))
+	    
+	    ;; 在 emacs 启动时应用这个 advice
+	    (add-hook 'emacs-startup-hook #'idiig/apply-backward-kill-word-or-region-advice)
 	    (add-hook 'after-init-hook
 	    	  (lambda ()
 	    	    (let* ((screen-height (display-pixel-height))

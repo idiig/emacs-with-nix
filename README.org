@@ -239,7 +239,6 @@ hook，config，自定义的函数。
 #+end_src
 
 *** 更好的默认设置
-
 **** 本体的设定
 :PROPERTIES:
 :header-args: :noweb-ref ecfg
@@ -287,7 +286,6 @@ hook，config，自定义的函数。
 #+end_src
 
 - 主题
-
 #+begin_src emacs-lisp
   (require-theme 'modus-themes)
 #+end_src
@@ -496,16 +494,13 @@ emacs在打开新的窗口时，默认光标维持在原来的窗口。比如当
 #+end_src
 
 **** 便利的光标首尾移动
-
 ***** 依赖
 :PROPERTIES:
 :header-args: :noweb-ref epkgs
 :END:
-
 #+begin_src nix
   mwim
 #+end_src
-
 ***** 配置
 :PROPERTIES:
 :header-args: :noweb-ref ecfg
@@ -524,21 +519,17 @@ emacs在打开新的窗口时，默认光标维持在原来的窗口。比如当
 #+end_src
 
 **** 折行与复原
-
 ***** 依赖
 :PROPERTIES:
 :header-args: :noweb-ref epkgs
 :END:
-
 #+begin_src nix
   unfill
 #+end_src
-
 ***** 配置
 :PROPERTIES:
 :header-args: :noweb-ref ecfg
 :END:
-
 - 物理折行与复原
 #+begin_src emacs-lisp
   (use-package unfill
@@ -547,14 +538,11 @@ emacs在打开新的窗口时，默认光标维持在原来的窗口。比如当
     :commands
     (unfill-toggle))
 #+end_src
-
 **** 更好的minibuffer
 :PROPERTIES:
 :header-args: :noweb-ref ecfg
 :END:
-
 ***** 原生设定
-
 #+begin_src emacs-lisp
   (use-package emacs
     :init
@@ -592,7 +580,6 @@ emacs在打开新的窗口时，默认光标维持在原来的窗口。比如当
 #+end_src
 
 ***** 基础五件套
-
 ****** 依赖
 :PROPERTIES:
 :header-args: :noweb-ref epkgs
@@ -878,7 +865,6 @@ emacs在打开新的窗口时，默认光标维持在原来的窗口。比如当
 #+end_src
 
 **** 语言无关的结构化编程
-
 ***** 依赖
 :PROPERTIES:
 :header-args: :noweb-ref epkgs
@@ -897,9 +883,6 @@ emacs在打开新的窗口时，默认光标维持在原来的窗口。比如当
     :bind
     (:map puni-mode-map
     	([remap puni-kill-line] . idiig/puni-kill-line)
-    	([remap puni-kill-region] . idiig/puni-backward-kill-word-or-region)
-  	([remap puni-forward-delete-char] . idiig/puni-forward-hungry-delete)
-  	([remap puni-backward-delete-char] . idiig/puni-backward-hungry-delete)
     	("C--" . idiig/puni-contract-region)
     	("C-=" . puni-expand-region))
     :init
@@ -910,9 +893,6 @@ emacs在打开新的窗口时，默认光标维持在原来的窗口。比如当
     (add-hook 'term-mode-hook #'puni-disable-puni-mode)
     :config
     <<idiig/puni-kill-line>>
-    <<idiig/puni-backward-kill-word-or-region>>
-    <<idiig/puni-backward-hungry-delete>>
-    <<idiig/puni-forward-hungry-delete>>  
     <<idiig/puni-contract-region>>
     <<idiig/puni-expand-region-advice>>
   )
@@ -986,66 +966,97 @@ emacs在打开新的窗口时，默认光标维持在原来的窗口。比如当
   	 "Use %k for further adjustment"))))
     (advice-add 'puni-expand-region :around #'idiig/puni-expand-region-advice))
 #+end_src
-****** =idiig/puni-forward-hungry-delete=
-向前删除时向前贪婪地删除连续的空白值。同时考虑对称的结构。
 
+**** 覆盖 =<Backspace>= 和 =<DEL>= 等删除动作
+:PROPERTIES:
+:header-args: :noweb-ref ecfg
+:END:
+***** =backward-hungry-delete=
+向后删除时向后贪婪地删除连续的空白值。同时考虑对称的结构。
+- 首先检查光标前面是否有连续的空白字符。
+- 使用 =looking-back= 用于判断满足以下任何一个条件：
+  - 光标之前在当前行是否有符合正则表达式 =(+ blank)= 的字符序列。
+  - 光标是否在行首 =(bolp)= 。
+- 如果有连续的空白字符或在行首：
+  - 使用 =skip-chars-backward= 向后跳过这些字符，并记录开始位置 =start= 。
+  - 然后 =delete-region= 用于删除从 =start= 到当前光标位置之间的字符。
+#+begin_src emacs-lisp
+  (defun idiig/backward-hungry-delete-advice (orig-fun &rest args)
+    "Advice function to provide hungry delete functionality."
+    (if (or (looking-back (rx (+ blank))) (bolp))
+        (let ((start (save-excursion (skip-chars-backward " \t\f\n\r\v") (point))))
+          (delete-region start (point)))
+      (apply orig-fun args)))
+
+  (defun idiig/apply-backward-hungry-delete-advice ()
+    "Reapply the hungry delete advice to the current DEL key binding function."
+    (let ((current-fun (key-binding (kbd "DEL"))))
+      (advice-remove current-fun #'idiig/backward-hungry-delete-advice)    ; 移除旧的 advice
+      (advice-add current-fun :around #'idiig/backward-hungry-delete-advice))) ; 应用新的 advice
+
+  ;; 在 emacs-startup 时应用 advice
+  (add-hook 'emacs-startup-hook #'idiig/apply-backward-hungry-delete-advice)
+
+  ;; 如果你有其他 hook 如打开某种模式时，需要重新应用 advice，可添加对应 hook，例如：
+  ;; (add-hook 'your-major-mode-hook #'idiig/reapply-backward-hungry-delete-advice)
+#+end_src
+***** =forward-hungry-delete=
+向前删除时向前贪婪地删除连续的空白值。同时考虑对称的结构。
 - 检查光标后的字符：
   - 使用 =looking-at= 判断光标后面的字符是否是一个或多个空白字符或换行符。
   - 如果匹配到，使用 =skip-chars-forward= 跳过所有这些字符并记录结束位置。
   - 使用 =delete-region= 删除从当前光标位置到记录的结束位置之间的所有空白。
-
 - 字符删除逻辑：
   - 如果光标后没有多余的空白字符，使用 =dotimes= 循环和 =puni-forward-delete-char= 删除 =n= 个普通字符。
   - =unless (eobp)=: 确保在没有到达缓冲区末尾时进行字符删除，防止出现试图超出缓冲区范围的错误。
-#+begin_src emacs-lisp :noweb-ref idiig/puni-forward-hungry-delete
-  (defun idiig/puni-forward-hungry-delete (&optional n)
-    "Delete contiguous whitespace characters forward.
-  If not on whitespace, delete forward with balanced structure using `puni'."
-    (interactive "p")
-    (let ((n (or n 1)))
-      (if (looking-at (rx (or (1+ blank) "\n")))  ; 匹配一个或多个空白字符或单个换行符
-  	(let ((end (save-excursion
-                       (skip-chars-forward " \t\f\v\n\r")
-                       (point))))
-            (delete-region (point) end))
-        (dotimes (_ n)
-          (unless (eobp)
-  	  (puni-forward-delete-char))))))
-#+end_src
-****** =idiig/puni-backward-hungry-delete=
-向后删除时向后贪婪地删除连续的空白值。同时考虑对称的结构。
+#+begin_src emacs-lisp
+  (defun idiig/forward-hungry-delete-advice (orig-fun &rest args)
+    "Advice function to provide forward hungry delete functionality."
+    (if (looking-at (rx (or (1+ blank) "\n")))
+        (let ((end (save-excursion
+                     (skip-chars-forward " \t\f\v\n\r")
+                     (point))))
+          (delete-region (point) end))
+      (apply orig-fun args)))
 
-- 首先检查光标前面是否有连续的空白字符。
-- 使用 =looking-back= 用于判断光标之前是否有符合正则表达式 =(+ blank)= 的字符序列。 =(line-beginning-position)= 确保不会查看超出行首的内容。
-- 如果有连续的空白字符：
-  - 使用 =skip-chars-backward= 向后跳过这些字符，并记录开始位置 =start= 。
-  - 然后 =delete-region= 用于删除从 =start= 到当前光标位置之间的字符。
-  - 如果光标前面不是连续空白字符，就调用 =puni-backward-delete-char= ，这是来自 =puni= 的函数，用于以结构化方式进行删除操作。
+  (defun idiig/apply-forward-hungry-delete-advice ()
+    "Apply the forward hungry delete advice to the current forward delete key binding function."
+    (let ((current-fun (key-binding (kbd "C-d"))))
+      (advice-remove current-fun #'idiig/forward-hungry-delete-advice) ; 移除旧的 advice
+      (advice-add current-fun :around #'idiig/forward-hungry-delete-advice))) ; 应用新的 advice
 
-#+begin_src emacs-lisp :noweb-ref idiig/puni-backward-hungry-delete
-  (defun idiig/puni-backward-hungry-delete (&optional n)
-    "Delete contiguous whitespace characters backward.
-  If not on whitespace, delete backward with balanced structure using `puni'."
-    (interactive "p")
-    (let ((n (or n 1)))
-      (if (or (looking-back (rx (+ blank))) (bolp))
-      (let ((start (save-excursion (skip-chars-backward " \t\f\n\r\v") (point))))
-            (delete-region start (point)))
-        (dotimes (_ n)
-          (unless (bobp)
-            (puni-backward-delete-char))))))
+  ;; 在 emacs-startup 时应用 advice
+  (add-hook 'emacs-startup-hook #'idiig/apply-forward-hungry-delete-advice)
+
+  ;; 如果你有其他 hook 需要重新应用 advice，可添加对应 hook，例如：
+  ;; (add-hook 'your-major-mode-hook #'idiig/apply-forward-hungry-delete-advice)
 #+end_src
-****** =idiig/puni-backward-kill-word-or-region=
+***** =puni-backward-kill-word-or-region=
 如无选中则杀掉前面的单词，如有选中则杀掉选中区域。
-#+begin_src emacs-lisp ::noweb-ref idiig/puni-backward-kill-word-or-region
-  (defun idiig/puni-backward-kill-word-or-region (&optional arg)
-    "如无选中则杀掉前面的单词，如有选中则杀掉选中区域"
-    (interactive "p")
+#+begin_src emacs-lisp
+  (defun idiig/backward-kill-word-or-region-advice (orig-fun &rest args)
+    "Enhance the C-w function to handle region more flexibly."
     (if (region-active-p)
-        (call-interactively #'puni-kill-region)
-      (puni-backward-kill-word arg)))
-#+end_src
+        ;; 当有选中区域时，使用传递的参数调用原始C-w功能（例如 `puni-kill-region`）
+        (apply orig-fun args)
+      ;; 当没有选中区域时，执行删除单词操作
+      (let ((backward-kill-word-fun (or (key-binding (kbd "M-<DEL>"))
+                                        (key-binding (kbd "S-<delete>"))
+                                        'backward-kill-word))) ; 默认删除单词函数
+        (if (fboundp backward-kill-word-fun)
+            (call-interactively backward-kill-word-fun) ; 交互式调用删除单词
+          (message "No word kill bound function found for M-<DEL> or S-<delete>")))))
 
+  (defun idiig/apply-backward-kill-word-or-region-advice ()
+    "Advice C-w to optionally kill region or word."
+    ;; 通过 `key-binding` 得到当前与 C-w 绑定的函数
+    (let ((current-fun (key-binding (kbd "C-w"))))
+      (advice-remove current-fun #'idiig/backward-kill-word-or-region-advice)
+      (advice-add current-fun :around #'idiig/backward-kill-word-or-region-advice)))
+
+  ;; 在 emacs 启动时应用这个 advice
+  (add-hook 'emacs-startup-hook #'idiig/apply-backward-kill-word-or-region-advice)
+#+end_src
 ** CJK字体
 这里我统一使用的是Sarasa的等宽字体，可以避免2个问题：
 
