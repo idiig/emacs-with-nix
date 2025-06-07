@@ -515,8 +515,8 @@
 	      If not on whitespace, delete backward with balanced structure using `puni'."
 	        (interactive "p")
 	        (let ((n (or n 1)))
-	          (if (looking-back (rx (+ blank)) (line-beginning-position))
-	              (let ((start (save-excursion (skip-chars-backward " \t\f\n\r\v") (point))))
+	          (if (or (looking-back (rx (+ blank))) (bolp))
+	          (let ((start (save-excursion (skip-chars-backward " \t\f\n\r\v") (point))))
 	                (delete-region start (point)))
 	            (dotimes (_ n)
 	              (unless (bobp)
@@ -527,7 +527,7 @@
 	        (interactive "p")
 	        (let ((n (or n 1)))
 	          (if (looking-at (rx (or (1+ blank) "\n")))  ; 匹配一个或多个空白字符或单个换行符
-	              (let ((end (save-excursion
+	      	(let ((end (save-excursion
 	                           (skip-chars-forward " \t\f\v\n\r")
 	                           (point))))
 	                (delete-region (point) end))

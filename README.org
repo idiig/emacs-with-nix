@@ -997,7 +997,6 @@ emacs在打开新的窗口时，默认光标维持在原来的窗口。比如当
 - 字符删除逻辑：
   - 如果光标后没有多余的空白字符，使用 =dotimes= 循环和 =puni-forward-delete-char= 删除 =n= 个普通字符。
   - =unless (eobp)=: 确保在没有到达缓冲区末尾时进行字符删除，防止出现试图超出缓冲区范围的错误。
-
 #+begin_src emacs-lisp :noweb-ref idiig/puni-forward-hungry-delete
   (defun idiig/puni-forward-hungry-delete (&optional n)
     "Delete contiguous whitespace characters forward.
@@ -1005,7 +1004,7 @@ emacs在打开新的窗口时，默认光标维持在原来的窗口。比如当
     (interactive "p")
     (let ((n (or n 1)))
       (if (looking-at (rx (or (1+ blank) "\n")))  ; 匹配一个或多个空白字符或单个换行符
-          (let ((end (save-excursion
+  	(let ((end (save-excursion
                        (skip-chars-forward " \t\f\v\n\r")
                        (point))))
             (delete-region (point) end))
@@ -1029,8 +1028,8 @@ emacs在打开新的窗口时，默认光标维持在原来的窗口。比如当
   If not on whitespace, delete backward with balanced structure using `puni'."
     (interactive "p")
     (let ((n (or n 1)))
-      (if (looking-back (rx (+ blank)) (line-beginning-position))
-          (let ((start (save-excursion (skip-chars-backward " \t\f\n\r\v") (point))))
+      (if (or (looking-back (rx (+ blank))) (bolp))
+      (let ((start (save-excursion (skip-chars-backward " \t\f\n\r\v") (point))))
             (delete-region start (point)))
         (dotimes (_ n)
           (unless (bobp)
@@ -1511,7 +1510,7 @@ TODO: 把 evil-jump-item 换成别的函数。
 径，依赖的 C 库。宏使用如下：
 
 #+begin_src emacs-lisp :noweb-ref -
-  (idiig/setup-nix-lsp-bridge-server 
+  (idiig//setup-nix-lsp-bridge-server 
    "python" 
    "basedpyright" 
    "${pkgs.basedpyright}/bin" 
