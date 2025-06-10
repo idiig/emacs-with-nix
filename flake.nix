@@ -347,12 +347,12 @@
 	             ([remap switch-to-buffer] . consult-buffer)
 	             ([remap find-file] . find-file)
 	    	 ([remap imenu] . consult-imenu)
-	             ("C-x C-r" . consult-recent-file)
+	             ("C-c C-r" . consult-recent-file)
 	             ("C-c y" . consult-yasnippet)
 	             ("C-c f" . consult-find)
-	             ("C-s" . consult-line)
+	             ("C-c s" . consult-line)
 	             ("C-c o" . consult-file-externally)
-	             ("C-x p f" . consult-ripgrep)
+	             ("C-c p f" . consult-ripgrep)
 	             (:map minibuffer-local-map
 	                   ("C-c h" . consult-history)
 	                   ("C-s" . #'previous-history-element)))
@@ -431,6 +431,8 @@
 	      (vundo)
 	      :bind
 	      ("C-x u" . vundo))
+	    (require 'ctrlf)
+	    (ctrlf-mode +1)
 	    (use-package emacs
 	      :init
 	      ;; 启用自动括号配对
@@ -608,9 +610,7 @@
 	    (add-hook 'after-init-hook
 	    	  (lambda ()
 	    	    (let* ((screen-height (display-pixel-height))
-	    		   (font-height (if (and
-	    				     (> screen-height 1150)
-	    				     (< screen-height 1200)) 230 130))  ;; 根据屏幕高度调整
+	    		   (font-height (if (> screen-height 1200) 230 130))  ;; 根据屏幕高度调整
 	    		   (minibuffer-font-height (- font-height 0))
 	    		   (my-font "Sarasa Mono SC"))
 	    	      (set-face-attribute 'default nil :family my-font :height font-height)
@@ -1134,6 +1134,7 @@
               consult
               embark-consult
             vundo
+            ctrlf
             puni
             ddskk
             pyim

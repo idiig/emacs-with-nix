@@ -702,12 +702,12 @@ emacs在打开新的窗口时，默认光标维持在原来的窗口。比如当
            ([remap switch-to-buffer] . consult-buffer)
            ([remap find-file] . find-file)
   	 ([remap imenu] . consult-imenu)
-           ("C-x C-r" . consult-recent-file)
+           ("C-c C-r" . consult-recent-file)
            ("C-c y" . consult-yasnippet)
            ("C-c f" . consult-find)
-           ("C-s" . consult-line)
+           ("C-c s" . consult-line)
            ("C-c o" . consult-file-externally)
-           ("C-x p f" . consult-ripgrep)
+           ("C-c p f" . consult-ripgrep)
            (:map minibuffer-local-map
                  ("C-c h" . consult-history)
                  ("C-s" . #'previous-history-element)))
@@ -813,6 +813,28 @@ emacs在打开新的窗口时，默认光标维持在原来的窗口。比如当
     (vundo)
     :bind
     ("C-x u" . vundo))
+#+end_src
+
+**** 检索（ctrlf）
+
+针对当前buffer利用 =Ctrlf= 而不在使用swiper和helm这类型的检索方式。
+***** 依赖
+:PROPERTIES:
+:header-args: :noweb-ref epkgs
+:END:
+
+#+BEGIN_SRC nix 
+  ctrlf
+#+END_SRC
+
+***** 配置
+:PROPERTIES:
+:header-args: :noweb-ref ecfg
+:END:
+
+#+begin_src emacs-lisp
+  (require 'ctrlf)
+  (ctrlf-mode +1)
 #+end_src
 
 **** 括号匹配
