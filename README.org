@@ -1090,9 +1090,7 @@ emacs在打开新的窗口时，默认光标维持在原来的窗口。比如当
   (add-hook 'after-init-hook
   	  (lambda ()
   	    (let* ((screen-height (display-pixel-height))
-  		   (font-height (if (and
-  				     (< screen-height 1150)
-  				     (> screen-height 1200)) 230 130))  ;; 根据屏幕高度调整
+  		   (font-height (if (> screen-height 1200) 230 130))  ;; 根据屏幕高度调整
   		   (minibuffer-font-height (- font-height 0))
   		   (my-font "Sarasa Mono SC"))
   	      (set-face-attribute 'default nil :family my-font :height font-height)
@@ -2041,8 +2039,6 @@ Snippet 用于快速插入模板
 
 #+begin_src emacs-lisp
   (use-package meow
-    :bind
-    ("C-M-s" . meow-visit)
     :init
     ;; https://github.com/meow-edit/meow/blob/master/KEYBINDING_QWERTY.org
     (require 'meow)
@@ -2447,7 +2443,7 @@ eaf还没有在 =nixpkgs= 中被打包，所以需要自己打包依赖。
 #+begin_src nix
   eaf
     eaf-browser
-    (pkgs.crow-translate)
+    # (pkgs.crow-translate) ; not available for MacOS 
     # eaf-pdf-viewer
 #+end_src
 

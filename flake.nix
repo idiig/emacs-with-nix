@@ -609,8 +609,8 @@
 	    	  (lambda ()
 	    	    (let* ((screen-height (display-pixel-height))
 	    		   (font-height (if (and
-	    				     (< screen-height 1150)
-	    				     (> screen-height 1200)) 230 130))  ;; 根据屏幕高度调整
+	    				     (> screen-height 1150)
+	    				     (< screen-height 1200)) 230 130))  ;; 根据屏幕高度调整
 	    		   (minibuffer-font-height (- font-height 0))
 	    		   (my-font "Sarasa Mono SC"))
 	    	      (set-face-attribute 'default nil :family my-font :height font-height)
@@ -982,8 +982,6 @@
 	                  (gptel-mode 1))))
 	    (add-to-list 'exec-path "${pkgs.aider-chat}/bin")
 	    (use-package meow
-	      :bind
-	      ("C-M-s" . meow-visit)
 	      :init
 	      ;; https://github.com/meow-edit/meow/blob/master/KEYBINDING_QWERTY.org
 	      (require 'meow)
@@ -1167,7 +1165,7 @@
               meow-tree-sitter
             eaf
               eaf-browser
-              (pkgs.crow-translate)
+              # (pkgs.crow-translate) ; not available for MacOS 
               # eaf-pdf-viewer
           ]);
           
