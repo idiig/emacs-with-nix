@@ -347,7 +347,7 @@
 	             ([remap switch-to-buffer] . consult-buffer)
 	             ([remap find-file] . find-file)
 	    	 ([remap imenu] . consult-imenu)
-	             ("C-c C-r" . consult-recent-file)
+	             ("C-c r" . consult-recent-file)
 	             ("C-c y" . consult-yasnippet)
 	             ("C-c f" . consult-find)
 	             ("C-c s" . consult-line)
