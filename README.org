@@ -832,9 +832,69 @@ emacs在打开新的窗口时，默认光标维持在原来的窗口。比如当
 :header-args: :noweb-ref ecfg
 :END:
 
+****** 启动 =ctrf=
 #+begin_src emacs-lisp
   (require 'ctrlf)
   (ctrlf-mode +1)
+#+end_src
+
+****** 识别拼音
+这里我写了一个函数 =pyim-cregex-build-lazy= 。这个函数的工作逻辑如下：
+
+- 如果还没有初始化拼音数据，就先进行预热预热时会加载 "a"、"e"、"o" 这
+  三个字符的拼音映射数据设置初始化标志，避免重复初始化
+  - 接着分两种情况处理：
+    1. 情况1 :: 单个字符且不是 a/e/o
+       + 使用 regexp-quote 直接转义字符
+       + 例如：输入 "z" → 直接匹配字符 "z"
+       + 避免触发拼音转换，提高性能
+    2. 情况2 :: 其他所有情况
+       + 使用 pyim-cregexp-build 进行拼音转换，包括：
+         1) 单个字符 "a"、"e"、"o"（常用韵母）
+         2) 多个字符组合（如 "zh"、"zhong"）
+- 设计目的
+  1. 性能优化 :: 避免输入大多数单个字符时的拼音转换开销
+  2. 保持功能 :: 在需要拼音搜索时正常工作
+  3. 用户体验 :: 减少首次输入时的卡顿感
+    
+#+begin_src emacs-lisp
+  (with-eval-after-load 'pyim
+    
+    (defvar pyim-ctrlf-initialized nil
+      "Flag to track if pyim data has been initialized for ctrlf.")
+    
+    ;; 根据拼音语言学特征定义常量
+    (defconst pyim-ctrlf-vowels-with-mapping '("a" "e" "o")
+      "Vowels that have direct Chinese character mappings.")
+    
+    (defconst pyim-ctrlf-double-consonants '("zh" "ch" "sh")
+      "Double-letter consonants that should use regex-quote for exact matching.")
+    
+    (defun pyim-cregexp-build-lazy (str)
+      "Lazy wrapper for pyim-cregexp-build with initialization.
+  For single characters except vowels with mappings, use regex-quote.
+  For double consonants, use regex-quote for exact matching.
+  Otherwise use pyim-cregexp-build for pinyin conversion."
+      (unless pyim-ctrlf-initialized
+        (message "Initializing pyim data for ctrlf...")
+        (dolist (vowel pyim-ctrlf-vowels-with-mapping)
+          (pyim-cregexp-build vowel))
+        (setq pyim-ctrlf-initialized t)
+        (message "Pyim data initialized."))
+      
+      ;; 判断是否使用 regex-quote
+      (if (or (and (= (length str) 1)
+                   (not (member str pyim-ctrlf-vowels-with-mapping)))
+              (member str pyim-ctrlf-double-consonants))
+          (regexp-quote str)
+        (pyim-cregexp-build str)))
+
+    (add-to-list 'ctrlf-style-alist
+                 '(pinyin-regexp . (:prompt "pinyin-regexp"
+  					  :translator pyim-cregexp-build-lazy
+  					  :case-fold ctrlf-no-uppercase-regexp-p
+  					  :fallback (isearch-forward-regexp
+  						     . isearch-backward-regexp)))))
 #+end_src
 
 **** 括号匹配

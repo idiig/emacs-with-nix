@@ -433,6 +433,43 @@
 	      ("C-x u" . vundo))
 	    (require 'ctrlf)
 	    (ctrlf-mode +1)
+	    (with-eval-after-load 'pyim
+	      
+	      (defvar pyim-ctrlf-initialized nil
+	        "Flag to track if pyim data has been initialized for ctrlf.")
+	      
+	      ;; 根据拼音语言学特征定义常量
+	      (defconst pyim-ctrlf-vowels-with-mapping '("a" "e" "o")
+	        "Vowels that have direct Chinese character mappings.")
+	      
+	      (defconst pyim-ctrlf-double-consonants '("zh" "ch" "sh")
+	        "Double-letter consonants that should use regex-quote for exact matching.")
+	      
+	      (defun pyim-cregexp-build-lazy (str)
+	        "Lazy wrapper for pyim-cregexp-build with initialization.
+	    For single characters except vowels with mappings, use regex-quote.
+	    For double consonants, use regex-quote for exact matching.
+	    Otherwise use pyim-cregexp-build for pinyin conversion."
+	        (unless pyim-ctrlf-initialized
+	          (message "Initializing pyim data for ctrlf...")
+	          (dolist (vowel pyim-ctrlf-vowels-with-mapping)
+	            (pyim-cregexp-build vowel))
+	          (setq pyim-ctrlf-initialized t)
+	          (message "Pyim data initialized."))
+	        
+	        ;; 判断是否使用 regex-quote
+	        (if (or (and (= (length str) 1)
+	                     (not (member str pyim-ctrlf-vowels-with-mapping)))
+	                (member str pyim-ctrlf-double-consonants))
+	            (regexp-quote str)
+	          (pyim-cregexp-build str)))
+	    
+	      (add-to-list 'ctrlf-style-alist
+	                   '(pinyin-regexp . (:prompt "pinyin-regexp"
+	    					  :translator pyim-cregexp-build-lazy
+	    					  :case-fold ctrlf-no-uppercase-regexp-p
+	    					  :fallback (isearch-forward-regexp
+	    						     . isearch-backward-regexp)))))
 	    (use-package emacs
 	      :init
 	      ;; 启用自动括号配对
