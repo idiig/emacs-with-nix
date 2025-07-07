@@ -433,6 +433,16 @@
 	      ("C-x u" . vundo))
 	    (require 'ctrlf)
 	    (ctrlf-mode +1)
+	    (with-eval-after-load 'ctrlf
+	      
+	      ;; 定义 advice 函数
+	      (defun ctrlf-set-default-style-advice (style)
+	        "Advice function to set the default search style when changing styles.
+	    This ensures the selected style becomes the new default for future sessions."
+	        (setq ctrlf-default-search-style style))
+	      
+	      ;; 添加 advice
+	      (advice-add 'ctrlf-change-search-style :after #'ctrlf-set-default-style-advice))
 	    (with-eval-after-load 'pyim
 	      
 	      (defvar pyim-ctrlf-initialized nil
