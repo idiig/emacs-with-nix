@@ -838,6 +838,20 @@ emacs在打开新的窗口时，默认光标维持在原来的窗口。比如当
   (ctrlf-mode +1)
 #+end_src
 
+****** 切换检索风格
+#+begin_src emacs-lisp
+  (with-eval-after-load 'ctrlf
+    
+    ;; 定义 advice 函数
+    (defun ctrlf-set-default-style-advice (style)
+      "Advice function to set the default search style when changing styles.
+  This ensures the selected style becomes the new default for future sessions."
+      (setq ctrlf-default-search-style style))
+    
+    ;; 添加 advice
+    (advice-add 'ctrlf-change-search-style :after #'ctrlf-set-default-style-advice))
+#+end_src
+
 ****** 识别拼音
 这里我写了一个函数 =pyim-cregex-build-lazy= 。这个函数的工作逻辑如下：
 
@@ -1242,18 +1256,34 @@ emacs在打开新的窗口时，默认光标维持在原来的窗口。比如当
                   (require 'context-skk))))
 #+end_src
 
-*** TODO 检索（Migemo）
-
+*** 检索（Migemo）
 **** 依赖
 :PROPERTIES:
 :header-args: :noweb-ref epkgs
 :END:
+#+begin_src nix
+  migemo
+#+end_src
 
 **** 配置
 :PROPERTIES:
 :header-args: :noweb-ref ecfg
 :END:
+#+begin_src emacs-lisp
+  (require 'migemo)
 
+  ;; cmigemo(default)
+  (setq migemo-command "${pkgs.cmigemo}/bin/cmigemo")
+  (setq migemo-options '("-q" "--emacs"))
+
+  ;; Set your installed path
+  (setq migemo-dictionary "${pkgs.cmigemo}/share/migemo/utf-8/migemo-dict")
+
+  (setq migemo-user-dictionary nil)
+  (setq migemo-regex-dictionary nil)
+  (setq migemo-coding-system 'utf-8-unix)
+  (migemo-init)
+#+end_src
 ** 中文
 *** 输入法
 

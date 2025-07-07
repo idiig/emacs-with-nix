@@ -438,7 +438,9 @@
 	      (defvar pyim-ctrlf-initialized nil
 	        "Flag to track if pyim data has been initialized for ctrlf.")
 	      
-	      ;; 根据拼音语言学特征定义常量
+	      (defvar pyim-ctrlf-cache (make-hash-table :test 'equal)
+	        "Cache for pyim-cregexp-build results.")
+	      
 	      (defconst pyim-ctrlf-vowels-with-mapping '("a" "e" "o")
 	        "Vowels that have direct Chinese character mappings.")
 	      
@@ -446,14 +448,13 @@
 	        "Double-letter consonants that should use regex-quote for exact matching.")
 	      
 	      (defun pyim-cregexp-build-lazy (str)
-	        "Lazy wrapper for pyim-cregexp-build with initialization.
-	    For single characters except vowels with mappings, use regex-quote.
-	    For double consonants, use regex-quote for exact matching.
-	    Otherwise use pyim-cregexp-build for pinyin conversion."
+	        "Lazy wrapper for pyim-cregexp-build with caching."
 	        (unless pyim-ctrlf-initialized
 	          (message "Initializing pyim data for ctrlf...")
+	          ;; 预缓存常用字符的结果
 	          (dolist (vowel pyim-ctrlf-vowels-with-mapping)
-	            (pyim-cregexp-build vowel))
+	            (let ((result (pyim-cregexp-build vowel)))
+	              (puthash vowel result pyim-ctrlf-cache)))
 	          (setq pyim-ctrlf-initialized t)
 	          (message "Pyim data initialized."))
 	        
@@ -462,14 +463,18 @@
 	                     (not (member str pyim-ctrlf-vowels-with-mapping)))
 	                (member str pyim-ctrlf-double-consonants))
 	            (regexp-quote str)
-	          (pyim-cregexp-build str)))
+	          ;; 使用缓存或计算新结果
+	          (or (gethash str pyim-ctrlf-cache)
+	              (let ((result (pyim-cregexp-build str)))
+	                (puthash str result pyim-ctrlf-cache)
+	                result))))
 	    
 	      (add-to-list 'ctrlf-style-alist
 	                   '(pinyin-regexp . (:prompt "pinyin-regexp"
-	    					  :translator pyim-cregexp-build-lazy
-	    					  :case-fold ctrlf-no-uppercase-regexp-p
-	    					  :fallback (isearch-forward-regexp
-	    						     . isearch-backward-regexp)))))
+	                                      :translator pyim-cregexp-build-lazy
+	                                      :case-fold ctrlf-no-uppercase-regexp-p
+	                                      :fallback (isearch-forward-regexp
+	                                                 . isearch-backward-regexp)))))
 	    (use-package emacs
 	      :init
 	      ;; 启用自动括号配对
@@ -690,6 +695,19 @@
 	      :hook
 	      (skk-load . (lambda ()
 	                    (require 'context-skk))))
+	    (require 'migemo)
+	    
+	    ;; cmigemo(default)
+	    (setq migemo-command "${pkgs.cmigemo}/bin/cmigemo")
+	    (setq migemo-options '("-q" "--emacs"))
+	    
+	    ;; Set your installed path
+	    (setq migemo-dictionary "${pkgs.cmigemo}/share/migemo/utf-8/migemo-dict")
+	    
+	    (setq migemo-user-dictionary nil)
+	    (setq migemo-regex-dictionary nil)
+	    (setq migemo-coding-system 'utf-8-unix)
+	    (migemo-init)
 	    (use-package pyim
 	      :diminish pyim-isearch-mode
 	      :commands
@@ -1174,6 +1192,7 @@
             ctrlf
             puni
             ddskk
+            migemo
             pyim
               pyim-basedict
             magit
