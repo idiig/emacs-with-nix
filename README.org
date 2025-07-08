@@ -1,10 +1,10 @@
-#+TITLE: 基于 Nix Flakes 的 Emacs 配置
+#+title: 基于 Nix Flakes 的 Emacs 配置
+#+author: Xudong
 
 * 本配置的用法
 :PROPERTIES:
 :header-args: :tangle no
 :END:
-
 这份配置文件使用Nix Flakes管理包。使用Nix的这类系统管理的包的目的主要
 是因为
 
@@ -23,12 +23,10 @@
 - 可以在elisp中用 =$pkgs.git= 的方式直接引用Nix的包
   
 - 提供一个函数加入一个新包时使用这个函数更新包列表
-  
 * 实现方式
 :PROPERTIES:
 :header-args: :tangle no
 :END:
-
 下面以配置 =Magit= 为例说明这个配置的方法。这里和大多数的配置一样我们
 把整体目的一致的包放在一个集群实现。每个集群主要分成两个子节点，一个用
 于安装包和依赖项，一个用于配置。配置部分可以细分为键位绑定，custom，
@@ -45,33 +43,27 @@ hook，config，自定义的函数。
 后在后面的代码块中我们使用 =:noweb-ref= 参照汇总代码块，最后后续的这些
 代码块都会在tangle时合并到第一个代码块中。这个被tangle的代码块在后续过
 程中会被nix依赖代码读入作为配置。
-
-* 如何使用？
+* 如何使用
 :PROPERTIES:
 :header-args: :tangle no
 :END:
-
 用emacs打开本文档， =M-x org-babel-tangle= 或使用快捷键 =C-c C-v t= 生
 成flake.nix。接下去运行可以通过如下方式：
-
 ** 调试
 #+begin_src sh
   nix run <path/to/this/config>
   source ~/.bashrc
   emacs
 #+end_src
-
 ** 版本回滚
-
-- 使用git：
+*** 使用git
 #+begin_src sh
   git checkout <previous-commit>
   nix run
   source ~/.bashrc
   emacs
 #+end_src
-
-- 备份lock文件：
+*** 备份lock文件
 #+begin_src sh
   # 查看以前的版本
   nix flake metadata
@@ -81,7 +73,6 @@ hook，config，自定义的函数。
   # 使用特定锁文件版本
   nix run --recreate-lock-file --inputs-from ./flake.lock.backup
 #+end_src
-
 * 配置本体
 :PROPERTIES:
 :header-args: :tangle no
@@ -166,7 +157,6 @@ hook，config，自定义的函数。
   	      });
   }
 #+END_SRC
-
 ** Early init
 :PROPERTIES:
 :header-args: :noweb-ref emacs-early-init-config
@@ -188,7 +178,6 @@ hook，config，自定义的函数。
         large-hscroll-threshold 1000
         syntax-wholeline-max 1000)
 #+end_src
-
 ** Emacs基建
 *** Mac OS 键位设定
 :PROPERTIES:
@@ -205,39 +194,31 @@ hook，config，自定义的函数。
   ;; 便于使用mac的JIS日语键盘
   (global-set-key (kbd "C-¥") 'toggle-input-method)
 #+end_src
-
 *** 包管理和其他基础
-
 这里我考虑了到底是否要使用 =use-package= 。因为我现在在使用 org mode
 写配置文件的目的是希望可以穿插自然语言的代码描述，所以需要拆分代码。
 =use-package= 这种一体成型的写法不是很适合这种风格。但考虑了实际写的过
 程，我觉得大多数情况可以在配置代码前面作完整的整理，而不需要过于细粒度
 的代码表述，然后在迁移的过程可能也比较简单。所以我最后还是决定改成使用
 =use-package= 了。
-
 **** 依赖
 :PROPERTIES:
 :header-args: :noweb-ref epkgs
 :END:
-
 - =use-package= ：用简介的宏语言描述包
 - =diminish= ：用于隐藏一些 minor mode
-  
 #+begin_src nix
   use-package
     diminish
 #+end_src
-
 **** 配置
 :PROPERTIES:
 :header-args: :noweb-ref ecfg
 :END:
-
 #+begin_src emacs-lisp
   (require 'use-package)
   (require 'diminish)
 #+end_src
-
 *** 更好的默认设置
 **** 本体的设定
 :PROPERTIES:
@@ -329,11 +310,8 @@ emacs在打开新的窗口时，默认光标维持在原来的窗口。比如当
 :PROPERTIES:
 :header-args: :noweb-ref ecfg
 :END:
-
-而不是要一直要重复 =C-x= 按键。后续行为使用默认 =^, V, {, }= 。
-
-这里我没用 =C-x v= 是因为这个键位目前用于 =vc= 。
-
+而不是要一直要重复 =C-x= 按键。后续行为使用默认 =^, V, {, }= 。这里我没用
+=C-x v= 是因为这个键位目前用于 =vc= 。
 #+begin_src emacs-lisp
   (global-set-key (kbd "C-x V") 'shrink-window)
 
@@ -392,7 +370,6 @@ emacs在打开新的窗口时，默认光标维持在原来的窗口。比如当
 :PROPERTIES:
 :header-args: :noweb-ref ecfg
 :END:
-
 #+begin_src emacs-lisp
   ;; 不存在文档时询问是否新建
   (add-hook 'before-save-hook
@@ -418,9 +395,7 @@ emacs在打开新的窗口时，默认光标维持在原来的窗口。比如当
 :PROPERTIES:
 :header-args: :noweb-ref ecfg
 :END:
-
 打开最近文件。
-
 #+begin_src emacs-lisp
   (use-package recentf
     :defer t
@@ -584,7 +559,6 @@ emacs在打开新的窗口时，默认光标维持在原来的窗口。比如当
 :PROPERTIES:
 :header-args: :noweb-ref epkgs
 :END:
-
 #+begin_src nix
   vertico
     orderless
@@ -595,9 +569,7 @@ emacs在打开新的窗口时，默认光标维持在原来的窗口。比如当
 #+end_src
 
 ****** 配置
-
 ******* *Vertico*: 提供minibuffer补全UI
-
 #+begin_src emacs-lisp
   (use-package vertico
     :after consult
@@ -607,9 +579,7 @@ emacs在打开新的窗口时，默认光标维持在原来的窗口。比如当
     :init
     (vertico-mode))
 #+end_src
-
 ******* *Orderless*: 提供补全格式选择
-
 #+begin_src emacs-lisp
   (use-package orderless
     :after
@@ -679,9 +649,7 @@ emacs在打开新的窗口时，默认光标维持在原来的窗口。比如当
           orderless-component-separator #'orderless-escapable-split-on-space ;; allow escaping space with backslash!
           orderless-style-dispatchers '(+orderless-dispatch)))
 #+end_src
-
 ******* *Maginalia*: 增强minubuffer的annotation
-
 #+begin_src emacs-lisp
   (use-package marginalia
     :after vertico
@@ -692,9 +660,7 @@ emacs在打开新的窗口时，默认光标维持在原来的窗口。比如当
     :config
     (marginalia-mode))
 #+end_src
-
 ******* *Consult*: 增强minibuffer的检索
-  
 #+begin_src emacs-lisp
   (use-package consult
     :hook (after-init . (lambda () (require 'consult)))
@@ -786,7 +752,7 @@ emacs在打开新的窗口时，默认光标维持在原来的窗口。比如当
     :after (consult))
 #+end_src
                 
-**** 撤销（vundo）
+**** 撤销 (=vundo=)
 我原来使用 undotree ，现在使用 vundo。这些用于视觉化撤销树。这里我之绑
 定了 =C-x u= ， =C-/= 我依然用的原生的 Undo，这样适合区分使用。
 ***** 依赖
@@ -808,8 +774,7 @@ emacs在打开新的窗口时，默认光标维持在原来的窗口。比如当
     :bind
     ("C-x u" . vundo))
 #+end_src
-
-**** 检索（ctrlf）
+**** 检索 (=ctrlf=)
 针对当前 buffer 利用 =Ctrlf= 而不在使用 =swiper= 和 =helm= 这类型的检索方式。
 用于替代 =isearch= 的 =C-s= 键。另外的选项是 =consult-line= ，我映射到了 =C-c
 s= 键位，用于不移动当前位置预览检索行，尤其是在类似与 org 存在折叠的情
@@ -819,11 +784,9 @@ minibuffer的检索]]。
 :PROPERTIES:
 :header-args: :noweb-ref epkgs
 :END:
-
 #+begin_src nix 
   ctrlf
 #+end_src
-
 ***** 配置
 :PROPERTIES:
 :header-args: :noweb-ref ecfg
@@ -833,7 +796,6 @@ minibuffer的检索]]。
   (require 'ctrlf)
   (ctrlf-mode +1)
 #+end_src
-
 ****** 切换检索风格
 #+begin_src emacs-lisp
   (with-eval-after-load 'ctrlf
@@ -847,8 +809,7 @@ minibuffer的检索]]。
     ;; 添加 advice
     (advice-add 'ctrlf-change-search-style :after #'ctrlf-set-default-style-advice))
 #+end_src
-
-**** 重构 (wgrep)
+**** 重构 (=wgrep=)
 在 =grep= , =ag=, =ripgrep= 等检索的结果中按下 =e= 进入编辑模式，按下 =C-c C-c=
 完成修改。
 ***** 依赖
@@ -917,7 +878,7 @@ minibuffer的检索]]。
     (show-paren-mode t))
 #+end_src
 
-**** 语言无关的结构化编程
+**** 语言无关的结构化编程 (=puni=)
 ***** 依赖
 :PROPERTIES:
 :header-args: :noweb-ref epkgs
