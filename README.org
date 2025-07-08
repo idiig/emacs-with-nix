@@ -614,15 +614,16 @@ emacs在打开新的窗口时，默认光标维持在原来的窗口。比如当
   (use-package orderless
     :after
     (consult)
+    :init
+    (defvar +orderless-dispatch-alist
+    '((?% . char-fold-to-regexp)    ; %word% - 字符折叠匹配
+      (?! . orderless-without-literal) ; !word! - 排除匹配
+      (?`. orderless-initialism)    ; `word` - 首字母匹配
+      (?= . orderless-literal)      ; =word= - 字面匹配
+      (?~ . orderless-flex)))	  ; ~word~ - 弹性匹配
     :config
     (setq search-default-mode t)
-    (defvar +orderless-dispatch-alist
-      '((?% . char-fold-to-regexp)
-        (?! . orderless-without-literal)
-        (?`. orderless-initialism)
-        (?= . orderless-literal)
-        (?~ . orderless-flex)))
-
+    
     (defun +orderless--suffix-regexp ()
       (if (and (boundp 'consult--tofu-char) (boundp 'consult--tofu-range))
           (format "[%c-%c]*$"
@@ -761,7 +762,6 @@ emacs在打开新的窗口时，默认光标维持在原来的窗口。比如当
 #+end_src
 
 ******* *Embark*: minibuffer action 和自适应的context menu
-
 #+begin_src emacs-lisp
   (use-package embark
     :after vertico
@@ -786,7 +786,7 @@ emacs在打开新的窗口时，默认光标维持在原来的窗口。比如当
     :ensure t
     :after (consult))
 #+end_src
-
+                
 **** 撤销（vundo）
 
 我原来使用 undotree ，现在使用 vundo。这些用于视觉化撤销树。这里我之绑
@@ -1208,28 +1208,40 @@ minibuffer的检索]]。
 :END:
 ***** 基础配置
 #+begin_src emacs-lisp
-  (use-package migemo
-    :after (consult ctrlf)
-    :init
-    (migemo-init)
-    :config
-    ;; cmigemo(default)
-    (setq migemo-command "${pkgs.cmigemo}/bin/cmigemo")
-    (setq migemo-options '("-q" "--emacs"))
+  (require 'migemo)
+  ;; cmigemo(default)
+  (setq migemo-command "${pkgs.cmigemo}/bin/cmigemo")
+  (setq migemo-options '("-q" "--emacs"))
 
-    ;; Set your installed path
-    (setq migemo-dictionary "${pkgs.cmigemo}/share/migemo/utf-8/migemo-dict")
-    
-    (setq migemo-user-dictionary nil)
-    (setq migemo-regex-dictionary nil)
-    (setq migemo-coding-system 'utf-8-unix))
+  ;; Set your installed path
+  (setq migemo-dictionary "${pkgs.cmigemo}/share/migemo/utf-8/migemo-dict")
+
+  (setq migemo-user-dictionary nil)
+  (setq migemo-regex-dictionary nil)
+  (when (and migemo-command migemo-dictionary)
+    (migemo-init)
+    (message "Migemo initialized with dictionary: %s" migemo-dictionary))
 #+end_src
-***** 检索 (=Ctrlf=) 交互
+***** buffer内字符检索 (=Ctrlf=) 交互
 #+begin_src emacs-lisp
   (with-eval-after-load 'migemo
-    (add-to-list 'ctrlf-style-alist '(migemo-regexp . (:prompt "migemo-regexp"
-  							     :translator migemo-search-pattern-get
-  							     :case-fold ctrlf-no-uppercase-regexp-p))))
+    (with-eval-after-load 'ctrlf
+      (add-to-list 'ctrlf-style-alist '(migemo-regexp . (:prompt "migemo-regexp"
+  							       :translator migemo-search-pattern-get
+  							       :case-fold ctrlf-no-uppercase-regexp-p)))))
+
+#+end_src
+***** minibuffer内检索 (=Orderless=) 交互
+用 =migemo= 在minibuffer的检索中用罗马字检索日语。
+#+begin_src emacs-lisp
+  (with-eval-after-load 'orderless
+    (defun orderless-migemo (component)
+    (let ((pattern (migemo-get-pattern component)))
+      (condition-case nil
+          (progn (string-match-p pattern "") pattern)
+        (invalid-regexp nil))))
+    
+    (add-to-list '+orderless-dispatch-alist '(?# . orderless-migemo)))
 #+end_src
 ** 中文
 *** 输入法和基于输入法的检索 (pyim)
@@ -1314,32 +1326,21 @@ minibuffer的检索]]。
     (advice-add 'pyim-activate :after #'idiig/enable-pyim-region))
 #+end_src
 
-***** minibuffer (=Orderless=) 交互
-#+begin_src emacs-lisp
-  (with-eval-after-load 'orderless
-    ;; 拼音检索字符串功能
-    (defun zh-orderless-regexp (orig_func component)
-      (call-interactively #'pyim-activate)
-      (call-interactively #'pyim-deactivate)
-      (let ((result (funcall orig_func component)))
-        (pyim-cregexp-build result)))
-    (advice-add 'orderless-regexp :around #'zh-orderless-regexp))
-#+end_src
-***** 检索 (=Ctrlf=) 交互
+***** buffer内检索 (=Ctrlf=) 交互
 这里我写了一个函数 =pyim-cregex-build-lazy= 。这个函数交互 =pyim= 。参见[[*输入法][输
 入法]]。这个函数的工作逻辑如下：
 
 - 如果还没有初始化拼音数据，就先进行预热预热时会加载 "a"、"e"、"o" 这
   三个字符的拼音映射数据设置初始化标志，避免重复初始化
 - 接着分两种情况处理：
-    1. 情况1 :: 单个字符且不是 a/e/o，双个字母不是 zh/ch/sh
-       1) 使用 regexp-quote 直接转义字符
-       2) 例如：输入 "b" → 直接匹配字符 "b"
-       3) 避免触发拼音转换，提高性能
-    2. 情况2 :: 其他所有情况
-       1) 使用 pyim-cregexp-build 进行拼音转换，包括：
-          + 单个字符 "a"、"e"、"o"（常用韵母）
-          + 多个字符组合（如 "zh"、"zhong"）
+  1. 情况1 :: 单个字符且不是 a/e/o，双个字母不是 zh/ch/sh
+     1) 使用 regexp-quote 直接转义字符
+     2) 例如：输入 "b" → 直接匹配字符 "b"
+     3) 避免触发拼音转换，提高性能
+  2. 情况2 :: 其他所有情况
+     1) 使用 pyim-cregexp-build 进行拼音转换，包括：
+        + 单个字符 "a"、"e"、"o"（常用韵母）
+        + 多个字符组合（如 "zh"、"zhong"）
 - 设计目的
   1. 性能优化 :: 避免输入大多数单个字符时的拼音转换开销
   2. 保持功能 :: 在需要拼音搜索时正常工作
@@ -1362,12 +1363,12 @@ minibuffer的检索]]。
     
     (defun pyim-cregexp-build-lazy (str)
       "Lazy wrapper for pyim-cregexp-build with caching."
-      (call-interactively #'pyim-activate)
-      (call-interactively #'pyim-deactivate)
-
       (unless pyim-ctrlf-initialized
         (message "Initializing pyim data for ctrlf...")
         ;; 预缓存常用字符的结果
+        (call-interactively #'pyim-activate)
+        (call-interactively #'pyim-deactivate)
+        
         (dolist (vowel pyim-ctrlf-vowels-with-mapping)
           (let ((result (pyim-cregexp-build vowel)))
             (puthash vowel result pyim-ctrlf-cache)))
@@ -1391,6 +1392,38 @@ minibuffer的检索]]。
   					  :case-fold ctrlf-no-uppercase-regexp-p
   					  :fallback (isearch-forward-regexp
   						     . isearch-backward-regexp)))))
+#+end_src
+***** minibuffer内检索 (=Orderless=) 交互
+#+begin_src emacs-lisp
+  ;; (with-eval-after-load 'orderless
+  ;;   ;; 拼音检索字符串功能
+  ;;   (defun zh-orderless-regexp (orig_func component)
+  ;;     (call-interactively #'pyim-activate)
+  ;;     (call-interactively #'pyim-deactivate)
+  ;;     (let ((result (funcall orig_func component)))
+  ;;       (pyim-cregexp-build result)))
+  ;;   (advice-add 'orderless-regexp :around #'zh-orderless-regexp))
+
+  (with-eval-after-load 'orderless
+
+    (defvar pyim-orderless-initialized nil
+      "Flag to track if pyim data has been initialized for orderless.")
+
+    (defun orderless-pyim (component)
+      (unless pyim-orderless-initialized
+        (message "Initializing pyim for orderless...")
+        ;; 预缓存常用字符的结果
+        (call-interactively #'pyim-activate)
+        (call-interactively #'pyim-deactivate)
+        (setq pyim-orderless-initialized t)
+        (message "Pyim data initialized."))
+      
+      (let ((pattern (pyim-cregexp-build component)))
+        (condition-case nil
+            (progn (string-match-p pattern "") pattern)
+  	(invalid-regexp nil))))
+
+    (add-to-list '+orderless-dispatch-alist '(?@ . orderless-pyim)))
 #+end_src
 ** Git（Magit）
 用 Magit 进行项目与版本的管理

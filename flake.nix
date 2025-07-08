@@ -269,15 +269,16 @@
 	    (use-package orderless
 	      :after
 	      (consult)
+	      :init
+	      (defvar +orderless-dispatch-alist
+	      '((?% . char-fold-to-regexp)    ; %word% - 字符折叠匹配
+	        (?! . orderless-without-literal) ; !word! - 排除匹配
+	        (?`. orderless-initialism)    ; `word` - 首字母匹配
+	        (?= . orderless-literal)      ; =word= - 字面匹配
+	        (?~ . orderless-flex)))	  ; ~word~ - 弹性匹配
 	      :config
 	      (setq search-default-mode t)
-	      (defvar +orderless-dispatch-alist
-	        '((?% . char-fold-to-regexp)
-	          (?! . orderless-without-literal)
-	          (?`. orderless-initialism)
-	          (?= . orderless-literal)
-	          (?~ . orderless-flex)))
-	    
+	      
 	      (defun +orderless--suffix-regexp ()
 	        (if (and (boundp 'consult--tofu-char) (boundp 'consult--tofu-range))
 	            (format "[%c-%c]*$"
@@ -443,48 +444,6 @@
 	      
 	      ;; 添加 advice
 	      (advice-add 'ctrlf-change-search-style :after #'ctrlf-set-default-style-advice))
-	    (with-eval-after-load 'pyim
-	      
-	      (defvar pyim-ctrlf-initialized nil
-	        "Flag to track if pyim data has been initialized for ctrlf.")
-	      
-	      (defvar pyim-ctrlf-cache (make-hash-table :test 'equal)
-	        "Cache for pyim-cregexp-build results.")
-	      
-	      (defconst pyim-ctrlf-vowels-with-mapping '("a" "e" "o")
-	        "Vowels that have direct Chinese character mappings.")
-	      
-	      (defconst pyim-ctrlf-double-consonants '("zh" "ch" "sh")
-	        "Double-letter consonants that should use regex-quote for exact matching.")
-	      
-	      (defun pyim-cregexp-build-lazy (str)
-	        "Lazy wrapper for pyim-cregexp-build with caching."
-	        (unless pyim-ctrlf-initialized
-	          (message "Initializing pyim data for ctrlf...")
-	          ;; 预缓存常用字符的结果
-	          (dolist (vowel pyim-ctrlf-vowels-with-mapping)
-	            (let ((result (pyim-cregexp-build vowel)))
-	              (puthash vowel result pyim-ctrlf-cache)))
-	          (setq pyim-ctrlf-initialized t)
-	          (message "Pyim data initialized."))
-	        
-	        ;; 判断是否使用 regex-quote
-	        (if (or (and (= (length str) 1)
-	                     (not (member str pyim-ctrlf-vowels-with-mapping)))
-	                (member str pyim-ctrlf-double-consonants))
-	            (regexp-quote str)
-	          ;; 使用缓存或计算新结果
-	          (or (gethash str pyim-ctrlf-cache)
-	              (let ((result (pyim-cregexp-build str)))
-	                (puthash str result pyim-ctrlf-cache)
-	                result))))
-	    
-	      (add-to-list 'ctrlf-style-alist
-	                   '(pinyin-regexp . (:prompt "pinyin-regexp"
-	                                      :translator pyim-cregexp-build-lazy
-	                                      :case-fold ctrlf-no-uppercase-regexp-p
-	                                      :fallback (isearch-forward-regexp
-	                                                 . isearch-backward-regexp)))))
 	    (use-package emacs
 	      :init
 	      ;; 启用自动括号配对
@@ -706,7 +665,6 @@
 	      (skk-load . (lambda ()
 	                    (require 'context-skk))))
 	    (require 'migemo)
-	    
 	    ;; cmigemo(default)
 	    (setq migemo-command "${pkgs.cmigemo}/bin/cmigemo")
 	    (setq migemo-options '("-q" "--emacs"))
@@ -716,8 +674,23 @@
 	    
 	    (setq migemo-user-dictionary nil)
 	    (setq migemo-regex-dictionary nil)
-	    (setq migemo-coding-system 'utf-8-unix)
-	    (migemo-init)
+	    (when (and migemo-command migemo-dictionary)
+	      (migemo-init)
+	      (message "Migemo initialized with dictionary: %s" migemo-dictionary))
+	    (with-eval-after-load 'migemo
+	      (with-eval-after-load 'ctrlf
+	        (add-to-list 'ctrlf-style-alist '(migemo-regexp . (:prompt "migemo-regexp"
+	    							       :translator migemo-search-pattern-get
+	    							       :case-fold ctrlf-no-uppercase-regexp-p)))))
+	    
+	    (with-eval-after-load 'orderless
+	      (defun orderless-migemo (component)
+	      (let ((pattern (migemo-get-pattern component)))
+	        (condition-case nil
+	            (progn (string-match-p pattern "") pattern)
+	          (invalid-regexp nil))))
+	      
+	      (add-to-list '+orderless-dispatch-alist '(?# . orderless-migemo)))
 	    (use-package pyim
 	      :diminish pyim-isearch-mode
 	      :commands
@@ -773,15 +746,80 @@
 	      ;; (advice-remove 'pyim-activate #'idiig/enable-pyim-region)
 	      ;; (advice-add 'pyim-deactivate :after #'idiig/disable-pyim-region)
 	      (advice-add 'pyim-activate :after #'idiig/enable-pyim-region))
-	    ;; 确保在 orderless 加载后再加载这些配置
+	    (with-eval-after-load 'ctrlf
+	      
+	      (defvar pyim-ctrlf-initialized nil
+	        "Flag to track if pyim data has been initialized for ctrlf.")
+	      
+	      (defvar pyim-ctrlf-cache (make-hash-table :test 'equal)
+	        "Cache for pyim-cregexp-build results.")
+	      
+	      (defconst pyim-ctrlf-vowels-with-mapping '("a" "e" "o")
+	        "Vowels that have direct Chinese character mappings.")
+	      
+	      (defconst pyim-ctrlf-double-consonants '("zh" "ch" "sh")
+	        "Double-letter consonants that should use regex-quote for exact matching.")
+	      
+	      (defun pyim-cregexp-build-lazy (str)
+	        "Lazy wrapper for pyim-cregexp-build with caching."
+	        (unless pyim-ctrlf-initialized
+	          (message "Initializing pyim data for ctrlf...")
+	          ;; 预缓存常用字符的结果
+	          (call-interactively #'pyim-activate)
+	          (call-interactively #'pyim-deactivate)
+	          
+	          (dolist (vowel pyim-ctrlf-vowels-with-mapping)
+	            (let ((result (pyim-cregexp-build vowel)))
+	              (puthash vowel result pyim-ctrlf-cache)))
+	          (setq pyim-ctrlf-initialized t)
+	          (message "Pyim data initialized."))
+	        
+	        ;; 判断是否使用 regex-quote
+	        (if (or (and (= (length str) 1)
+	                     (not (member str pyim-ctrlf-vowels-with-mapping)))
+	                (member str pyim-ctrlf-double-consonants))
+	            (regexp-quote str)
+	          ;; 使用缓存或计算新结果
+	          (or (gethash str pyim-ctrlf-cache)
+	              (let ((result (pyim-cregexp-build str)))
+	                (puthash str result pyim-ctrlf-cache)
+	                result))))
+	    
+	      (add-to-list 'ctrlf-style-alist
+	                   '(pinyin-regexp . (:prompt "pinyin-regexp"
+	    					  :translator pyim-cregexp-build-lazy
+	    					  :case-fold ctrlf-no-uppercase-regexp-p
+	    					  :fallback (isearch-forward-regexp
+	    						     . isearch-backward-regexp)))))
+	    ;; (with-eval-after-load 'orderless
+	    ;;   ;; 拼音检索字符串功能
+	    ;;   (defun zh-orderless-regexp (orig_func component)
+	    ;;     (call-interactively #'pyim-activate)
+	    ;;     (call-interactively #'pyim-deactivate)
+	    ;;     (let ((result (funcall orig_func component)))
+	    ;;       (pyim-cregexp-build result)))
+	    ;;   (advice-add 'orderless-regexp :around #'zh-orderless-regexp))
+	    
 	    (with-eval-after-load 'orderless
-	      ;; 拼音检索字符串功能
-	      (defun zh-orderless-regexp (orig_func component)
-	        (call-interactively #'pyim-activate)
-	        (call-interactively #'pyim-deactivate)
-	        (let ((result (funcall orig_func component)))
-	          (pyim-cregexp-build result)))
-	      (advice-add 'orderless-regexp :around #'zh-orderless-regexp))
+	    
+	      (defvar pyim-orderless-initialized nil
+	        "Flag to track if pyim data has been initialized for orderless.")
+	    
+	      (defun orderless-pyim (component)
+	        (unless pyim-orderless-initialized
+	          (message "Initializing pyim for orderless...")
+	          ;; 预缓存常用字符的结果
+	          (call-interactively #'pyim-activate)
+	          (call-interactively #'pyim-deactivate)
+	          (setq pyim-orderless-initialized t)
+	          (message "Pyim data initialized."))
+	        
+	        (let ((pattern (pyim-cregexp-build component)))
+	          (condition-case nil
+	              (progn (string-match-p pattern "") pattern)
+	    	(invalid-regexp nil))))
+	    
+	      (add-to-list '+orderless-dispatch-alist '(?@ . orderless-pyim)))
 	    (use-package magit
 	      :bind ("C-x g" . magit-status)
 	      :commands magit-status
