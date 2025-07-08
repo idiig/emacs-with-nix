@@ -1032,19 +1032,17 @@
 	      (setq org-support-shift-select 2))
 	    (with-eval-after-load 'org
 	      (setq org-display-remote-inline-images t))
-	    (use-package org-bullets
-	      :after org
-	      :hook (org-mode . org-bullets-mode)
-	      :custom
-	      (org-bullets-bullet-list '("◉" "○" "●" "○" "●" "○" "●")))
-	    
-	    (font-lock-add-keywords 'org-mode
-	                            '(("^ *\\([-]\\) "
-	                               (0 (prog1 () (compose-region (match-beginning 1) (match-end 1) "•"))))))
-	    
 	    (with-eval-after-load 'org
-	      (setq org-ellipsis " ▾"
-	            org-hide-emphasis-markers t))
+	     ;; Edit settings
+	     org-auto-align-tags nil                    ; 禁用标签自动对齐功能
+	     org-tags-column 0                          ; 标签紧贴标题文本，不右对齐
+	     org-catch-invisible-edits 'show-and-error  ; 编辑折叠内容时显示并报错提醒
+	     org-special-ctrl-a/e t                     ; 增强 C-a/C-e，先跳到内容开始/结束，再跳到行首/尾
+	     org-insert-heading-respect-content t       ; 插入标题时考虑内容结构，在内容后插入
+	    
+	     ;; Org styling, hide markup etc.
+	     org-hide-emphasis-markers t                ; 隐藏强调标记符号 (*粗体* 显示为 粗体)
+	     org-pretty-entities t)                     ; 美化显示实体字符 (\alpha 显示为 α)
 	    (defun idiig/org-mode-face-settings ()
 	      "Set custom face attributes for Org mode headings in current buffer only."
 	    
@@ -1079,6 +1077,19 @@
 	        (diminish 'buffer-face-mode)))
 	    
 	    (add-hook 'org-mode-hook 'idiig/org-mode-face-settings)
+	    (use-package org-bullets
+	      :after org
+	      :hook (org-mode . org-bullets-mode)
+	      :custom
+	      (org-bullets-bullet-list '("◉" "○" "●" "○" "●" "○" "●")))
+	    
+	    (font-lock-add-keywords 'org-mode
+	                            '(("^ *\\([-]\\) "
+	                               (0 (prog1 () (compose-region (match-beginning 1) (match-end 1) "•"))))))
+	    
+	    (with-eval-after-load 'org
+	      (setq org-ellipsis " ▾"
+	            org-hide-emphasis-markers t))
 	    (with-eval-after-load 'org
 	      (setq org-cite-export-processors
 	          '((latex biblatex)
@@ -1269,6 +1280,7 @@
               auctex-latexmk
             plantuml-mode
             ob-nix
+            org-modern
             org-bullets
             citeproc
             org-tree-slide
