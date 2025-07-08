@@ -787,24 +787,19 @@ emacs在打开新的窗口时，默认光标维持在原来的窗口。比如当
 #+end_src
                 
 **** 撤销（vundo）
-
 我原来使用 undotree ，现在使用 vundo。这些用于视觉化撤销树。这里我之绑
 定了 =C-x u= ， =C-/= 我依然用的原生的 Undo，这样适合区分使用。
-
 ***** 依赖
 :PROPERTIES:
 :header-args: :noweb-ref epkgs
 :END:
-
-#+BEGIN_SRC nix 
+#+begin_src nix 
   vundo
-#+END_SRC
-
+#+end_src
 ***** 配置
 :PROPERTIES:
 :header-args: :noweb-ref ecfg
 :END:
-
 #+begin_src emacs-lisp
   (use-package vundo
     :defer t
@@ -825,9 +820,9 @@ minibuffer的检索]]。
 :header-args: :noweb-ref epkgs
 :END:
 
-#+BEGIN_SRC nix 
+#+begin_src nix 
   ctrlf
-#+END_SRC
+#+end_src
 
 ***** 配置
 :PROPERTIES:
@@ -928,7 +923,6 @@ minibuffer的检索]]。
 #+begin_src nix
   puni
 #+end_src
-
 ***** 配置
 :PROPERTIES:
 :header-args: :noweb-ref ecfg
@@ -1022,7 +1016,6 @@ minibuffer的检索]]。
   	 "Use %k for further adjustment"))))
     (advice-add 'puni-expand-region :around #'idiig/puni-expand-region-advice))
 #+end_src
-
 **** 覆盖 =<Backspace>= 和 =<DEL>= 等删除动作
 :PROPERTIES:
 :header-args: :noweb-ref ecfg
@@ -1087,7 +1080,7 @@ minibuffer的检索]]。
   ;; 如果你有其他 hook 需要重新应用 advice，可添加对应 hook，例如：
   ;; (add-hook 'your-major-mode-hook #'idiig/apply-forward-hungry-delete-advice)
 #+end_src
-***** =puni-backward-kill-word-or-region=
+***** =backward-kill-word-or-region=
 如无选中则杀掉前面的单词，如有选中则杀掉选中区域。
 #+begin_src emacs-lisp
   (defun idiig/backward-kill-word-or-region-advice (orig-fun &rest args)
