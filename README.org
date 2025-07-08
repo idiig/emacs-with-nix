@@ -917,6 +917,12 @@ emacs在打开新的窗口时，默认光标维持在原来的窗口。比如当
                                                . isearch-backward-regexp)))))
 #+end_src
 
+****** 假名匹配
+#+begin_src emacs-lisp
+  (add-to-list 'ctrlf-style-alist '(migemo-regexp . (:prompt "migemo-regexp"
+  							  :translator migemo-search-pattern-get
+  							  :case-fold ctrlf-no-uppercase-regexp-p)))
+#+end_src
 **** 括号匹配
 :PROPERTIES:
 :header-args: :noweb-ref ecfg
