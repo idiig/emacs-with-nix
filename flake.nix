@@ -63,6 +63,9 @@
 	    
 	    ;; 文件在外部更新时buffer更新
 	    (global-auto-revert-mode 1)
+	    (use-package so-long
+	      :init
+	      (global-so-long-mode +1))
 	    ;; 基础设置
 	    (tool-bar-mode -1) ;; 关闭工具栏
 	    (scroll-bar-mode -1) ;; 关闭文件滑动控件
@@ -1231,6 +1234,7 @@
           emacsWithPackages = ((pkgs.emacsPackagesFor emacs).overrideScope overrides).withPackages (epkgs: with epkgs; [
             use-package
               diminish
+            so-long
             mwim
             unfill
             vertico

@@ -224,7 +224,6 @@ hook，config，自定义的函数。
 :PROPERTIES:
 :header-args: :noweb-ref ecfg
 :END:
-
 #+begin_src emacs-lisp
   ;; 关闭警告声
   (setq ring-bell-function 'ignore)
@@ -244,12 +243,27 @@ hook，config，自定义的函数。
   ;; 文件在外部更新时buffer更新
   (global-auto-revert-mode 1)
 #+end_src
-
+**** 优化长文档 (=so-long=)
+***** 依赖
+:PROPERTIES:
+:header-args: :noweb-ref epkgs
+:END:
+#+begin_src nix
+  so-long
+#+end_src
+***** 配置
+:PROPERTIES:
+:header-args: :noweb-ref ecfg
+:END:
+#+begin_src emacs-lisp
+  (use-package so-long
+    :init
+    (global-so-long-mode +1))
+#+end_src
 **** UI
 :PROPERTIES:
 :header-args: :noweb-ref ecfg
 :END:
-
 #+begin_src emacs-lisp
   ;; 基础设置
   (tool-bar-mode -1) ;; 关闭工具栏
@@ -265,12 +279,10 @@ hook，config，自定义的函数。
                      (abbreviate-file-name (buffer-file-name)) "%b"))))
   (setq ns-use-proxy-icon nil)  ;; 删除frame icon
 #+end_src
-
-- 主题
+***** 主题
 #+begin_src emacs-lisp
   (require-theme 'modus-themes)
 #+end_src
-
 **** 光标跳到新窗口
 :PROPERTIES:
 :header-args: :noweb-ref ecfg
