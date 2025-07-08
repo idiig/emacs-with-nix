@@ -1232,7 +1232,7 @@ minibuffer的检索]]。
 
 #+end_src
 ***** minibuffer内检索 (=Orderless=) 交互
-用 =migemo= 在minibuffer的检索中用罗马字检索日语。
+用 =migemo= 在minibuffer的检索中用 =#= 前缀可开启罗马字检索日语。
 #+begin_src emacs-lisp
   (with-eval-after-load 'orderless
     (defun orderless-migemo (component)
@@ -1394,6 +1394,7 @@ minibuffer的检索]]。
   						     . isearch-backward-regexp)))))
 #+end_src
 ***** minibuffer内检索 (=Orderless=) 交互
+用 =pyim= 在minibuffer的检索中用 =◎= 前缀可开启拼音检索中文。
 #+begin_src emacs-lisp
   ;; (with-eval-after-load 'orderless
   ;;   ;; 拼音检索字符串功能
@@ -2305,7 +2306,7 @@ insert-state 时重新打开输入方式：
   	    (deactivate-input-method)))
 #+end_src
 
-** 扩展
+** 特殊扩展
 
 扩展主要针对不存在于 =nixpkgs= 中的包，这里我基本上使用了[[https://codeberg.org/heraplem/nix-emacs-extra/src/branch/emacs-application-framework/packages/eaf][这个链接的代
 码和方法]]，由于Nix水平有限，我在代码中增加了一些注释提示自己：
