@@ -74,7 +74,6 @@ hook，config，自定义的函数。
 :END:
 ** Flake入口
 包的安装基于下面的 =flake.nix= 和 =init.nix= 。
-
 #+BEGIN_SRC nix :tangle flake.nix :noweb yes
   {
     description = "idiig's Emacs Configuration with Nix Flakes";
@@ -178,7 +177,6 @@ hook，config，自定义的函数。
 :PROPERTIES:
 :header-args: :noweb-ref ecfg
 :END:
-
 #+begin_src emacs-lisp
   ;; 在mac中使用Command key作为meta
   (setq mac-option-key-is-meta nil
@@ -433,7 +431,6 @@ emacs在打开新的窗口时，默认光标维持在原来的窗口。比如当
 :PROPERTIES:
 :header-args: :noweb-ref ecfg
 :END:
-打开最近文件。
 #+begin_src emacs-lisp
   (use-package recentf
     :defer t
@@ -518,9 +515,7 @@ emacs在打开新的窗口时，默认光标维持在原来的窗口。比如当
 :PROPERTIES:
 :header-args: :noweb-ref ecfg
 :END:
-
 *mwim*: 跳到代码之前而非最前，或者代码后面而不是最后
-
 #+begin_src emacs-lisp
   (use-package mwim
     :bind
@@ -1132,7 +1127,6 @@ minibuffer的检索]]。
 :PROPERTIES:
 :header-args: :noweb-ref ecfg
 :END:
-
 #+begin_src emacs-lisp
   (add-hook 'after-init-hook
   	  (lambda ()
@@ -1158,7 +1152,6 @@ minibuffer的检索]]。
 :PROPERTIES:
 :header-args: :noweb-ref epkgs
 :END:
-
 #+BEGIN_SRC nix 
   ddskk
 #+END_SRC
@@ -1167,7 +1160,6 @@ minibuffer的检索]]。
 :PROPERTIES:
 :header-args: :noweb-ref ecfg
 :END:
-
 #+begin_src emacs-lisp
   (use-package ddskk
     :defer t
@@ -1285,13 +1277,10 @@ minibuffer的检索]]。
     (pyim-basedict-enable))
 #+end_src
 ***** TODO 正则表达交互
-
-目前支持
-
+目前支持：
 - 在minibuffer中用 =C-Ret= 把单字拼音转换为该读音本身代表的中文正则表达
 - =M-x idiig/toggle-pyim-region= 用于开关中文的forward-word和backward
 - 激活进入pyim时，自动开启中文的forward和backward
-  
 #+begin_src emacs-lisp
   (with-eval-after-load 'pyim
     (require 'pyim-cstring-utils)
@@ -1466,7 +1455,6 @@ minibuffer的检索]]。
 :header-args: :noweb-ref ecfg
 :END:
 *** 文档后缀
-  
 #+begin_src emacs-lisp
   (defvar idiig/writing-environment-list '("\\.org\\'"
                                            "\\.md\\'"
@@ -1479,7 +1467,6 @@ minibuffer的检索]]。
 #+end_src
 
 *** 文档状态折行
-  
 #+begin_src emacs-lisp
   (defun idiig/in-writing-environment-p ()
     "Check if current buffer file matches any pattern in idiig/writing-environment-list."
@@ -1498,9 +1485,7 @@ minibuffer的检索]]。
 #+end_src
 
 *** 在选中区域的状态下 =C-w= 删除选中的区域
-
 在没选中的状态下删除上一个单词。
-
 #+begin_src emacs-lisp
   (with-eval-after-load 'puni
     (defun idiig/backward-kill-word-or-region (&optional arg)
@@ -1513,9 +1498,6 @@ minibuffer的检索]]。
 #+end_src
 
 *** =C-M-\= 全局缩进
-
-全局缩进
-
 #+begin_src emacs-lisp
   (defun idiig/indent-buffer()
     (interactive)
@@ -1535,15 +1517,12 @@ minibuffer的检索]]。
 #+end_src
 
 *** =Shift-Ret= 下方插入空白行
-
 #+begin_src emacs-lisp
   (global-set-key [(shift return)] 'idiig/smart-open-line)
 #+end_src
 
-*** =M--= 匹配到括号 
-
+*** =M--= 匹配到括号
 TODO: 把 evil-jump-item 换成别的函数。
-
 #+begin_src emacs-lisp
   (defun idiig/goto-match-paren (arg)
     "Go to the matching if on (){}[], similar to vi style of % "
@@ -1560,7 +1539,6 @@ TODO: 把 evil-jump-item 换成别的函数。
 #+end_src
 
 *** 点后插入空白
-
 #+begin_src emacs-lisp
   (defun idiig/insert-space-after-point ()
     (interactive)
@@ -1574,7 +1552,6 @@ TODO: 把 evil-jump-item 换成别的函数。
 :PROPERTIES:
 :header-args: :noweb-ref ecfg
 :END:
-
 #+begin_src emacs-lisp
   ;; TODO: 这里未来需要改成在每个语言的设定的节点push进来
   (defvar idiig/language-list
@@ -1593,16 +1570,13 @@ TODO: 把 evil-jump-item 换成别的函数。
 :PROPERTIES:
 :CUSTOM_ID: lsp-bridge
 :END:
-
 语言服务器用于补全代码，提示文档，参照转跳等。这里我使用了 LSP-Bridge，
 其主要优势是通过 python 后端调用语言服务器，不卡 emacs 进程达到高速的
 补全。其他倾向的代替选项有 emacs 捆绑 =eglot= 。
-
 **** 依赖
 :PROPERTIES:
 :header-args: :noweb-ref epkgs
 :END:
-
 #+begin_src nix
   (lsp-bridge.override {
     # 指定使用 Python 3.11 而不是 3.12
@@ -1652,7 +1626,6 @@ TODO: 把 evil-jump-item 换成别的函数。
 :PROPERTIES:
 :header-args: :noweb-ref ecfg
 :END:
-
 #+begin_src emacs-lisp
   (defmacro idiig//setup-nix-lsp-bridge-server (language server-name executable-path &optional lib-path)
     "配置 Nix 环境下的 LSP 服务器。
@@ -1729,9 +1702,7 @@ TODO: 把 evil-jump-item 换成别的函数。
 的情况，我们可以手动安装。
 
 *** TODO Treesitter
-
 用于解析语法和语法高亮
-
 **** 依赖
 :PROPERTIES:
 :header-args: :noweb-ref epkgs
@@ -1745,7 +1716,6 @@ TODO: 把 evil-jump-item 换成别的函数。
 :PROPERTIES:
 :header-args: :noweb-ref ecfg
 :END:
-
 #+begin_src emacs-lisp
   (use-package treesit-auto
     :custom
@@ -1765,17 +1735,13 @@ TODO: 把 evil-jump-item 换成别的函数。
 treesit。
 
 *** Snippet（Yasnippet）
-
 Snippet 用于快速插入模板
-
 **** 依赖
 :PROPERTIES:
 :header-args: :noweb-ref epkgs
 :END:
-
 这里 =yasnippet= 本体已经作为 =lsp-bridge= 的依赖被加入，我们这里只加
 入一个 snippet 的合集 =yasnippert-snippets= 。
-
 #+begin_src nix
   # yasnippet
   yasnippet-snippets
@@ -1786,7 +1752,6 @@ Snippet 用于快速插入模板
 :PROPERTIES:
 :header-args: :noweb-ref ecfg
 :END:
-
 #+begin_src emacs-lisp
   ;; (defvar idiig/snippet-dir (concat user-emacs-directory "snippets"))
   (use-package yasnippet
@@ -1811,7 +1776,6 @@ Snippet 用于快速插入模板
 #+end_src
 
 *** 基于 tresitter 的结构化编程
-
 **** 依赖
 :PROPERTIES:
 :header-args: :noweb-ref epkgs
@@ -1828,14 +1792,12 @@ Snippet 用于快速插入模板
 
 ** 编程与文档语言
 *** Nix
-
 **** 依赖
 #+begin_src nix :noweb-ref epkgs
   nix-mode
 #+end_src
 
 加入 nix 的 major mode。
-
 #+begin_src emacs-lisp :noweb-ref ecfg
   (idiig//setup-nix-lsp-bridge-server 
    "nix" 
@@ -1850,9 +1812,7 @@ Snippet 用于快速插入模板
 **** 配置
 
 *** Python
-
 **** 依赖
-
 #+begin_src emacs-lisp :noweb-ref ecfg
   (idiig//setup-nix-lsp-bridge-server 
    "python" 
@@ -1869,14 +1829,12 @@ Snippet 用于快速插入模板
 :PROPERTIES:
 :header-args: :noweb-ref ecfg
 :END:
-
 - =M-:= 时的 eval expression minibuffer 的时候加入 prog mode。
 #+begin_src emacs-lisp
   (add-hook 'eval-expression-minibuffer-setup 'idiig/run-prog-mode-hooks)
 #+end_src
 
 *** Shell
-
 用 =bash= 作为默认 shell
 #+begin_src emacs-lisp :noweb-ref ecfg
   ;; (setq shell-command-switch "-ic")
@@ -1889,12 +1847,10 @@ Snippet 用于快速插入模板
 *** Make
 
 *** TeX
-
 **** 依赖
 :PROPERTIES:
 :header-args: :noweb-ref ecfg
 :END:
-
 #+begin_src nix :noweb-ref epkgs
   auctex
     auctex-latexmk
@@ -1912,7 +1868,6 @@ Snippet 用于快速插入模板
 :PROPERTIES:
 :header-args: :noweb-ref ecfg
 :END:
-
 #+begin_src emacs-lisp
   (add-hook 'TeX-mode-hook 'idiig/run-prog-mode-hooks)
 #+end_src
@@ -1939,12 +1894,10 @@ Snippet 用于快速插入模板
 #+end_src
 
 *** PlantUML
-
 **** 依赖
 :PROPERTIES:
 :header-args: :noweb-ref epkgs
 :END:
-
 #+begin_src nix
   plantuml-mode
 #+end_src
@@ -1958,7 +1911,6 @@ Snippet 用于快速插入模板
 #+end_src
 
 *** GraphViz
-
 **** 依赖
 #+begin_src emacs-lisp :noweb-ref ecfg
   (add-to-list 'exec-path "${pkgs.graphviz}/bin")
@@ -1970,7 +1922,6 @@ Snippet 用于快速插入模板
 :header-args: :noweb-ref ecfg
 :END:
 **** 绑定 prog mode
-
 #+begin_src emacs-lisp
   (add-hook 'org-mode-hook 'idiig/run-prog-mode-hooks)
 #+end_src
@@ -1993,7 +1944,6 @@ Snippet 用于快速插入模板
 **** 代码块支持语言
 ***** 依赖
 由于 =ob-nix= 还没有默认。我们需要添加这些依赖
-
 #+begin_src nix :noweb-ref epkgs
   ob-nix
 #+end_src
@@ -2158,16 +2108,12 @@ Snippet 用于快速插入模板
 #+end_src
 
 ** AI辅助功能
-
 *** 文档写作
-
 **** gptel.el
-
 ***** 依赖
 :PROPERTIES:
 :header-args: :noweb-ref epkgs
 :END:
-
 #+BEGIN_SRC nix
   gptel
 #+END_SRC
@@ -2184,12 +2130,10 @@ Snippet 用于快速插入模板
 #+end_src
 
 *** Aider
-
 **** 依赖
 :PROPERTIES:
 :header-args: :noweb-ref epkgs
 :END:
-
 ***** TODO Aider.el
 #+BEGIN_SRC nix
   # aider
@@ -2219,7 +2163,6 @@ Snippet 用于快速插入模板
 :PROPERTIES:
 :header-args: :noweb-ref ecfg
 :END:
-
 #+begin_src emacs-lisp
   (use-package meow
     :init
@@ -2335,7 +2278,6 @@ insert-state 时重新打开输入方式：
 #+end_src
 
 ** 特殊扩展
-
 扩展主要针对不存在于 =nixpkgs= 中的包，这里我基本上使用了[[https://codeberg.org/heraplem/nix-emacs-extra/src/branch/emacs-application-framework/packages/eaf][这个链接的代
 码和方法]]，由于Nix水平有限，我在代码中增加了一些注释提示自己：
 
@@ -2426,17 +2368,11 @@ insert-state 时重新打开输入方式：
 #+end_src
 
 *** EAF
-
 EAF 是一个可编程扩展的框架，它自带一系列丰富的应用。
-
 **** 外部元
-
 eaf还没有在 =nixpkgs= 中被打包，所以需要自己打包依赖。
-
 ***** eaf本体
-
 - 以下代码是外部元的链接
-  
 #+begin_src nix :noweb-ref externals
   eaf = {
     url = "github:emacs-eaf/emacs-application-framework";
@@ -2445,7 +2381,6 @@ eaf还没有在 =nixpkgs= 中被打包，所以需要自己打包依赖。
 #+end_src
 
 - 以下代码是eaf的打包文件
-  
 #+begin_src nix :tangle externals/eaf/default.nix
   { package_src
   , elispFileVersion
@@ -2555,9 +2490,7 @@ eaf还没有在 =nixpkgs= 中被打包，所以需要自己打包依赖。
 
 
 ***** eaf浏览器
-
 - 外部元链接
-  
 #+begin_src nix :noweb-ref externals
   eaf-browser = {
     url = "github:emacs-eaf/eaf-browser";
@@ -2566,7 +2499,6 @@ eaf还没有在 =nixpkgs= 中被打包，所以需要自己打包依赖。
 #+end_src
 
 - 打包代码
-  
 #+begin_src nix :tangle externals/eaf-browser/default.nix
   { package_src
   , elispFileVersion
@@ -2603,9 +2535,7 @@ eaf还没有在 =nixpkgs= 中被打包，所以需要自己打包依赖。
 
 
 ***** eaf阅读器
-
 - 外部元的链接
-  
 #+begin_src nix :noweb-ref externals
   eaf-pdf-viewer = {
     url = "github:emacs-eaf/eaf-pdf-viewer";
@@ -2614,7 +2544,6 @@ eaf还没有在 =nixpkgs= 中被打包，所以需要自己打包依赖。
 #+end_src
 
 - 打包代码
-  
 #+begin_src nix :tangle -
 #+end_src
 
@@ -2622,7 +2551,6 @@ eaf还没有在 =nixpkgs= 中被打包，所以需要自己打包依赖。
 :PROPERTIES:
 :header-args: :noweb-ref epkgs
 :END:
-
 #+begin_src nix
   eaf
     eaf-browser
@@ -2634,7 +2562,6 @@ eaf还没有在 =nixpkgs= 中被打包，所以需要自己打包依赖。
 :PROPERTIES:
 :header-args: :noweb-ref ecfg
 :END:
-
 #+begin_src emacs-lisp
   ;; (defvar idiig/eaf-path (concat user-emacs-directory "site-lisp/emacs-application-framework"))
   ;; (add-to-list 'load-path idiig/eaf-path)
