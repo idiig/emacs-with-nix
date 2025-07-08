@@ -849,6 +849,8 @@ minibuffer的检索]]。
 #+end_src
 
 **** 重构 (wgrep)
+在 =grep= , =ag=, =ripgrep= 等检索的结果中按下 =e= 进入编辑模式，按下 =C-c C-c=
+完成修改。
 ***** 依赖
 :PROPERTIES:
 :header-args: :noweb-ref epkgs
