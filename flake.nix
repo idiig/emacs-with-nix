@@ -80,6 +80,21 @@
 	                       (abbreviate-file-name (buffer-file-name)) "%b"))))
 	    (setq ns-use-proxy-icon nil)  ;; 删除frame icon
 	    (require-theme 'modus-themes)
+	    (use-package spacious-padding
+	      :config
+	      (setq spacious-padding-widths
+	            '( :internal-border-width 15
+	               :header-line-width 4
+	               :mode-line-width 6
+	               :tab-width 4
+	               :right-divider-width 30
+	               :scroll-bar-width 8))
+	    
+	      ;; Read the doc string of `spacious-padding-subtle-mode-line' as it
+	      ;; is very flexible and provides several examples.
+	      (setq spacious-padding-subtle-mode-line
+	            `( :mode-line-active 'default
+	               :mode-line-inactive vertical-border)))
 	    (setq switch-to-buffer-obey-display-actions t)
 	    (setq switch-to-buffer-in-dedicated-window 'pop)
 	    (customize-set-variable 'display-buffer-base-action
@@ -1246,6 +1261,8 @@
             use-package
               diminish
             so-long
+            spacious-padding
+              writeroom-mode
             mwim
             unfill
             vertico
@@ -1280,7 +1297,6 @@
               auctex-latexmk
             plantuml-mode
             ob-nix
-            org-modern
             org-bullets
             citeproc
             org-tree-slide

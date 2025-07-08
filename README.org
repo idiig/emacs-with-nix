@@ -10,18 +10,13 @@
 
 - emacs内置的包管理器无法处理系统工具的依存：如 =ripgrep=, 特定版本的
   =python=
-
 - 使用gitsubmodule相同
-
 - 完全使用Nix的话，写配置和尝试包的体验感比较差
 
 这份配置的解决法如下：
-
 - 通过org-babel同时写作Nix和elisp。前者用于版本和包的管理，后者用于包
   的配置
-
 - 可以在elisp中用 =$pkgs.git= 的方式直接引用Nix的包
-  
 - 提供一个函数加入一个新包时使用这个函数更新包列表
 * 实现方式
 :PROPERTIES:
@@ -264,6 +259,7 @@ hook，config，自定义的函数。
 :PROPERTIES:
 :header-args: :noweb-ref ecfg
 :END:
+***** 基础
 #+begin_src emacs-lisp
   ;; 基础设置
   (tool-bar-mode -1) ;; 关闭工具栏
@@ -282,6 +278,36 @@ hook，config，自定义的函数。
 ***** 主题
 #+begin_src emacs-lisp
   (require-theme 'modus-themes)
+#+end_src
+***** 写作和展示UI（手动开启）  
+****** 依赖
+:PROPERTIES:
+:header-args: :noweb-ref epkgs
+:END:
+#+begin_src nix
+  spacious-padding
+    writeroom-mode
+#+end_src
+****** 配置
+:PROPERTIES:
+:header-args: :noweb-ref ecfg
+:END:
+#+begin_src emacs-lisp
+  (use-package spacious-padding
+    :config
+    (setq spacious-padding-widths
+          '( :internal-border-width 15
+             :header-line-width 4
+             :mode-line-width 6
+             :tab-width 4
+             :right-divider-width 30
+             :scroll-bar-width 8))
+
+    ;; Read the doc string of `spacious-padding-subtle-mode-line' as it
+    ;; is very flexible and provides several examples.
+    (setq spacious-padding-subtle-mode-line
+          `( :mode-line-active 'default
+             :mode-line-inactive vertical-border)))
 #+end_src
 **** 光标跳到新窗口
 :PROPERTIES:
@@ -1408,7 +1434,7 @@ minibuffer的检索]]。
 
     (add-to-list '+orderless-dispatch-alist '(?@ . orderless-pyim)))
 #+end_src
-** Git (=Magit=)
+** Git (=magit=)
 用 Magit 进行项目与版本的管理
 *** 依赖
 :PROPERTIES:
@@ -2026,7 +2052,7 @@ Snippet 用于快速插入模板
    org-hide-emphasis-markers t                ; 隐藏强调标记符号 (*粗体* 显示为 粗体)
    org-pretty-entities t)                     ; 美化显示实体字符 (\alpha 显示为 α)
 #+end_src
-***** 更现代的UI（手动开启）
+***** COMMENT 更现代的UI（手动开启）
 ****** 依赖
 :PROPERTIES:
 :header-args: :noweb-ref epkgs
@@ -2179,7 +2205,7 @@ Snippet 用于快速插入模板
 :header-args: :noweb-ref ecfg
 :END:
 
-** 模态编辑 (=Meow=)
+** 模态编辑 (=meow=)
 *** 依赖
 :PROPERTIES:
 :header-args: :noweb-ref epkgs
