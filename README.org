@@ -596,7 +596,7 @@ emacs在打开新的窗口时，默认光标维持在原来的窗口。比如当
 
 ****** 配置
 
-- *Vertico*: 提供minibuffer补全UI
+******* *Vertico*: 提供minibuffer补全UI
 
 #+begin_src emacs-lisp
   (use-package vertico
@@ -608,7 +608,7 @@ emacs在打开新的窗口时，默认光标维持在原来的窗口。比如当
     (vertico-mode))
 #+end_src
 
-- *Orderless*: 提供补全格式选择
+******* *Orderless*: 提供补全格式选择
 
 #+begin_src emacs-lisp
   (use-package orderless
@@ -679,7 +679,7 @@ emacs在打开新的窗口时，默认光标维持在原来的窗口。比如当
           orderless-style-dispatchers '(+orderless-dispatch)))
 #+end_src
 
-- *Maginalia*: 增强minubuffer的annotation
+******* *Maginalia*: 增强minubuffer的annotation
 
 #+begin_src emacs-lisp
   (use-package marginalia
@@ -692,7 +692,7 @@ emacs在打开新的窗口时，默认光标维持在原来的窗口。比如当
     (marginalia-mode))
 #+end_src
 
-- *Consult*:
+******* *Consult*: 增强minibuffer的检索
   
 #+begin_src emacs-lisp
   (use-package consult
@@ -760,7 +760,7 @@ emacs在打开新的窗口时，默认光标维持在原来的窗口。比如当
   		(vconcat consult-narrow-key "?") #'consult-narrow-help)))
 #+end_src
 
-- *Embark*: minibuffer action 和自适应的context menu
+******* *Embark*: minibuffer action 和自适应的context menu
 
 #+begin_src emacs-lisp
   (use-package embark
@@ -816,8 +816,11 @@ emacs在打开新的窗口时，默认光标维持在原来的窗口。比如当
 #+end_src
 
 **** 检索（ctrlf）
-
-针对当前buffer利用 =Ctrlf= 而不在使用swiper和helm这类型的检索方式。
+针对当前 buffer 利用 =Ctrlf= 而不在使用 =swiper= 和 =helm= 这类型的检索方式。
+用于替代 =isearch= 的 =C-s= 键。另外的选项是 =consult-line= ，我映射到了 =C-c
+s= 键位，用于不移动当前位置预览检索行，尤其是在类似与 org 存在折叠的情
+况下，我不需要移动光标和展开折叠。关于 =consult= ，可见[[**Consult*: 增强minibuffer的检索][*Consult*: 增强
+minibuffer的检索]]。
 ***** 依赖
 :PROPERTIES:
 :header-args: :noweb-ref epkgs
@@ -831,7 +834,6 @@ emacs在打开新的窗口时，默认光标维持在原来的窗口。比如当
 :PROPERTIES:
 :header-args: :noweb-ref ecfg
 :END:
-
 ****** 启动 =ctrf=
 #+begin_src emacs-lisp
   (require 'ctrlf)
@@ -852,77 +854,6 @@ emacs在打开新的窗口时，默认光标维持在原来的窗口。比如当
     (advice-add 'ctrlf-change-search-style :after #'ctrlf-set-default-style-advice))
 #+end_src
 
-****** 识别拼音
-这里我写了一个函数 =pyim-cregex-build-lazy= 。这个函数交互 =pyim= 。参见
-[[*输入法][输入法]]。这个函数的工作逻辑如下：
-
-- 如果还没有初始化拼音数据，就先进行预热预热时会加载 "a"、"e"、"o" 这
-  三个字符的拼音映射数据设置初始化标志，避免重复初始化
-  - 接着分两种情况处理：
-    1. 情况1 :: 单个字符且不是 a/e/o，双个字母不是 zh/ch/sh
-       + 使用 regexp-quote 直接转义字符
-       + 例如：输入 "b" → 直接匹配字符 "b"
-       + 避免触发拼音转换，提高性能
-    2. 情况2 :: 其他所有情况
-       + 使用 pyim-cregexp-build 进行拼音转换，包括：
-         1) 单个字符 "a"、"e"、"o"（常用韵母）
-         2) 多个字符组合（如 "zh"、"zhong"）
-- 设计目的
-  1. 性能优化 :: 避免输入大多数单个字符时的拼音转换开销
-  2. 保持功能 :: 在需要拼音搜索时正常工作
-  3. 用户体验 :: 减少首次输入时的卡顿感
-    
-#+begin_src emacs-lisp
-  (with-eval-after-load 'pyim
-    
-    (defvar pyim-ctrlf-initialized nil
-      "Flag to track if pyim data has been initialized for ctrlf.")
-    
-    (defvar pyim-ctrlf-cache (make-hash-table :test 'equal)
-      "Cache for pyim-cregexp-build results.")
-    
-    (defconst pyim-ctrlf-vowels-with-mapping '("a" "e" "o")
-      "Vowels that have direct Chinese character mappings.")
-    
-    (defconst pyim-ctrlf-double-consonants '("zh" "ch" "sh")
-      "Double-letter consonants that should use regex-quote for exact matching.")
-    
-    (defun pyim-cregexp-build-lazy (str)
-      "Lazy wrapper for pyim-cregexp-build with caching."
-      (unless pyim-ctrlf-initialized
-        (message "Initializing pyim data for ctrlf...")
-        ;; 预缓存常用字符的结果
-        (dolist (vowel pyim-ctrlf-vowels-with-mapping)
-          (let ((result (pyim-cregexp-build vowel)))
-            (puthash vowel result pyim-ctrlf-cache)))
-        (setq pyim-ctrlf-initialized t)
-        (message "Pyim data initialized."))
-      
-      ;; 判断是否使用 regex-quote
-      (if (or (and (= (length str) 1)
-                   (not (member str pyim-ctrlf-vowels-with-mapping)))
-              (member str pyim-ctrlf-double-consonants))
-          (regexp-quote str)
-        ;; 使用缓存或计算新结果
-        (or (gethash str pyim-ctrlf-cache)
-            (let ((result (pyim-cregexp-build str)))
-              (puthash str result pyim-ctrlf-cache)
-              result))))
-
-    (add-to-list 'ctrlf-style-alist
-                 '(pinyin-regexp . (:prompt "pinyin-regexp"
-                                    :translator pyim-cregexp-build-lazy
-                                    :case-fold ctrlf-no-uppercase-regexp-p
-                                    :fallback (isearch-forward-regexp
-                                               . isearch-backward-regexp)))))
-#+end_src
-
-****** 假名匹配
-#+begin_src emacs-lisp
-  (add-to-list 'ctrlf-style-alist '(migemo-regexp . (:prompt "migemo-regexp"
-  							  :translator migemo-search-pattern-get
-  							  :case-fold ctrlf-no-uppercase-regexp-p)))
-#+end_src
 **** 括号匹配
 :PROPERTIES:
 :header-args: :noweb-ref ecfg
@@ -1214,8 +1145,7 @@ emacs在打开新的窗口时，默认光标维持在原来的窗口。比如当
 #+end_src
 
 ** 日文
-*** 输入法
-
+*** 输入法 (ddskk)
 **** 依赖
 :PROPERTIES:
 :header-args: :noweb-ref epkgs
@@ -1271,45 +1201,51 @@ emacs在打开新的窗口时，默认光标维持在原来的窗口。比如当
 #+begin_src nix
   migemo
 #+end_src
-
+注意这里使用的是 =cmigemo= 。
 **** 配置
 :PROPERTIES:
 :header-args: :noweb-ref ecfg
 :END:
+***** 基础配置
 #+begin_src emacs-lisp
-  (require 'migemo)
+  (use-package migemo
+    :after (consult ctrlf)
+    :init
+    (migemo-init)
+    :config
+    ;; cmigemo(default)
+    (setq migemo-command "${pkgs.cmigemo}/bin/cmigemo")
+    (setq migemo-options '("-q" "--emacs"))
 
-  ;; cmigemo(default)
-  (setq migemo-command "${pkgs.cmigemo}/bin/cmigemo")
-  (setq migemo-options '("-q" "--emacs"))
-
-  ;; Set your installed path
-  (setq migemo-dictionary "${pkgs.cmigemo}/share/migemo/utf-8/migemo-dict")
-
-  (setq migemo-user-dictionary nil)
-  (setq migemo-regex-dictionary nil)
-  (setq migemo-coding-system 'utf-8-unix)
-  (migemo-init)
+    ;; Set your installed path
+    (setq migemo-dictionary "${pkgs.cmigemo}/share/migemo/utf-8/migemo-dict")
+    
+    (setq migemo-user-dictionary nil)
+    (setq migemo-regex-dictionary nil)
+    (setq migemo-coding-system 'utf-8-unix))
+#+end_src
+***** 检索 (=Ctrlf=) 交互
+#+begin_src emacs-lisp
+  (with-eval-after-load 'migemo
+    (add-to-list 'ctrlf-style-alist '(migemo-regexp . (:prompt "migemo-regexp"
+  							     :translator migemo-search-pattern-get
+  							     :case-fold ctrlf-no-uppercase-regexp-p))))
 #+end_src
 ** 中文
-*** 输入法
-
+*** 输入法和基于输入法的检索 (pyim)
 **** 依赖
 :PROPERTIES:
 :header-args: :noweb-ref epkgs
 :END:
-
 #+BEGIN_SRC nix 
   pyim
     pyim-basedict
 #+END_SRC
-
 **** 配置
 :PROPERTIES:
 :header-args: :noweb-ref ecfg
 :END:
-
-***** 基础设定
+***** 基础配置
 #+begin_src emacs-lisp
   (use-package pyim
     :diminish pyim-isearch-mode
@@ -1328,7 +1264,6 @@ emacs在打开新的窗口时，默认光标维持在原来的窗口。比如当
     :config
     (pyim-basedict-enable))
 #+end_src
-
 ***** TODO 正则表达交互
 
 目前支持
@@ -1379,12 +1314,8 @@ emacs在打开新的窗口时，默认光标维持在原来的窗口。比如当
     (advice-add 'pyim-activate :after #'idiig/enable-pyim-region))
 #+end_src
 
-#+RESULTS:
-
-***** Orderless交互
-
+***** minibuffer (=Orderless=) 交互
 #+begin_src emacs-lisp
-  ;; 确保在 orderless 加载后再加载这些配置
   (with-eval-after-load 'orderless
     ;; 拼音检索字符串功能
     (defun zh-orderless-regexp (orig_func component)
@@ -1394,7 +1325,73 @@ emacs在打开新的窗口时，默认光标维持在原来的窗口。比如当
         (pyim-cregexp-build result)))
     (advice-add 'orderless-regexp :around #'zh-orderless-regexp))
 #+end_src
+***** 检索 (=Ctrlf=) 交互
+这里我写了一个函数 =pyim-cregex-build-lazy= 。这个函数交互 =pyim= 。参见[[*输入法][输
+入法]]。这个函数的工作逻辑如下：
 
+- 如果还没有初始化拼音数据，就先进行预热预热时会加载 "a"、"e"、"o" 这
+  三个字符的拼音映射数据设置初始化标志，避免重复初始化
+- 接着分两种情况处理：
+    1. 情况1 :: 单个字符且不是 a/e/o，双个字母不是 zh/ch/sh
+       1) 使用 regexp-quote 直接转义字符
+       2) 例如：输入 "b" → 直接匹配字符 "b"
+       3) 避免触发拼音转换，提高性能
+    2. 情况2 :: 其他所有情况
+       1) 使用 pyim-cregexp-build 进行拼音转换，包括：
+          + 单个字符 "a"、"e"、"o"（常用韵母）
+          + 多个字符组合（如 "zh"、"zhong"）
+- 设计目的
+  1. 性能优化 :: 避免输入大多数单个字符时的拼音转换开销
+  2. 保持功能 :: 在需要拼音搜索时正常工作
+  3. 用户体验 :: 减少首次输入时的卡顿感
+    
+#+begin_src emacs-lisp
+  (with-eval-after-load 'ctrlf
+    
+    (defvar pyim-ctrlf-initialized nil
+      "Flag to track if pyim data has been initialized for ctrlf.")
+    
+    (defvar pyim-ctrlf-cache (make-hash-table :test 'equal)
+      "Cache for pyim-cregexp-build results.")
+    
+    (defconst pyim-ctrlf-vowels-with-mapping '("a" "e" "o")
+      "Vowels that have direct Chinese character mappings.")
+    
+    (defconst pyim-ctrlf-double-consonants '("zh" "ch" "sh")
+      "Double-letter consonants that should use regex-quote for exact matching.")
+    
+    (defun pyim-cregexp-build-lazy (str)
+      "Lazy wrapper for pyim-cregexp-build with caching."
+      (call-interactively #'pyim-activate)
+      (call-interactively #'pyim-deactivate)
+
+      (unless pyim-ctrlf-initialized
+        (message "Initializing pyim data for ctrlf...")
+        ;; 预缓存常用字符的结果
+        (dolist (vowel pyim-ctrlf-vowels-with-mapping)
+          (let ((result (pyim-cregexp-build vowel)))
+            (puthash vowel result pyim-ctrlf-cache)))
+        (setq pyim-ctrlf-initialized t)
+        (message "Pyim data initialized."))
+      
+      ;; 判断是否使用 regex-quote
+      (if (or (and (= (length str) 1)
+                   (not (member str pyim-ctrlf-vowels-with-mapping)))
+              (member str pyim-ctrlf-double-consonants))
+          (regexp-quote str)
+        ;; 使用缓存或计算新结果
+        (or (gethash str pyim-ctrlf-cache)
+            (let ((result (pyim-cregexp-build str)))
+              (puthash str result pyim-ctrlf-cache)
+              result))))
+
+    (add-to-list 'ctrlf-style-alist
+                 '(pinyin-regexp . (:prompt "pinyin-regexp"
+  					  :translator pyim-cregexp-build-lazy
+  					  :case-fold ctrlf-no-uppercase-regexp-p
+  					  :fallback (isearch-forward-regexp
+  						     . isearch-backward-regexp)))))
+#+end_src
 ** Git（Magit）
 用 Magit 进行项目与版本的管理
 *** 依赖
