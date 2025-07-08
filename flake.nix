@@ -409,10 +409,9 @@
 	      :bind
 	      (("C-h B" . embark-bindings)  ;; alternative for `describe-bindings'
 	       (:map minibuffer-local-map
-	             ("C-;" . embark-act)         ;; 对函数进行设置操作 
+	             ("C-'" . embark-act)         ;; 对函数进行设置操作 
 	             ("M-." . embark-dwim)        ;; 实施 
-	             ("C-c C-e" . embark-export)  ;; occur
-	             )) 
+	             ("C-c C-e" . embark-export))) ;; occur 
 	      :init
 	      ;; Optionally replace the key help with a completing-read interface
 	      (setq prefix-help-command #'embark-prefix-help-command)
@@ -444,6 +443,10 @@
 	      
 	      ;; 添加 advice
 	      (advice-add 'ctrlf-change-search-style :after #'ctrlf-set-default-style-advice))
+	    (use-package wgrep
+	      :config
+	      (setq wgrep-auto-save-buffer t)
+	      (setq wgrep-enable-key "e"))
 	    (use-package emacs
 	      :init
 	      ;; 启用自动括号配对
@@ -1238,6 +1241,7 @@
               embark-consult
             vundo
             ctrlf
+            wgrep
             puni
             ddskk
             migemo
