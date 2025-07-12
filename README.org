@@ -1556,7 +1556,7 @@ TODO: 把 evil-jump-item 换成别的函数。
   ;; TODO: 这里未来需要改成在每个语言的设定的节点push进来
   (defvar idiig/language-list
     '("emacs-lisp" "python" "ditaa" "plantuml" "shell" "nix"
-      "R" "haskell" "latex"  "css" "json" "xml" "html")
+      "R" "haskell" "latex" "css" "js")
     "支持的编程语言列表。")
 
   (defun idiig/run-prog-mode-hooks ()
@@ -1891,6 +1891,7 @@ Snippet 用于快速插入模板
 :END:
 #+begin_src nix :noweb-ref epkgs
   jsonian
+    json-mode
 #+end_src
 
 #+begin_src emacs-lisp
@@ -1966,7 +1967,6 @@ Snippet 用于快速插入模板
 由于 =ob-nix= 还没有默认。我们需要添加这些依赖
 #+begin_src nix :noweb-ref epkgs
   ob-nix
-  ob-html 
 #+end_src
 
 ***** 配置
