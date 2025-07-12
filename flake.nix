@@ -1007,6 +1007,11 @@
 	    (add-hook 'TeX-mode-hook 'idiig/run-prog-mode-hooks)
 	    (use-package auctex
 	      :defer t)
+	    (idiig//setup-nix-lsp-bridge-server 
+	     "json" 
+	     "vscode-json-language-server" 
+	     "${pkgs.vscode-langservers-extracted}/bin" 
+	     nil)
 	    (add-to-list 'exec-path "${pkgs.plantuml}/bin")
 	    (with-eval-after-load 'org
 	      (setq org-plantuml-jar-path "${pkgs.plantuml}/lib/plantuml.jar")
@@ -1295,6 +1300,7 @@
             nix-mode
             auctex
               auctex-latexmk
+            jsonian
             plantuml-mode
             ob-nix
             org-bullets

@@ -1812,7 +1812,8 @@ Snippet 用于快速插入模板
 **** 配置
 
 *** Python
-**** 依赖
+**** 本体
+***** 依赖
 #+begin_src emacs-lisp :noweb-ref ecfg
   (idiig//setup-nix-lsp-bridge-server 
    "python" 
@@ -1820,9 +1821,8 @@ Snippet 用于快速插入模板
    "${pkgs.basedpyright}/bin" 
    "${pkgs.stdenv.cc.cc.lib}/lib")
 #+end_src
-
-**** 配置
-
+***** 配置
+**** 虚拟环境
 *** R
 
 *** Elisp
@@ -1884,7 +1884,23 @@ Snippet 用于快速插入模板
 *** Quarto
 
 *** XML
+*** JSON
+**** 依赖
+:PROPERTIES:
+:header-args: :noweb-ref ecfg
+:END:
+#+begin_src nix :noweb-ref epkgs
+  jsonian
+#+end_src
 
+#+begin_src emacs-lisp
+  (idiig//setup-nix-lsp-bridge-server 
+   "json" 
+   "vscode-json-language-server" 
+   "${pkgs.vscode-langservers-extracted}/bin" 
+   nil)
+#+end_src
+**** 配置
 *** Web
 
 *** Java
