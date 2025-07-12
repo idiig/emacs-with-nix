@@ -1303,6 +1303,7 @@
             jsonian
             plantuml-mode
             ob-nix
+            ob-html 
             org-bullets
             citeproc
             org-tree-slide

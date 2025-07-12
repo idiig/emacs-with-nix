@@ -1966,6 +1966,7 @@ Snippet 用于快速插入模板
 由于 =ob-nix= 还没有默认。我们需要添加这些依赖
 #+begin_src nix :noweb-ref epkgs
   ob-nix
+  ob-html 
 #+end_src
 
 ***** 配置
