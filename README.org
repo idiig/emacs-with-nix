@@ -1566,7 +1566,7 @@ TODO: 把 evil-jump-item 换成别的函数。
     (run-hooks 'prog-mode-hook))
 #+end_src
 
-*** 语言服务器（LSP-Bridge)
+*** 语言服务器 (=lsp-Bridge=)
 :PROPERTIES:
 :CUSTOM_ID: lsp-bridge
 :END:
@@ -1734,7 +1734,7 @@ TODO: 把 evil-jump-item 换成别的函数。
 我们可以手动 =treesit-auto-install-all= 。下载目前所有可能的语言的
 treesit。
 
-*** Snippet（Yasnippet）
+*** Snippet (=yasnippet=)
 Snippet 用于快速插入模板
 **** 依赖
 :PROPERTIES:
@@ -1790,6 +1790,25 @@ Snippet 用于快速插入模板
 #+begin_src emacs-lisp
 #+end_src
 
+*** 终端 (=eat=)
+**** 依赖
+:PROPERTIES:
+:header-args: :noweb-ref epkgs
+:END:
+#+begin_src nix
+  eat
+#+end_src
+**** 配置
+:PROPERTIES:
+:header-args: :noweb-ref ecfg
+:END:
+#+begin_src emacs-lisp
+  ;; For `eat-eshell-mode'.
+  (add-hook 'eshell-load-hook #'eat-eshell-mode)
+
+  ;; For `eat-eshell-visual-command-mode'.
+  (add-hook 'eshell-load-hook #'eat-eshell-visual-command-mode)
+#+end_src
 ** 编程与文档语言
 *** Nix
 **** 依赖

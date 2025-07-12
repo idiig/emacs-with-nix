@@ -983,6 +983,11 @@
 	      (consult
 	       yas-minor-mode))
 	    
+	    ;; For `eat-eshell-mode'.
+	    (add-hook 'eshell-load-hook #'eat-eshell-mode)
+	    
+	    ;; For `eat-eshell-visual-command-mode'.
+	    (add-hook 'eshell-load-hook #'eat-eshell-visual-command-mode)
 	    (idiig//setup-nix-lsp-bridge-server 
 	     "nix" 
 	     "nixd" 
@@ -1297,6 +1302,7 @@
             yasnippet-snippets
               consult-yasnippet
             
+            eat
             nix-mode
             auctex
               auctex-latexmk
