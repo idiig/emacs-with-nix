@@ -1942,9 +1942,13 @@ Snippet 用于快速插入模板
   (add-hook 'org-mode-hook 'idiig/run-prog-mode-hooks)
 #+end_src
 
-**** 函数与advice
-=org-insert-structure-template= 后选择 =s= (src block) 时自动提示插入代码块的语言。
+**** TODO 函数与advice
+=org-insert-structure-template= 后选择 =s= (src block) 时自动提示插入代码
+块的语言。
 
+更改这个函数：
+- 新增一个功能，如果输入的语言不在列表里，则把语言加入列表。但仅限于当前org文档
+- 新增一个功能，根据输入的语言更新推荐语言的排序。
 #+begin_src emacs-lisp
   (with-eval-after-load 'org
     (defun idiig/org-insert-structure-template-src-advice (orig-fun type)
