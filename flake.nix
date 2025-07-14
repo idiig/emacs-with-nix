@@ -985,7 +985,12 @@
 	    (use-package copilot
 	      :hook (prog-mode . copilot-mode)
 	      :config
-	      (define-key copilot-completion-map (kbd "<tab>") 'copilot-accept-completion))
+	      (define-key copilot-completion-map (kbd "<tab>") 'copilot-accept-completion)
+	      (add-to-list 'copilot-indentation-alist '(prog-mode 2))
+	      (add-to-list 'copilot-indentation-alist '(org-mode 2))
+	      (add-to-list 'copilot-indentation-alist '(text-mode 2))
+	      (add-to-list 'copilot-indentation-alist '(lisp-mode 2))
+	      (add-to-list 'copilot-indentation-alist '(emacs-lisp-mode 2)))
 	    
 	    ;; For `eat-eshell-mode'.
 	    (add-hook 'eshell-load-hook #'eat-eshell-mode)
