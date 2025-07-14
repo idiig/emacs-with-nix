@@ -982,6 +982,10 @@
 	      :after
 	      (consult
 	       yas-minor-mode))
+	    (use-package copilot
+	      :hook (prog-mode . copilot-mode)
+	      :config
+	      (define-key copilot-completion-map (kbd "<tab>") 'copilot-accept-completion))
 	    
 	    ;; For `eat-eshell-mode'.
 	    (add-hook 'eshell-load-hook #'eat-eshell-mode)
@@ -1306,6 +1310,7 @@
             # yasnippet
             yasnippet-snippets
               consult-yasnippet
+            copilot
             
             eat
             nix-mode

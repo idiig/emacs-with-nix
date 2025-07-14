@@ -1775,6 +1775,24 @@ Snippet 用于快速插入模板
      yas-minor-mode))
 #+end_src
 
+*** Copilot
+**** 依赖
+:PROPERTIES:
+:header-args: :noweb-ref epkgs
+:END:
+#+begin_src nix
+  copilot
+#+end_src
+**** 配置
+:PROPERTIES:
+:header-args: :noweb-ref ecfg
+:END:
+#+begin_src emacs-lisp
+  (use-package copilot
+    :hook (prog-mode . copilot-mode)
+    :config
+    (define-key copilot-completion-map (kbd "<tab>") 'copilot-accept-completion))
+#+end_src
 *** 基于 tresitter 的结构化编程
 **** 依赖
 :PROPERTIES:
