@@ -1004,7 +1004,11 @@
 	     nil)
 	    (use-package slime
 	      :init
-	      (setq inferior-lisp-program "${pkgs.sbcl}/bin/sbcl"))
+	      (setq inferior-lisp-program
+	    	(or (executable-find "sbcl")
+	    	    "${pkgs.sbcl}/bin/sbcl"))
+	      :config
+	      (slime-setup '(slime-fancy)))
 	    (add-hook 'eval-expression-minibuffer-setup 'idiig/run-prog-mode-hooks)
 	    (idiig//setup-nix-lsp-bridge-server 
 	     "clojure" 				; language name
