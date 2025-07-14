@@ -1556,7 +1556,7 @@ TODO: 把 evil-jump-item 换成别的函数。
   ;; TODO: 这里未来需要改成在每个语言的设定的节点push进来
   (defvar idiig/language-list
     '("emacs-lisp" "python" "ditaa" "plantuml" "shell" "nix"
-      "R" "haskell" "latex" "css" "js")
+      "R" "haskell" "latex" "css" "lisp")
     "支持的编程语言列表。")
 
   (defun idiig/run-prog-mode-hooks ()
@@ -1828,6 +1828,36 @@ Snippet 用于快速插入模板
 [[#lsp-bridge]]）。
 
 **** 配置
+*** Lisp
+**** RERL
+:PROPERTIES:
+:header-args: :noweb-ref epkgs
+:END:
+***** 依赖
+#+begin_src nix
+  slime
+    geiser                        # for scheme
+#+end_src
+**** 方言
+***** Elisp
+****** 配置
+:PROPERTIES:
+:header-args: :noweb-ref ecfg
+:END:
+- =M-:= 时的 eval expression minibuffer 的时候加入 prog mode。
+#+begin_src emacs-lisp
+  (add-hook 'eval-expression-minibuffer-setup 'idiig/run-prog-mode-hooks)
+#+end_src
+
+***** Clojure
+****** 依赖
+#+begin_src emacs-lisp :noweb-ref ecfg
+  (idiig//setup-nix-lsp-bridge-server 
+   "clojure" 				; language name
+   "clojure-lsp" 				; lsp name
+   "${pkgs.clojure-lsp}/bin"		; dependency nixpkg path
+   nil)					; other dependencies
+#+end_src
 
 *** Python
 **** 本体
@@ -1842,15 +1872,6 @@ Snippet 用于快速插入模板
 ***** 配置
 **** 虚拟环境
 *** R
-
-*** Elisp
-:PROPERTIES:
-:header-args: :noweb-ref ecfg
-:END:
-- =M-:= 时的 eval expression minibuffer 的时候加入 prog mode。
-#+begin_src emacs-lisp
-  (add-hook 'eval-expression-minibuffer-setup 'idiig/run-prog-mode-hooks)
-#+end_src
 
 *** Shell
 用 =bash= 作为默认 shell

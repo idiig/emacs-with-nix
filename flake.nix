@@ -913,7 +913,7 @@
 	    ;; TODO: 这里未来需要改成在每个语言的设定的节点push进来
 	    (defvar idiig/language-list
 	      '("emacs-lisp" "python" "ditaa" "plantuml" "shell" "nix"
-	        "R" "haskell" "latex" "css" "js")
+	        "R" "haskell" "latex" "css" "lisp")
 	      "支持的编程语言列表。")
 	    
 	    (defun idiig/run-prog-mode-hooks ()
@@ -993,12 +993,17 @@
 	     "nixd" 
 	     "${pkgs.nixd}/bin" 
 	     nil)
+	    (add-hook 'eval-expression-minibuffer-setup 'idiig/run-prog-mode-hooks)
+	    (idiig//setup-nix-lsp-bridge-server 
+	     "clojure" 				; language name
+	     "clojure-lsp" 				; lsp name
+	     "${pkgs.clojure-lsp}/bin"		; dependency nixpkg path
+	     nil)					; other dependencies
 	    (idiig//setup-nix-lsp-bridge-server 
 	     "python" 
 	     "basedpyright" 
 	     "${pkgs.basedpyright}/bin" 
 	     "${pkgs.stdenv.cc.cc.lib}/lib")
-	    (add-hook 'eval-expression-minibuffer-setup 'idiig/run-prog-mode-hooks)
 	    ;; (setq shell-command-switch "-ic")
 	    (setq-default explicit-shell-file-name "${pkgs.bashInteractive
 	    }/bin/bash")
@@ -1304,6 +1309,8 @@
             
             eat
             nix-mode
+            slime
+              geiser                        # for scheme
             auctex
               auctex-latexmk
             jsonian
