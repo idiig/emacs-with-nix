@@ -1002,6 +1002,9 @@
 	     "nixd" 
 	     "${pkgs.nixd}/bin" 
 	     nil)
+	    (use-package slime
+	      :init
+	      (setq inferior-lisp-program "${pkgs.sbcl}/bin/sbcl"))
 	    (add-hook 'eval-expression-minibuffer-setup 'idiig/run-prog-mode-hooks)
 	    (idiig//setup-nix-lsp-bridge-server 
 	     "clojure" 				; language name

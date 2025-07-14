@@ -1861,6 +1861,15 @@ Snippet 用于快速插入模板
   slime
     geiser                        # for scheme
 #+end_src
+***** 配置
+:PROPERTIES:
+:header-args: :noweb-ref ecfg
+:END:
+#+begin_src emacs-lisp
+  (use-package slime
+    :init
+    (setq inferior-lisp-program "${pkgs.sbcl}/bin/sbcl"))
+#+end_src
 **** 方言
 ***** Elisp
 ****** 配置
