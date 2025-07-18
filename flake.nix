@@ -992,7 +992,7 @@
 	      (add-to-list 'copilot-indentation-alist '(lisp-mode 2))
 	      (add-to-list 'copilot-indentation-alist '(emacs-lisp-mode 2))
 	    
-	      (setq copilot-max-char 50000))
+	      (setq copilot-max-char 99999999))
 	    
 	    ;; For `eat-eshell-mode'.
 	    (add-hook 'eshell-load-hook #'eat-eshell-mode)

@@ -1798,7 +1798,7 @@ Snippet 用于快速插入模板
     (add-to-list 'copilot-indentation-alist '(lisp-mode 2))
     (add-to-list 'copilot-indentation-alist '(emacs-lisp-mode 2))
 
-    (setq copilot-max-char 50000))
+    (setq copilot-max-char 99999999))
 #+end_src
 *** 基于 tresitter 的结构化编程
 **** 依赖
