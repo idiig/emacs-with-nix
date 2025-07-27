@@ -1868,13 +1868,13 @@ Snippet 用于快速插入模板
 :header-args: :noweb-ref ecfg
 :END:
 #+begin_src emacs-lisp
-    (use-package slime
-      :init
-      (setq inferior-lisp-program
-    	(or (executable-find "sbcl")
-    	    "${pkgs.sbcl}/bin/sbcl"))
-      :config
-      (slime-setup '(slime-fancy)))
+  (use-package slime
+    :init
+    (setq inferior-lisp-program
+  	(or (executable-find "sbcl")
+  	    "${pkgs.sbcl}/bin/sbcl"))
+    :config
+    (slime-setup '(slime-fancy)))
 #+end_src
 **** 方言
 ***** Elisp
