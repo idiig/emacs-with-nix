@@ -46,7 +46,7 @@ hook，config，自定义的函数。
 成flake.nix。接下去运行可以通过如下方式：
 ** 调试
 #+begin_src sh
-  nix run <path/to/this/config>
+  nix run <path/to/this/config> --impure
   source ~/.bashrc
   emacs
 #+end_src
@@ -54,7 +54,7 @@ hook，config，自定义的函数。
 *** 使用git
 #+begin_src sh
   git checkout <previous-commit>
-  nix run
+  nix run --impure
   source ~/.bashrc
   emacs
 #+end_src
@@ -68,6 +68,7 @@ hook，config，自定义的函数。
   # 使用特定锁文件版本
   nix run --recreate-lock-file --inputs-from ./flake.lock.backup
 #+end_src
+
 * 配置本体
 :PROPERTIES:
 :header-args: :tangle no
@@ -2375,6 +2376,30 @@ insert-state 时重新打开输入方式：
   	    (deactivate-input-method)))
 #+end_src
 
+** EAF
+EAF（Emacs Application Framework）是一个在 Emacs 中运行的应用框架，我
+偶尔使用这个框架来使用浏览器和 PDF 阅读器等应用。
+
+*** 依赖
+:PROPERTIES:
+:header-args: :noweb-ref epkgs
+:END:
+
+#+begin_src nix
+  (eaf.withApplications [ eaf-browser eaf-pdf-viewer ])
+#+end_src
+
+*** 配置
+:PROPERTIES:
+:header-args: :noweb-ref ecfg
+:END:
+
+#+begin_src emacs-lisp
+  (require 'eaf)
+  (require 'eaf-browser)
+  (require 'eaf-pdf-viewer)
+#+end_src
+
 ** 特殊扩展
 扩展主要针对不存在于 =nixpkgs= 中的包，这里我基本上使用了[[https://codeberg.org/heraplem/nix-emacs-extra/src/branch/emacs-application-framework/packages/eaf][这个链接的代
 码和方法]]，由于Nix水平有限，我在代码中增加了一些注释提示自己：
@@ -2465,7 +2490,7 @@ insert-state 时重新打开输入方式：
   ]
 #+end_src
 
-*** EAF
+*** COMMENT EAF
 EAF 是一个可编程扩展的框架，它自带一系列丰富的应用。
 **** 外部元
 eaf还没有在 =nixpkgs= 中被打包，所以需要自己打包依赖。
@@ -2586,7 +2611,6 @@ eaf还没有在 =nixpkgs= 中被打包，所以需要自己打包依赖。
   })
 #+end_src
 
-
 ***** eaf浏览器
 - 外部元链接
 #+begin_src nix :noweb-ref externals
@@ -2630,7 +2654,6 @@ eaf还没有在 =nixpkgs= 中被打包，所以需要自己打包依赖。
     '';
   })
 #+end_src
-
 
 ***** eaf阅读器
 - 外部元的链接

@@ -5,18 +5,7 @@
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
     flake-utils.url = "github:numtide/flake-utils";
     emacs-overlay.url = "github:nix-community/emacs-overlay";
-    eaf = {
-      url = "github:emacs-eaf/emacs-application-framework";
-      flake = false;
-    };
-    eaf-browser = {
-      url = "github:emacs-eaf/eaf-browser";
-      flake = false;
-    };
-    eaf-pdf-viewer = {
-      url = "github:emacs-eaf/eaf-pdf-viewer";
-      flake = false;
-    };
+    
   };
 
   outputs = inputs@{ self, nixpkgs, flake-utils, emacs-overlay, ... }:
@@ -1248,20 +1237,9 @@
 	    	  (lambda ()
 	    	    (setq the-late-input-method current-input-method)
 	    	    (deactivate-input-method)))
-	    ;; (defvar idiig/eaf-path (concat user-emacs-directory "site-lisp/emacs-application-framework"))
-	    ;; (add-to-list 'load-path idiig/eaf-path)
-	    ;; (setq eaf-python-command (concat idiig/eaf-path "/eaf/bin/python"))
-	    
 	    (require 'eaf)
 	    (require 'eaf-browser)
-	    ;; (require 'eaf-pdf-viewer)
-	    
-	    (setq eaf-webengine-default-zoom 2.0
-	          eaf-browse-blank-page-url "https://kagi.com"
-	          eaf-browser-auto-import-chrome-cookies nil   ; 非自动 cookies
-	          eaf-browser-enable-autofill t                ; 自动填充密码
-	          eaf-browser-enable-tampermonkey t            ; 使用油猴
-	          )
+	    (require 'eaf-pdf-viewer)
 	    '';
 
 		      # early-init 配置文件
@@ -1343,10 +1321,7 @@
             # aider
             meow
               meow-tree-sitter
-            eaf
-              eaf-browser
-              # (pkgs.crow-translate) ; not available for MacOS 
-              # eaf-pdf-viewer
+            (eaf.withApplications [ eaf-browser eaf-pdf-viewer ])
           ]);
           
 	      in {
