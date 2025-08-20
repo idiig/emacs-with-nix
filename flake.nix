@@ -1240,6 +1240,13 @@
 	    (require 'eaf)
 	    (require 'eaf-browser)
 	    (require 'eaf-pdf-viewer)
+	    
+	    (setq eaf-webengine-default-zoom 2.0
+	            eaf-browse-blank-page-url "https://www.kagi.com"
+	            eaf-browser-auto-import-chrome-cookies nil   ; 非自动 cookies
+	            eaf-browser-enable-autofill t                ; 自动填充密码
+	            eaf-browser-enable-tampermonkey t            ; 使用油猴
+	            )
 	    '';
 
 		      # early-init 配置文件
@@ -1354,7 +1361,7 @@
 		      sed -i \"\" '/^alias ne=/d' "$HOME/.bashrc"
 	      fi
 
-	      echo "alias ne='${emacsWithPackages}/bin/emacs --init-dir \"$EMACS_DIR\"'" >> "$HOME/.bashrc"
+	      echo "alias ne='QT_QUICK_BACKEND=software LIBGL_ALWAYS_SOFTWARE=1 ${emacsWithPackages}/bin/emacs --init-dir \"$EMACS_DIR\"'" >> "$HOME/.bashrc"
 
 	      # 提示用户手动 source 而不是直接执行，以避免 shell 继承问题
 	      echo "请手动运行 'source ~/.bashrc' 以使 alias 生效"
