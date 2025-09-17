@@ -1888,7 +1888,17 @@ Snippet 用于快速插入模板
 *** R
 
 *** Shell
-用 =bash= 作为默认 shell
+**** 依赖
+#+begin_src emacs-lisp :noweb-ref ecfg
+  (idiig//setup-nix-lsp-bridge-server 
+   "bash" 				; language name
+   "bash-language-server" 		; lsp name
+   "${pkgs.bash-language-server}/bin" 	; dependency nixpkg path
+   nil)					; other dependencies
+#+end_src
+
+**** 配置
+***** 用 =bash= 作为默认 shell
 #+begin_src emacs-lisp :noweb-ref ecfg
   ;; (setq shell-command-switch "-ic")
   (setq-default explicit-shell-file-name "${pkgs.bashInteractive
@@ -2308,7 +2318,8 @@ Snippet 用于快速插入模板
                       (let ((full-path (expand-file-name dir current-dir)))
                         (and (file-directory-p full-path) full-path)))
                     possible-dirs)
-          nil)))
+          ;; If none found, query user for directory using `read-directory-name`
+  	(read-directory-name "Select API keys directory: " current-dir nil t))))
 
   (defun idiig/setup-api-keys (&optional api-dir)
     "Set up API keys for Aider from directory containing API files.
@@ -2316,7 +2327,7 @@ Snippet 用于快速插入模板
   folder has 'api-key' or 'api-keys' folder and use it as default.
   Interactively prompts for the directory with smart default."
     (interactive)
-    (let* ((default-dir (or api-dir (idiig/get-default-api-dir)))
+    (let* ((default-dir (idiig/get-default-api-dir))
            (prompt (if (string= default-dir default-directory)
                        "Select API keys directory: "
                      (format "Select API keys directory (default: %s): " 
@@ -2353,6 +2364,7 @@ Snippet 用于快速插入模板
     (aidermacs-default-chat-mode 'architect)
     (aidermacs-default-model "sonnet"))
 #+end_src
+
 ** 模态编辑 (=meow=)
 *** 依赖
 :PROPERTIES:

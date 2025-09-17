@@ -1000,6 +1000,11 @@
 	     "basedpyright" 
 	     "${pkgs.basedpyright}/bin" 
 	     "${pkgs.stdenv.cc.cc.lib}/lib")
+	    (idiig//setup-nix-lsp-bridge-server 
+	     "bash" 				; language name
+	     "bash-language-server" 		; lsp name
+	     "${pkgs.bash-language-server}/bin" 	; dependency nixpkg path
+	     nil)					; other dependencies
 	    ;; (setq shell-command-switch "-ic")
 	    (setq-default explicit-shell-file-name "${pkgs.bashInteractive
 	    }/bin/bash")
@@ -1190,7 +1195,8 @@
 	                        (let ((full-path (expand-file-name dir current-dir)))
 	                          (and (file-directory-p full-path) full-path)))
 	                      possible-dirs)
-	            nil)))
+	            ;; If none found, query user for directory using `read-directory-name`
+	    	(read-directory-name "Select API keys directory: " current-dir nil t))))
 	    
 	    (defun idiig/setup-api-keys (&optional api-dir)
 	      "Set up API keys for Aider from directory containing API files.
@@ -1198,7 +1204,7 @@
 	    folder has 'api-key' or 'api-keys' folder and use it as default.
 	    Interactively prompts for the directory with smart default."
 	      (interactive)
-	      (let* ((default-dir (or api-dir (idiig/get-default-api-dir)))
+	      (let* ((default-dir (idiig/get-default-api-dir))
 	             (prompt (if (string= default-dir default-directory)
 	                         "Select API keys directory: "
 	                       (format "Select API keys directory (default: %s): " 
