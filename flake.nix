@@ -1023,6 +1023,10 @@
 	     "vscode-json-language-server" 
 	     "${pkgs.vscode-langservers-extracted}/bin" 
 	     nil)
+	    (use-package jsonian
+	      :after so-long
+	      :custom
+	      (jsonian-no-so-long-mode))
 	    (add-to-list 'exec-path "${pkgs.plantuml}/bin")
 	    (with-eval-after-load 'org
 	      (setq org-plantuml-jar-path "${pkgs.plantuml}/lib/plantuml.jar")
@@ -1234,6 +1238,10 @@
 	      :custom
 	      (aidermacs-default-chat-mode 'architect)
 	      (aidermacs-default-model "sonnet"))
+	    (use-package gemini-cli :ensure t
+	      :vc (:url "https://github.com/linchen2chris/gemini-cli.el" :rev :newest)
+	      :config (gemini-cli-mode)
+	      :bind-keymap ("C-c c" . gemini-cli-command-map)) ;; or your preferred key
 	    (use-package meow
 	      :init
 	      ;; https://github.com/meow-edit/meow/blob/master/KEYBINDING_QWERTY.org
