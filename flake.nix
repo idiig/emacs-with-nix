@@ -902,7 +902,7 @@
 	    ;; TODO: 这里未来需要改成在每个语言的设定的节点push进来
 	    (defvar idiig/language-list
 	      '("emacs-lisp" "python" "ditaa" "plantuml" "shell" "nix"
-	        "R" "haskell" "latex" "css" "lisp")
+	        "R" "haskell" "latex" "css" "lisp" "jq")
 	      "支持的编程语言列表。")
 	    
 	    (defun idiig/run-prog-mode-hooks ()
@@ -1418,13 +1418,13 @@
             nix-mode
             slime
               geiser                        # for scheme
+            jq-mode
             auctex
               auctex-latexmk
             jsonian
               json-mode
             plantuml-mode
             ob-nix
-              ob-jq
             org-bullets
             citeproc
             org-tree-slide
