@@ -1424,6 +1424,7 @@
               json-mode
             plantuml-mode
             ob-nix
+              ob-jq
             org-bullets
             citeproc
             org-tree-slide
