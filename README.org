@@ -1577,7 +1577,7 @@ TODO: 把 evil-jump-item 换成别的函数。
   ;; TODO: 这里未来需要改成在每个语言的设定的节点push进来
   (defvar idiig/language-list
     '("emacs-lisp" "python" "ditaa" "plantuml" "shell" "nix"
-      "R" "haskell" "latex" "css" "lisp" "jq")
+      "R" "haskell" "latex" "css" "lisp" "jq" "makefile")
     "支持的编程语言列表。")
 
   (defun idiig/run-prog-mode-hooks ()
