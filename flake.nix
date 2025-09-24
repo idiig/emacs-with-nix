@@ -902,7 +902,7 @@
 	    ;; TODO: 这里未来需要改成在每个语言的设定的节点push进来
 	    (defvar idiig/language-list
 	      '("emacs-lisp" "python" "ditaa" "plantuml" "shell" "nix"
-	        "R" "haskell" "latex" "css" "lisp" "jq" "makefile")
+	        "R" "haskell" "latex" "css" "lisp" "jq" "makefile" "go")
 	      "支持的编程语言列表。")
 	    
 	    (defun idiig/run-prog-mode-hooks ()
@@ -910,6 +910,9 @@
 	    如：(add-hook 'python-hook 'idiig/run-prog-mode-hooks)
 	    "
 	      (run-hooks 'prog-mode-hook))
+	    (defvar idiig/lsp-extra-paths nil
+	      "Emacs 侧已配置的 LSP 可执行目录清单。会被写入到项目的 .emacs-lsp-paths。")
+	    
 	    (defmacro idiig//setup-nix-lsp-bridge-server (language server-name executable-path &optional lib-path)
 	      "配置 Nix 环境下的 LSP 服务器。
 	    LANGUAGE 是语言名称，如 'python'。
@@ -922,7 +925,9 @@
 	         
 	         ;; 添加可执行文件路径到 exec-path
 	         ,(when executable-path
-	            `(add-to-list 'exec-path ,executable-path))
+	            `(progn
+	    	   (add-to-list 'exec-path ,executable-path)
+	    	   (add-to-list 'idiig/lsp-extra-paths ,executable-path)))
 	         
 	         ;; 添加库路径到 LD_LIBRARY_PATH
 	         ,(when lib-path
@@ -949,6 +954,26 @@
 	      (setenv "LD_LIBRARY_PATH" 
 	              (concat "${pkgs.stdenv.cc.cc.lib}/lib:" 
 	                      (or (getenv "LD_LIBRARY_PATH") ""))))
+	    (with-eval-after-load 'lsp-bridge
+	      (defun idiig/acm-prefer-lsp-all ()
+	        (when (bound-and-true-p lsp-bridge-mode)
+	          ;; 让 search 后端慢一点再来（避免覆盖 LSP）
+	          (when (boundp 'acm-backend-search-delay)
+	            (setq-local acm-backend-search-delay 0.8))  ;; 你可调成 0.6~1.0
+	    
+	          ;; 提高 LSP 优先级，降低 search 优先级（若有这些变量）
+	          (when (boundp 'acm-backend-lsp-priority)
+	            (setq-local acm-backend-lsp-priority 100))
+	          (when (boundp 'acm-backend-search-priority)
+	            (setq-local acm-backend-search-priority 0))
+	    
+	          ;; 可选：减少噪声（若存在这些开关）
+	          (when (boundp 'acm-enable-dabbrev)
+	            (setq-local acm-enable-dabbrev nil))          ; 关闭 dabbrev 后端
+	          (when (boundp 'acm-backend-search-candidates-min-length)
+	            (setq-local acm-backend-search-candidates-min-length 3)))) ; 至少 3 字符再搜
+	    
+	      (add-hook 'lsp-bridge-mode-hook #'idiig/acm-prefer-lsp-all))
 	    (use-package treesit-auto
 	      :custom
 	      (treesit-auto-install 'prompt)   ; 设置安装 tree-sitter 语法时提示用户确认
@@ -976,6 +1001,47 @@
 	      :defer t
 	      :config
 	      (direnv-mode))
+	    (require 'cl-lib)
+	    
+	    (defun idiig/project-root ()
+	      "返回当前 buffer 对应的项目根（优先含 .envrc，其次 .git）。"
+	      (or (locate-dominating-file default-directory ".envrc")
+	          (locate-dominating-file default-directory ".git")
+	          default-directory))
+	    
+	    (defun idiig/write-emacs-lsp-paths ()
+	      "将 `idiig/lsp-extra-paths` 写入项目根的 .emacs-lsp-paths。"
+	      (interactive)
+	      (when-let* ((root (idiig/project-root))
+	                  (file (expand-file-name ".emacs-lsp-paths" root)))
+	        (let* ((dirs (->> idiig/lsp-extra-paths
+	                          (seq-filter #'file-directory-p)
+	                          (delete-dups))))
+	          (when dirs
+	            (with-temp-file file
+	              (dolist (p dirs) (insert p "\n")))))))
+	    
+	    ;; lsp-bridge 项目根识别（避免偶发 no views）
+	    ;; direnv 集成：allow/refresh 前写清单；完成后自动重启 lsp-bridge
+	    (with-eval-after-load 'direnv
+	      ;; before：生成/更新 .emacs-lsp-paths，供 .envrc 读取
+	      (advice-add 'direnv-allow :before (lambda (&rest _) (idiig/write-emacs-lsp-paths)))
+	      (when (fboundp 'direnv-update-environment)
+	        (advice-add 'direnv-update-environment :before
+	                    (lambda (&rest _) (idiig/write-emacs-lsp-paths))))
+	    
+	      ;; after：环境就绪后，如有需要自动重启 lsp-bridge
+	      (defun idiig/direnv--restart-lsp-bridge (&rest _)
+	        (when (and (featurep 'lsp-bridge)
+	                   (fboundp 'lsp-bridge-restart-process)
+	                   (cl-some (lambda (buf)
+	                              (with-current-buffer buf
+	                                (bound-and-true-p lsp-bridge-mode)))
+	                            (buffer-list)))
+	          (lsp-bridge-restart-process)))
+	      (advice-add 'direnv-allow :after #'idiig/direnv--restart-lsp-bridge)
+	      (when (fboundp 'direnv-update-environment)
+	        (advice-add 'direnv-update-environment :after #'idiig/direnv--restart-lsp-bridge)))
 	    ;; For `eat-eshell-mode'.
 	    (add-hook 'eshell-load-hook #'eat-eshell-mode)
 	    
@@ -1009,6 +1075,21 @@
 	     "gopls" 
 	     "${pkgs.gopls}/bin" 
 	     nil)
+	    (defun idiig/go-prefer-lsp ()
+	      (when (derived-mode-p 'go-mode 'go-ts-mode)
+	        ;; 关闭文件内/跨缓冲词搜索后端（如果你的版本有这些开关）
+	        (when (boundp 'acm-enable-search-file-words)
+	          (setq-local acm-enable-search-file-words nil))
+	        (when (boundp 'acm-enable-dabbrev)
+	          (setq-local acm-enable-dabbrev nil))
+	        ;; 把搜索词的延迟调大，避免覆盖（若有这个变量）
+	        (when (boundp 'acm-backend-search-delay)
+	          (setq-local acm-backend-search-delay 0.8))
+	        ;; LSP 候选最短前缀更短一些（若有）
+	        (when (boundp 'acm-backend-lsp-candidate-min-length)
+	          (setq-local acm-backend-lsp-candidate-min-length 0))))
+	    (add-hook 'go-mode-hook #'idiig/go-prefer-lsp)
+	    (add-hook 'go-ts-mode-hook #'idiig/go-prefer-lsp)
 	    (idiig//setup-nix-lsp-bridge-server 
 	     "bash" 				; language name
 	     "bash-language-server" 		; lsp name
@@ -1436,6 +1517,7 @@
               json-mode
             plantuml-mode
             ob-nix
+              ob-go
             org-bullets
             citeproc
             org-tree-slide
