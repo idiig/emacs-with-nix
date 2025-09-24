@@ -972,6 +972,10 @@
 	      (consult
 	       yas-minor-mode))
 	    
+	    (use-package direnv
+	      :defer t
+	      :config
+	      (direnv-mode))
 	    ;; For `eat-eshell-mode'.
 	    (add-hook 'eshell-load-hook #'eat-eshell-mode)
 	    
@@ -1419,6 +1423,7 @@
             yasnippet-snippets
               consult-yasnippet
             
+            direnv
             eat
             nix-mode
             slime
