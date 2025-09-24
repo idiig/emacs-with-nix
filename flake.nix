@@ -1001,6 +1001,11 @@
 	     "${pkgs.basedpyright}/bin" 
 	     "${pkgs.stdenv.cc.cc.lib}/lib")
 	    (idiig//setup-nix-lsp-bridge-server 
+	     "go" 
+	     "gopls" 
+	     "${pkgs.gopls}/bin" 
+	     nil)
+	    (idiig//setup-nix-lsp-bridge-server 
 	     "bash" 				; language name
 	     "bash-language-server" 		; lsp name
 	     "${pkgs.bash-language-server}/bin" 	; dependency nixpkg path
@@ -1418,6 +1423,7 @@
             nix-mode
             slime
               geiser                        # for scheme
+            go-mode
             jq-mode
             auctex
               auctex-latexmk

@@ -1906,6 +1906,23 @@ Snippet 用于快速插入模板
 ***** 配置
 **** 虚拟环境
 *** R
+*** Go
+**** 本体
+***** 依赖
+Major mode:
+#+begin_src nix :noweb-ref epkgs
+  go-mode
+#+end_src
+
+LSP:
+#+begin_src emacs-lisp :noweb-ref ecfg
+  (idiig//setup-nix-lsp-bridge-server 
+   "go" 
+   "gopls" 
+   "${pkgs.gopls}/bin" 
+   nil)
+#+end_src
+***** 配置
 
 *** Shell
 **** 依赖
