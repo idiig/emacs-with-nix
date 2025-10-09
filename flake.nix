@@ -1328,10 +1328,11 @@
 	      :custom
 	      (aidermacs-default-chat-mode 'architect)
 	      (aidermacs-default-model "sonnet"))
-	    (use-package gemini-cli :ensure t
-	      :vc (:url "https://github.com/linchen2chris/gemini-cli.el" :rev :newest)
-	      :config (gemini-cli-mode)
-	      :bind-keymap ("C-c c" . gemini-cli-command-map)) ;; or your preferred key
+	    ;; Add to your init.el
+	    (use-package claude-code
+	      :init
+	      (add-to-list 'exec-path "${pkgs.claude-code}/bin")
+	      :bind (("C-c c" . claude-code-transient)))
 	    (use-package meow
 	      :init
 	      ;; https://github.com/meow-edit/meow/blob/master/KEYBINDING_QWERTY.org
@@ -1524,6 +1525,7 @@
             copilot
             gptel
             aidermacs
+            claude-code
             meow
               meow-tree-sitter
             (eaf.withApplications [ eaf-browser eaf-pdf-viewer ])

@@ -2524,13 +2524,18 @@ LSP:
     (aidermacs-default-model "sonnet"))
 #+end_src
 
-*** TODO AI-Client (=gemini-cli=)
-这里暂时没有用nix包管理器安装。在稳定后会加入。
+*** TODO AI-Client (=claude-code=)
+**** 依赖
+#+begin_src nix :noweb-ref epkgs
+  claude-code
+#+end_src
+**** 配置
 #+begin_src emacs-lisp :noweb-ref ecfg
-  (use-package gemini-cli :ensure t
-    :vc (:url "https://github.com/linchen2chris/gemini-cli.el" :rev :newest)
-    :config (gemini-cli-mode)
-    :bind-keymap ("C-c c" . gemini-cli-command-map)) ;; or your preferred key
+  ;; Add to your init.el
+  (use-package claude-code
+    :init
+    (add-to-list 'exec-path "${pkgs.claude-code}/bin")
+    :bind (("C-c c" . claude-code-transient)))
 #+end_src
 
 ** 模态编辑 (=meow=)
