@@ -46,7 +46,7 @@ hook，config，自定义的函数。
 成flake.nix。接下去运行可以通过如下方式：
 ** 调试
 #+begin_src sh
-  nix run <path/to/this/config> --impure
+  nix run <path/to/this/config> --impure --extra-experimental-features nix-command --extra-experimental-features flakes
   source ~/.bashrc
   emacs
 #+end_src
@@ -1854,6 +1854,8 @@ Snippet 用于快速插入模板
 #+begin_src emacs-lisp
   (use-package direnv
     :defer t
+    :init
+    (add-to-list 'exec-path "${pkgs.direnv}/bin")
     :config
     (direnv-mode))
 #+end_src

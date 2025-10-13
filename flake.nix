@@ -999,6 +999,8 @@
 	    
 	    (use-package direnv
 	      :defer t
+	      :init
+	      (add-to-list 'exec-path "${pkgs.direnv}/bin")
 	      :config
 	      (direnv-mode))
 	    (require 'cl-lib)
