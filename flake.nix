@@ -1073,6 +1073,11 @@
 	     "${pkgs.basedpyright}/bin" 
 	     "${pkgs.stdenv.cc.cc.lib}/lib")
 	    (idiig//setup-nix-lsp-bridge-server 
+	     "haskell"
+	     "hls" 
+	     "${pkgs.haskell-language-server}/bin" 
+	     nil)
+	    (idiig//setup-nix-lsp-bridge-server 
 	     "go" 
 	     "gopls" 
 	     "${pkgs.gopls}/bin" 
@@ -1512,6 +1517,7 @@
             nix-mode
             slime
               geiser                        # for scheme
+            haskell-mode
             go-mode
             jq-mode
             auctex

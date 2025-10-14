@@ -46,6 +46,7 @@ hook，config，自定义的函数。
 成flake.nix。接下去运行可以通过如下方式：
 ** 调试
 #+begin_src sh
+  export NIXPKGS_ALLOW_UNFREE=1
   nix run <path/to/this/config> --impure --extra-experimental-features nix-command --extra-experimental-features flakes
   source ~/.bashrc
   emacs
@@ -2002,6 +2003,21 @@ Snippet 用于快速插入模板
 #+end_src
 ***** 配置
 **** 虚拟环境
+*** Haskell
+**** 本体
+***** 依赖
+Major mode:
+#+begin_src nix :noweb-ref epkgs
+  haskell-mode
+#+end_src
+
+#+begin_src emacs-lisp :noweb-ref ecfg
+  (idiig//setup-nix-lsp-bridge-server 
+   "haskell"
+   "hls" 
+   "${pkgs.haskell-language-server}/bin" 
+   nil)
+#+end_src
 *** R
 *** Go
 **** 本体
@@ -2062,7 +2078,6 @@ LSP:
   jq-mode
 #+end_src
 *** Make
-
 *** TeX
 **** 依赖
 :PROPERTIES:
