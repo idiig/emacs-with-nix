@@ -389,12 +389,6 @@ emacs在打开新的窗口时，默认光标维持在原来的窗口。比如当
          nil nil
          "Use %k for further adjustment"))))
 
-  ;; ;; 如果需要移除 advice:
-  ;; (advice-remove 'enlarge-window #'idiig/window-adjust-advice)
-  ;; (advice-remove 'shrink-window #'idiig/window-adjust-advice)
-  ;; (advice-remove 'enlarge-window-horizontally #'idiig/window-adjust-advice)
-  ;; (advice-remove 'shrink-window-horizontally #'idiig/window-adjust-advice)
-
   ;; 添加 advice
   (advice-add 'enlarge-window :around #'idiig/window-adjust-advice)
   (advice-add 'shrink-window :around #'idiig/window-adjust-advice)
