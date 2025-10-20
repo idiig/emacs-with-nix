@@ -1228,6 +1228,126 @@
 	            (html csl)
 	            (odt  csl)
 	            (t    biblatex))))
+	    (with-eval-after-load 'oc
+	      (require 'oc-basic)
+	      (require 'subr-x)
+	    
+	      ;; 样式选择和参数输入
+	      (defun my/oc--ask-style-and-affixes ()
+	        "询问 citation 样式和附加参数。"
+	        (let* ((style-help "
+	    Style examples:
+	      cite/a/cf → Citeauthor – Aa, Bb, and Cc
+	      cite/a/c  → Citeauthor – Aa et al.
+	      cite/na   → citeyear – 2022
+	      cite/na/b → citeyearpar – (2022)
+	      cite/t/c  → Citet – Aa et al. (2022)
+	      cite/t/cf → citep* – Aa, Bb, and Cc (2022)
+	      cite/bc   → Cite – Aa et al. 2022
+	      cite/cf   → Citep – (Aa et al. 2022)")
+	               (presets '(("cite/a/cf" . ("a"  . "cf"))
+	                          ("cite/a/c"  . ("a"  . "c"))
+	                          ("cite/na"   . ("na" . ""))
+	                          ("cite/na/b" . ("na" . "b"))
+	                          ("cite/t/c"  . ("t"  . "c"))
+	                          ("cite/t/cf" . ("t"  . "cf"))
+	                          ("cite/bc"   . ("bc" . ""))
+	                          ("cite/cf"   . ("cf" . ""))))
+	               (choice (completing-read
+	                        "Citation style (? for help): "
+	                        (append (mapcar #'car presets) '("custom" "?"))
+	                        nil t nil nil "cite/cf"))
+	               (l "") (b ""))
+	          
+	          ;; 显示帮助
+	          (when (string= choice "?")
+	            (message "%s" style-help)
+	            (sit-for 3)
+	            (setq choice (completing-read "Citation style: "
+	                                          (append (mapcar #'car presets) '("custom"))
+	                                          nil t nil nil "cite/cf")))
+	          
+	          ;; 获取样式
+	          (if (not (string= choice "custom"))
+	              (let ((p (cdr (assoc choice presets))))
+	                (setq l (car p) b (cdr p)))
+	            (setq l (completing-read "Style (l): " '("a" "na" "t" "bc" "c" "cf" "") nil t ""))
+	            (setq b (completing-read "Variant (b): " '("b" "c" "cf" "") nil t "")))
+	          
+	          ;; 构建完整样式和参数
+	          (let* ((style (string-join (seq-filter (lambda (x) (and x (not (string-empty-p x))))
+	                                                 (list l b))
+	                                     "/"))
+	                 (prefix  (read-string "Prefix (optional): "))
+	                 (locator (read-string "Locator (optional): "))
+	                 (suffix  (read-string "Suffix (optional): ")))
+	            (list style prefix locator suffix))))
+	    
+	      ;; 修改插入点的 citation
+	      (defun my/oc--rewrite-cite-at-point (style prefix locator suffix)
+	        "在当前位置修改 citation 的样式和参数。"
+	        (save-excursion
+	          (let* ((ctx (org-element-context))
+	                 (cite (if (eq (org-element-type ctx) 'citation)
+	                           ctx
+	                         (when (re-search-backward "\\[cite\\>" (max (point-min) (- (point) 1000)) t)
+	                           (org-with-point-at (match-beginning 0)
+	                             (org-element-citation-parser))))))
+	            (when cite
+	              (let* ((beg (org-element-begin cite))
+	                     (end (org-element-end   cite))
+	                     (has-style (save-excursion (goto-char beg) (looking-at-p "\\[cite/")))
+	                     (has-colon (save-excursion
+	                                  (goto-char beg)
+	                                  (re-search-forward "\\[cite\\(?:/[^:]]+\\)?\\(:\\)" end t))))
+	                
+	                ;; 添加样式
+	                (when (and (not has-style) (not (string-empty-p style)))
+	                  (goto-char (+ beg 5))
+	                  (insert "/" style)
+	                  (setq end (+ end (length style) 1)))
+	                
+	                ;; 添加前缀
+	                (when (not (string-empty-p prefix))
+	                  (unless has-colon
+	                    (goto-char beg)
+	                    (re-search-forward "\\[cite\\(?:/[^:]]+\\)?" end t)
+	                    (insert ":")
+	                    (setq end (1+ end)))
+	                  (goto-char beg)
+	                  (re-search-forward ":" end t)
+	                  (insert prefix " ")
+	                  (setq end (+ end (length prefix) 1)))
+	                
+	                ;; 添加定位符
+	                (when (not (string-empty-p locator))
+	                  (goto-char beg)
+	                  (when (re-search-forward "@[^; \t\n]+" end t)
+	                    (insert " " locator)
+	                    (setq end (+ end (length locator) 1))))
+	                
+	                ;; 添加后缀
+	                (when (not (string-empty-p suffix))
+	                  (goto-char (1- end))
+	                  (insert " " suffix)))))))
+	    
+	      ;; 主 advice：插入后弹出二次对话
+	      (defun my/oc-insert-then-ask (orig-fn arg)
+	        "插入引用后询问样式和参数。"
+	        (let ((ret (funcall orig-fn arg)))
+	          (run-at-time
+	           0 nil
+	           (lambda ()
+	             (condition-case err
+	                 (pcase-let ((`(,style ,prefix ,locator ,suffix)
+	                              (my/oc--ask-style-and-affixes)))
+	                   (my/oc--rewrite-cite-at-point style prefix locator suffix))
+	               (quit  (message "Citation style canceled"))
+	               (error (message "Error setting citation style: %s" (error-message-string err))))))
+	          ret))
+	    
+	      ;; 挂载 advice
+	      (advice-add 'org-cite-insert :around #'my/oc-insert-then-ask))
 	    (use-package copilot
 	      :hook (prog-mode . copilot-mode)
 	      :config
