@@ -136,12 +136,6 @@
 	           nil nil
 	           "Use %k for further adjustment"))))
 	    
-	    ;; ;; 如果需要移除 advice:
-	    ;; (advice-remove 'enlarge-window #'idiig/window-adjust-advice)
-	    ;; (advice-remove 'shrink-window #'idiig/window-adjust-advice)
-	    ;; (advice-remove 'enlarge-window-horizontally #'idiig/window-adjust-advice)
-	    ;; (advice-remove 'shrink-window-horizontally #'idiig/window-adjust-advice)
-	    
 	    ;; 添加 advice
 	    (advice-add 'enlarge-window :around #'idiig/window-adjust-advice)
 	    (advice-add 'shrink-window :around #'idiig/window-adjust-advice)
@@ -1164,6 +1158,8 @@
 	      (setq org-support-shift-select 2))
 	    (with-eval-after-load 'org
 	      (setq org-display-remote-inline-images t))
+	    (with-eval-after-load 'org
+	      (setq org-export-allow-bind-keywords t))
 	    (with-eval-after-load 'org
 	     ;; Edit settings
 	     org-auto-align-tags nil                    ; 禁用标签自动对齐功能

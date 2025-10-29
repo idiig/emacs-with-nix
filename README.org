@@ -2237,6 +2237,11 @@ LSP:
   (with-eval-after-load 'org
     (setq org-display-remote-inline-images t))
 #+end_src
+***** 允许 =#+bind= 关键词
+#+begin_src emacs-lisp
+  (with-eval-after-load 'org
+    (setq org-export-allow-bind-keywords t))
+#+end_src
 **** 面貌
 ***** 基础美化
 :PROPERTIES:
