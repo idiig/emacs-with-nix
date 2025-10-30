@@ -49,7 +49,7 @@ hook，config，自定义的函数。
   export NIXPKGS_ALLOW_UNFREE=1
   nix run <path/to/this/config> --impure --extra-experimental-features nix-command --extra-experimental-features flakes
   source ~/.bashrc
-  emacs
+  ne
 #+end_src
 ** 版本回滚
 *** 使用git
