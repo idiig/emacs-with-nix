@@ -1180,7 +1180,12 @@
 	      (variable-pitch-mode 1)
 	      (visual-line-mode 1)
 	      
-	      (let ((my-font "Sarasa Mono SC")
+	      (set-face-attribute 'variable-pitch nil :family "Sarasa Gothic J" :height 120)
+	      (set-face-attribute 'fixed-pitch nil    :family "Sarasa Mono J"   :height 120)
+	      (buffer-face-set '(:family "Sarasa Gothic J" :height 1.1))
+	      (setq-local line-spacing 0.3)
+	      
+	      (let ((my-font "Sarasa Mono J")
 	    	(faces '((org-level-1 . 1.2)
 	                     (org-level-2 . 1.1)
 	                     (org-level-3 . 1.05)
