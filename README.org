@@ -2282,7 +2282,7 @@ LSP:
     (variable-pitch-mode 1)
     (visual-line-mode 1)
     
-    (set-face-attribute 'variable-pitch nil :family "Sarasa Gothic J" :height 120)
+    (set-face-attribute 'variable-pitch nil :family "Sarasa Gothic J" :height 150)
     (set-face-attribute 'fixed-pitch nil    :family "Sarasa Mono J"   :height 120)
     (buffer-face-set '(:family "Sarasa Gothic J" :height 1.1))
     (setq-local line-spacing 0.3)
