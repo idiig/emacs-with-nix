@@ -1219,7 +1219,7 @@
 	         :message "use latex and dvisvgm from nix-store."
 	         :image-input-type "dvi"
 	         :image-output-type "svg"
-	         :image-size-adjust (1.0 . 1.0)
+	         :image-size-adjust (0.8 . 1.0)
 	         :latex-compiler ("${pkgs.texliveMedium}/bin/latex -interaction nonstopmode -output-directory %o %f")
 	         :image-converter ("${pkgs.texliveMedium}/bin/dvisvgm %f --no-fonts --exact-bbox --scale=%S --output=%O")))
 	    
