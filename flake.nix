@@ -1180,7 +1180,7 @@
 	      (variable-pitch-mode 1)
 	      (visual-line-mode 1)
 	      
-	      (set-face-attribute 'variable-pitch nil :family "Sarasa Gothic J" :height 120)
+	      (set-face-attribute 'variable-pitch nil :family "Sarasa Gothic J" :height 150)
 	      (set-face-attribute 'fixed-pitch nil    :family "Sarasa Mono J"   :height 120)
 	      (buffer-face-set '(:family "Sarasa Gothic J" :height 1.1))
 	      (setq-local line-spacing 0.3)
@@ -1210,6 +1210,20 @@
 	        (diminish 'buffer-face-mode)))
 	    
 	    (add-hook 'org-mode-hook 'idiig/org-mode-face-settings)
+	    (with-eval-after-load 'org
+	      (add-to-list
+	       'org-preview-latex-process-alist
+	       '(idiig-dvisvgm
+	         :programs ("${pkgs.texliveMedium}/bin/latex" "${pkgs.texliveMedium}/bin/dvisvgm")
+	         :description "latex -> dvi -> svg (nix-store)"
+	         :message "use latex and dvisvgm from nix-store."
+	         :image-input-type "dvi"
+	         :image-output-type "svg"
+	         :image-size-adjust (1.0 . 1.0)
+	         :latex-compiler ("${pkgs.texliveMedium}/bin/latex -interaction nonstopmode -output-directory %o %f")
+	         :image-converter ("${pkgs.texliveMedium}/bin/dvisvgm %f --no-fonts --exact-bbox --scale=%S --output=%O")))
+	    
+	      (setq org-latex-create-formula-image-program 'idiig-dvisvgm))
 	    (use-package org-bullets
 	      :after org
 	      :hook (org-mode . org-bullets-mode)
