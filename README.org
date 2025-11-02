@@ -517,7 +517,6 @@ emacs在打开新的窗口时，默认光标维持在原来的窗口。比如当
     (setq dired-listing-switches "-alh")
     ;; Use single buffer for navigation
     (put 'dired-find-alternate-file 'disabled nil))
-    
 #+end_src
 **** 便利的光标首尾移动
 ***** 依赖
@@ -2834,12 +2833,10 @@ insert-state 时重新打开输入方式：
 ** 多线程丰富功能 (=EAF=)
 EAF（Emacs Application Framework）是一个在 Emacs 中运行的应用框架，我
 偶尔使用这个框架来使用浏览器和 PDF 阅读器等应用。
-
 *** 依赖
 :PROPERTIES:
 :header-args: :noweb-ref epkgs
 :END:
-
 #+begin_src nix
   (eaf.withApplications [ eaf-browser eaf-pdf-viewer ])
 #+end_src
@@ -2853,13 +2850,12 @@ EAF（Emacs Application Framework）是一个在 Emacs 中运行的应用框架�
   (require 'eaf)
   (require 'eaf-browser)
   (require 'eaf-pdf-viewer)
-
+  (add-to-list 'exec-path "${pkgs.wmctrl}/bin")
   (setq eaf-webengine-default-zoom 2.0
           eaf-browse-blank-page-url "https://www.kagi.com"
           eaf-browser-auto-import-chrome-cookies nil   ; 非自动 cookies
           eaf-browser-enable-autofill t                ; 自动填充密码
-          eaf-browser-enable-tampermonkey t            ; 使用油猴
-          )
+          eaf-browser-enable-tampermonkey t)	     ; 使用油猴
 #+end_src
 
 ** 特殊扩展

@@ -1577,13 +1577,12 @@
 	    (require 'eaf)
 	    (require 'eaf-browser)
 	    (require 'eaf-pdf-viewer)
-	    
+	    (add-to-list 'exec-path "${pkgs.wmctrl}/bin")
 	    (setq eaf-webengine-default-zoom 2.0
 	            eaf-browse-blank-page-url "https://www.kagi.com"
 	            eaf-browser-auto-import-chrome-cookies nil   ; 非自动 cookies
 	            eaf-browser-enable-autofill t                ; 自动填充密码
-	            eaf-browser-enable-tampermonkey t            ; 使用油猴
-	            )
+	            eaf-browser-enable-tampermonkey t)	     ; 使用油猴
 	    '';
 
 		      # early-init 配置文件
