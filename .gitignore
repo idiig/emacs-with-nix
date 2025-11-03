@@ -10,3 +10,4 @@ result/*
 /externals
 /api-keys/
 .aider*
+/.emacs-lsp-paths
