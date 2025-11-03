@@ -8,9 +8,8 @@
 			     "\\1\\2"
 			     text)))
 			
-			(unless (memq 'my-html-filter-nobreaks org-export-filter-plain-text-functions)
-			  (add-to-list 'org-export-filter-plain-text-functions
-				       'my-html-filter-nobreaks))
+			(add-to-list 'org-export-filter-plain-text-functions
+				       'my-html-filter-nobreaks)
 
 			(defun my-html-image-width (text backend info)
 			  "Set all images to width 100% in HTML export."
@@ -20,6 +19,5 @@
 			     "<img style=\"width:100%\" src=\"\\1\"" 
 			     text)))
 
-			(unless (memq 'my-html-image-width org-export-filter-final-output-functions)
-			  (add-to-list 'org-export-filter-final-output-functions
-				       'my-html-image-width)))))))
+			(add-to-list 'org-export-filter-final-output-functions
+				       'my-html-image-width))))))
