@@ -3,7 +3,7 @@
 "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
 <head>
-<!-- 2025-11-04 Tue 00:30 -->
+<!-- 2025-11-04 Tue 02:03 -->
 <meta http-equiv="Content-Type" content="text/html;charset=utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>基于 Nix Flakes 的 Emacs 配置</title>
@@ -28,190 +28,181 @@
 <h2>Table of Contents</h2>
 <div id="text-table-of-contents" role="doc-toc">
 <ul>
-<li><a href="#org24d9167">1. 本配置</a>
+<li><a href="#org87cef0b">1. 本配置</a>
 <ul>
-<li><a href="#orge484650">1.1. 目的</a></li>
-<li><a href="#org3b83589">1.2. 其他方式做不到的</a></li>
-<li><a href="#orgcaeadb5">1.3. 本配置的做法</a></li>
-<li><a href="#orgc0bd0a8">1.4. 目前的缺点</a></li>
+<li><a href="#orgdb20202">1.1. 目的</a></li>
+<li><a href="#org240a904">1.2. 其他方式做不到的</a></li>
+<li><a href="#org5a37991">1.3. 本配置的做法</a></li>
+<li><a href="#org6cb7a24">1.4. 目前的缺点</a></li>
 </ul>
 </li>
-<li><a href="#orge753e5f">2. 实现方式</a></li>
-<li><a href="#org0d1aa8b">3. 如何使用</a>
+<li><a href="#org2e8cad4">2. 实现方式</a></li>
+<li><a href="#org4a1635a">3. 如何使用</a>
 <ul>
-<li><a href="#org51a08fc">3.1. 调试</a></li>
-<li><a href="#org5efd695">3.2. 版本回滚</a>
+<li><a href="#org439c61f">3.1. 调试</a></li>
+<li><a href="#orgc733819">3.2. 版本回滚</a>
 <ul>
-<li><a href="#orgae27a76">3.2.1. 使用git</a></li>
-<li><a href="#org99dea77">3.2.2. 备份lock文件</a></li>
+<li><a href="#org69b6efe">3.2.1. 使用git</a></li>
+<li><a href="#orge0aa415">3.2.2. 备份lock文件</a></li>
 </ul>
 </li>
 </ul>
 </li>
-<li><a href="#org46e8b8d">4. 配置入口 (<code>flake.nix</code>)</a></li>
-<li><a href="#orgabc01c7">5. 配置本体</a>
+<li><a href="#orgea2f005">4. 配置入口 (<code>flake.nix</code>)</a></li>
+<li><a href="#org090a592">5. 配置本体</a>
 <ul>
-<li><a href="#org9128ecf">5.1. Early-init</a></li>
-<li><a href="#org485fa1c">5.2. Emacs基建</a>
+<li><a href="#org427eda8">5.1. Early-init</a></li>
+<li><a href="#org28fff55">5.2. Emacs基建</a>
 <ul>
-<li><a href="#orgc0859f8">5.2.1. Mac OS 键位设定</a></li>
-<li><a href="#org045bbd7">5.2.2. 包管理和其他基础</a></li>
-<li><a href="#org7f5bf5d">5.2.3. 更好的默认设置</a></li>
+<li><a href="#org6239f67">5.2.1. Mac OS 键位设定</a></li>
+<li><a href="#orge177349">5.2.2. 包管理和其他基础</a></li>
+<li><a href="#org47beaf3">5.2.3. 更好的默认设置</a></li>
 </ul>
 </li>
-<li><a href="#org7bdaeca">5.3. CJK字体</a>
+<li><a href="#org6f25f7a">5.3. CJK字体</a>
 <ul>
-<li><a href="#orgbed31cc">5.3.1. 依赖</a></li>
-<li><a href="#org824727c">5.3.2. 配置</a></li>
+<li><a href="#org1fae257">5.3.1. 依赖</a></li>
+<li><a href="#orgf436fce">5.3.2. 配置</a></li>
 </ul>
 </li>
-<li><a href="#orgb62c4e4">5.4. 日文</a>
+<li><a href="#org966bbc6">5.4. 日文</a>
 <ul>
-<li><a href="#orgac290e6">5.4.1. 输入法 (ddskk)</a></li>
-<li><a href="#org4af40a5">5.4.2. 检索（Migemo）</a></li>
+<li><a href="#orgfbb7fdc">5.4.1. 输入法 (ddskk)</a></li>
+<li><a href="#org0cee40a">5.4.2. 检索（Migemo）</a></li>
 </ul>
 </li>
-<li><a href="#orgbe77447">5.5. 中文</a>
+<li><a href="#org10f36e4">5.5. 中文</a>
 <ul>
-<li><a href="#org38d5057">5.5.1. 输入法和基于输入法的检索 (pyim)</a></li>
+<li><a href="#org83decea">5.5.1. 输入法和基于输入法的检索 (pyim)</a></li>
 </ul>
 </li>
-<li><a href="#orga3d8e53">5.6. Git (<code>magit</code>)</a>
+<li><a href="#org947df27">5.6. Git (<code>magit</code>)</a>
 <ul>
-<li><a href="#org9582a9c">5.6.1. 依赖</a></li>
-<li><a href="#org7a24555">5.6.2. 配置</a></li>
+<li><a href="#org9675fbd">5.6.1. 依赖</a></li>
+<li><a href="#org3ca0ec2">5.6.2. 配置</a></li>
 </ul>
 </li>
-<li><a href="#org03063f8">5.7. 文档写作</a>
+<li><a href="#orgda5335d">5.7. 文档写作</a>
 <ul>
-<li><a href="#org77dfd15">5.7.1. 文档后缀</a></li>
-<li><a href="#orge04d047">5.7.2. 文档状态折行</a></li>
-<li><a href="#org1d6ec12">5.7.3. 在选中区域的状态下 <code>C-w</code> 删除选中的区域</a></li>
-<li><a href="#orgfb16aa5">5.7.4. <code>C-M-\</code> 全局缩进</a></li>
-<li><a href="#orgf955779">5.7.5. <code>Shift-Ret</code> 下方插入空白行</a></li>
-<li><a href="#org5ef46cd">5.7.6. <code>M--</code> 匹配到括号</a></li>
-<li><a href="#org589708b">5.7.7. 点后插入空白</a></li>
+<li><a href="#orgb19906d">5.7.1. 文档后缀</a></li>
+<li><a href="#org993a978">5.7.2. 文档状态折行</a></li>
+<li><a href="#org2aa7e2c">5.7.3. 在选中区域的状态下 <code>C-w</code> 删除选中的区域</a></li>
+<li><a href="#orgec93a74">5.7.4. <code>C-M-\</code> 全局缩进</a></li>
+<li><a href="#orgf32a6fa">5.7.5. <code>Shift-Ret</code> 下方插入空白行</a></li>
+<li><a href="#orgcee81d7">5.7.6. <code>M--</code> 匹配到括号</a></li>
+<li><a href="#org4f86c67">5.7.7. 点后插入空白</a></li>
 </ul>
 </li>
-<li><a href="#org4afffa1">5.8. 编程工具</a>
+<li><a href="#org1091962">5.8. 编程工具</a>
 <ul>
-<li><a href="#org4b296ff">5.8.1. 我有可能使用的语言</a></li>
+<li><a href="#org7137073">5.8.1. 我有可能使用的语言</a></li>
 <li><a href="#lsp-bridge">5.8.2. 语言服务器 (<code>lsp-Bridge</code>)</a></li>
-<li><a href="#org1a6de8f">5.8.3. <span class="todo TODO">TODO</span> Treesitter</a></li>
-<li><a href="#org880941a">5.8.4. Snippet (<code>yasnippet</code>)</a></li>
-<li><a href="#org19f5c7a">5.8.5. 基于 tresitter 的结构化编程</a></li>
-<li><a href="#orgb7771d2">5.8.6. 自动化环境管理 (<code>direnv</code>)</a></li>
-<li><a href="#org65a0bf3">5.8.7. 终端 (<code>eat</code>)</a></li>
+<li><a href="#org2d4ab87">5.8.3. <span class="todo TODO">TODO</span> Treesitter</a></li>
+<li><a href="#orgcfad172">5.8.4. Snippet (<code>yasnippet</code>)</a></li>
+<li><a href="#org11ff8b4">5.8.5. 基于 tresitter 的结构化编程</a></li>
+<li><a href="#orgd68ece4">5.8.6. 自动化环境管理 (<code>direnv</code>)</a></li>
+<li><a href="#org7692796">5.8.7. 终端 (<code>eat</code>)</a></li>
 </ul>
 </li>
-<li><a href="#orgd16169c">5.9. 编程与文档语言</a>
+<li><a href="#org9859c3b">5.9. 编程与文档语言</a>
 <ul>
-<li><a href="#org444590e">5.9.1. Nix</a></li>
-<li><a href="#org417e953">5.9.2. Lisp</a></li>
-<li><a href="#org379df0c">5.9.3. Python</a></li>
-<li><a href="#orgc1d0cee">5.9.4. Haskell</a></li>
-<li><a href="#orgf9bdafa">5.9.5. R</a></li>
-<li><a href="#org4c16af1">5.9.6. Go</a></li>
-<li><a href="#org70205f9">5.9.7. Shell</a></li>
-<li><a href="#org72942fe">5.9.8. jq</a></li>
-<li><a href="#orgf247e8d">5.9.9. Make</a></li>
-<li><a href="#org01699a9">5.9.10. TeX</a></li>
-<li><a href="#org58ca5ee">5.9.11. Typst</a></li>
-<li><a href="#org24e7838">5.9.12. Markdown</a></li>
-<li><a href="#org52defa4">5.9.13. Quarto</a></li>
-<li><a href="#org8388d67">5.9.14. XML</a></li>
-<li><a href="#org10a42b4">5.9.15. JSON</a></li>
-<li><a href="#org3577c95">5.9.16. Web</a></li>
-<li><a href="#org6bf793a">5.9.17. Java</a></li>
-<li><a href="#orgd98781e">5.9.18. PlantUML</a></li>
-<li><a href="#org5f7db72">5.9.19. GraphViz</a></li>
+<li><a href="#org5bdb37a">5.9.1. Nix</a></li>
+<li><a href="#orgd58a2dc">5.9.2. Lisp</a></li>
+<li><a href="#org37018eb">5.9.3. Python</a></li>
+<li><a href="#org805a26f">5.9.4. Haskell</a></li>
+<li><a href="#org24185ab">5.9.5. R</a></li>
+<li><a href="#org14e3a26">5.9.6. Go</a></li>
+<li><a href="#orgd172290">5.9.7. Shell</a></li>
+<li><a href="#org6a49d6d">5.9.8. jq</a></li>
+<li><a href="#org5ca55c0">5.9.9. Make</a></li>
+<li><a href="#org66b1763">5.9.10. TeX</a></li>
+<li><a href="#org5bc426e">5.9.11. Typst</a></li>
+<li><a href="#org11b5bec">5.9.12. Markdown</a></li>
+<li><a href="#orgce1f1f6">5.9.13. Quarto</a></li>
+<li><a href="#org3746008">5.9.14. XML</a></li>
+<li><a href="#org0d7321f">5.9.15. JSON</a></li>
+<li><a href="#orge63066f">5.9.16. Web</a></li>
+<li><a href="#orgc0efa34">5.9.17. Java</a></li>
+<li><a href="#org276ae8b">5.9.18. PlantUML</a></li>
+<li><a href="#orgad530d6">5.9.19. GraphViz</a></li>
 </ul>
 </li>
-<li><a href="#orgfa10409">5.10. Org相关配置</a>
+<li><a href="#orgb2aad78">5.10. Org相关配置</a>
 <ul>
-<li><a href="#org14d2373">5.10.1. Org本体</a></li>
-<li><a href="#org8f3eab7">5.10.2. 文献引用处理器 (<code>citeproc-el</code>)</a></li>
-<li><a href="#org77e5849">5.10.3. 出入引用配置 (<code>oc</code>, <code>oc-basic</code>)</a></li>
-<li><a href="#org83c7cbd">5.10.4. 幻灯片 (<code>org-tree-slide</code>)</a></li>
+<li><a href="#orgf29628f">5.10.1. Org本体</a></li>
+<li><a href="#org2cbab1a">5.10.2. 文献引用处理器 (<code>citeproc-el</code>)</a></li>
+<li><a href="#org7942b11">5.10.3. 出入引用配置 (<code>oc</code>, <code>oc-basic</code>)</a></li>
+<li><a href="#org87c80dc">5.10.4. 幻灯片 (<code>org-present</code>)</a></li>
 </ul>
 </li>
-<li><a href="#orga5ad42c">5.11. AI辅助功能</a>
+<li><a href="#orgb3a30b2">5.11. AI辅助功能</a>
 <ul>
-<li><a href="#orge7b46e1">5.11.1. Copilot</a></li>
-<li><a href="#org7c298bd">5.11.2. Chatbot (<code>gptel)</code></a></li>
-<li><a href="#org5808aed">5.11.3. AI-pairing programming (<code>Aidermacs</code>)</a></li>
-<li><a href="#orgc8ab8bb">5.11.4. <span class="todo TODO">TODO</span> AI-Client (<code>claude-code</code>)</a></li>
+<li><a href="#orgb442a04">5.11.1. Copilot</a></li>
+<li><a href="#orgac02828">5.11.2. Chatbot (<code>gptel)</code></a></li>
+<li><a href="#org676a018">5.11.3. AI-pairing programming (<code>Aidermacs</code>)</a></li>
+<li><a href="#orgb67bf42">5.11.4. <span class="todo TODO">TODO</span> AI-Client (<code>claude-code</code>)</a></li>
 </ul>
 </li>
-<li><a href="#orgf77de6e">5.12. 模态编辑 (<code>meow</code>)</a>
+<li><a href="#org091a0de">5.12. 模态编辑 (<code>meow</code>)</a>
 <ul>
-<li><a href="#orgaef2d01">5.12.1. 依赖</a></li>
-<li><a href="#org551c9c9">5.12.2. 配置</a></li>
+<li><a href="#org07c8a33">5.12.1. 依赖</a></li>
+<li><a href="#orgc6e1886">5.12.2. 配置</a></li>
 </ul>
 </li>
-<li><a href="#org68fe682">5.13. 多线程丰富功能 (<code>EAF</code>)</a>
+<li><a href="#org10853f9">5.13. 多线程丰富功能 (<code>EAF</code>)</a>
 <ul>
-<li><a href="#org1b29dd3">5.13.1. 依赖</a></li>
-<li><a href="#orge3e70ad">5.13.2. 配置</a></li>
+<li><a href="#org1fabbd5">5.13.1. 依赖</a></li>
+<li><a href="#org7527fcf">5.13.2. 配置</a></li>
 </ul>
 </li>
-<li><a href="#org84ce517">5.14. 特殊扩展</a></li>
+<li><a href="#org4c23f4b">5.14. 特殊扩展</a></li>
 </ul>
 </li>
 </ul>
 </div>
 </div>
-<div id="outline-container-org24d9167" class="outline-2">
-<h2 id="org24d9167"><span class="section-number-2">1.</span> 本配置</h2>
+<div id="outline-container-org87cef0b" class="outline-2">
+<h2 id="org87cef0b"><span class="section-number-2">1.</span> 本配置</h2>
 <div class="outline-text-2" id="text-1">
 </div>
-<div id="outline-container-orge484650" class="outline-3">
-<h3 id="orge484650"><span class="section-number-3">1.1.</span> 目的</h3>
+<div id="outline-container-orgdb20202" class="outline-3">
+<h3 id="orgdb20202"><span class="section-number-3">1.1.</span> 目的</h3>
 <div class="outline-text-3" id="text-1-1">
 <p>
-这份配置文件的特色是使用 Nix Flakes 同时管理 emacs 的包和 emacs 在使用
-过程中会调用的外部程序。使用这个方法的主要目的是有以下理由：
+这份配置文件的特色是使用 Nix Flakes 同时管理 emacs 的包和 emacs 在使用过程中会调用的外部程序。使用这个方法的主要目的是有以下理由：
 </p>
 <dl class="org-dl">
 <dt>同时协同 emacs 插件和其依赖的外部工具</dt><dd>emacs 内置的包管理器无法管理系统级别工具，比如用于检索的
-<code>consult-ripgrep</code> 会寻找可运行的 <code>ripgrep</code> 调用。这样我需要脱离 elisp 的
-设定文件去下载这个外部工具。还有很多编程语言也有这个问题。我的习惯是
-希望针对特定的项目文件夹定制所需的环境（比如使用 nix 和
-.dir-locals.el）。但是，类似于语言服务器这类本质与项目无关，但与我的
-编辑环境有关的设定，我倾向于使用与项目无关的环境。</dd>
+<code>consult-ripgrep</code> 会寻找可运行的 <code>ripgrep</code> 调用。这样我需要脱离 elisp 的设定文件去下载这个外部工具。还有很多编程语言也有这个问题。我的习惯是希望针对特定的项目文件夹定制所需的环境（比如使用 nix 和.dir-locals.el）。但是，类似于语言服务器这类本质与项目无关，但与我的编辑环境有关的设定，我倾向于使用与项目无关的环境。</dd>
 </dl>
 </div>
 </div>
-<div id="outline-container-org3b83589" class="outline-3">
-<h3 id="org3b83589"><span class="section-number-3">1.2.</span> 其他方式做不到的</h3>
+<div id="outline-container-org240a904" class="outline-3">
+<h3 id="org240a904"><span class="section-number-3">1.2.</span> 其他方式做不到的</h3>
 <div class="outline-text-3" id="text-1-2">
 <p>
 目前不依赖 emacs 的其他包管理工具的其他方式也有一些：
 </p>
 <dl class="org-dl">
-<dt>git 子模块</dt><dd>这种方式可以管理 emacs 包，而且可以灵活的更新和回滚版本。但是这个方
-法也同样不方便整合系统级别的依赖。</dd>
-<dt><code>twist.nix</code> 等基于 nix 的方法</dt><dd>在 nix 文件里写配置的话，确实可以使用 <code>${pkgs.xxx}</code> 的方式使用系统工具
-避免，在配置文件外单独下载。但完全使用 nix 的话，写配置的方式更新快，
-个人希望尽可能使用 elisp 的方式写配置。</dd>
+<dt>git 子模块</dt><dd>这种方式可以管理 emacs 包，而且可以灵活的更新和回滚版本。但是这个方法也同样不方便整合系统级别的依赖。</dd>
+<dt><code>twist.nix</code> 等基于 nix 的方法</dt><dd>在 nix 文件里写配置的话，确实可以使用 <code>${pkgs.xxx}</code> 的方式使用系统工具避免，在配置文件外单独下载。但完全使用 nix 的话，写配置的方式更新快，个人希望尽可能使用 elisp 的方式写配置。</dd>
 </dl>
 </div>
 </div>
-<div id="outline-container-orgcaeadb5" class="outline-3">
-<h3 id="orgcaeadb5"><span class="section-number-3">1.3.</span> 本配置的做法</h3>
+<div id="outline-container-org5a37991" class="outline-3">
+<h3 id="org5a37991"><span class="section-number-3">1.3.</span> 本配置的做法</h3>
 <div class="outline-text-3" id="text-1-3">
 <p>
 这份配置的解决法如下：
 </p>
 <ul class="org-ul">
-<li>通过 org-babel 同时写 nix 和 elisp。前者用于版本，emacs 包，依赖的系
-统工具的管理，后者用于 emacs 本身的配置的管理。</li>
+<li>通过 org-babel 同时写 nix 和 elisp。前者用于版本，emacs 包，依赖的系统工具的管理，后者用于 emacs 本身的配置的管理。</li>
 <li>可以在 elisp 中用 <code>$pkgs.git</code> 的方式直接引用Nix的包。</li>
 </ul>
 </div>
 </div>
-<div id="outline-container-orgc0bd0a8" class="outline-3">
-<h3 id="orgc0bd0a8"><span class="section-number-3">1.4.</span> 目前的缺点</h3>
+<div id="outline-container-org6cb7a24" class="outline-3">
+<h3 id="org6cb7a24"><span class="section-number-3">1.4.</span> 目前的缺点</h3>
 <div class="outline-text-3" id="text-1-4">
 <p>
 目前使用下，这个配置方式也有一些缺点：
@@ -224,13 +215,11 @@
 </div>
 </div>
 </div>
-<div id="outline-container-orge753e5f" class="outline-2">
-<h2 id="orge753e5f"><span class="section-number-2">2.</span> 实现方式</h2>
+<div id="outline-container-org2e8cad4" class="outline-2">
+<h2 id="org2e8cad4"><span class="section-number-2">2.</span> 实现方式</h2>
 <div class="outline-text-2" id="text-2">
 <p>
-下面以配置 <code>Magit</code> 为例说明这个配置的方法。这里和大多数的配置一样我们把
-整体目的一致的包放在一个集群实现。每个集群主要分成两个子节点，一个用于
-安装包和依赖项，另一个用于配置包本身。
+下面以配置 <code>Magit</code> 为例说明这个配置的方法。这里和大多数的配置一样我们把整体目的一致的包放在一个集群实现。每个集群主要分成两个子节点，一个用于安装包和依赖项，另一个用于配置包本身。
 </p>
 
 <p>
@@ -240,24 +229,21 @@ emacs 外部依赖（系统工具如 <code>git</code> ）。然后从 <code>epkg
 </p>
 
 <p>
-这里稍微多做一些解释。在配置节里面，我利用了org-babel的一些文学编程特
-性。首先我们在一个入口代码块中使用了 <code>:noweb=yes</code> <sup><a id="fnr.lit-prog" class="footref" href="#fn.lit-prog" role="doc-backlink">1</a></sup>。然后在
-后面的代码块中我们使用 <code>:noweb-ref</code> 参照入口代码块，最后后续的这些代码块
-都会在 <code>org-babel-tangle</code> (<code>C-c C-v C-t</code>) 时合并到这个入口代码块中输出为
+这里稍微多做一些解释。在配置节里面，我利用了org-babel的一些文学编程特性。首先我们在一个入口代码块中使用了 <code>:noweb=yes</code> <sup><a id="fnr.lit-prog" class="footref" href="#fn.lit-prog" role="doc-backlink">1</a></sup>。然后在后面的代码块中我们使用 <code>:noweb-ref</code> 参照入口代码块，最后后续的这些代码块都会在 <code>org-babel-tangle</code> (<code>C-c C-v C-t</code>) 时合并到这个入口代码块中输出为
 flake.nix。
 </p>
 </div>
 </div>
-<div id="outline-container-org0d1aa8b" class="outline-2">
-<h2 id="org0d1aa8b"><span class="section-number-2">3.</span> 如何使用</h2>
+<div id="outline-container-org4a1635a" class="outline-2">
+<h2 id="org4a1635a"><span class="section-number-2">3.</span> 如何使用</h2>
 <div class="outline-text-2" id="text-3">
 <p>
 用emacs打开本文档， <code>M-x org-babel-tangle</code> 或使用快捷键 <code>C-c C-v t</code> 生成
 flake.nix。接下去运行可以通过在终端运行下面进行调试和版本回滚：
 </p>
 </div>
-<div id="outline-container-org51a08fc" class="outline-3">
-<h3 id="org51a08fc"><span class="section-number-3">3.1.</span> 调试</h3>
+<div id="outline-container-org439c61f" class="outline-3">
+<h3 id="org439c61f"><span class="section-number-3">3.1.</span> 调试</h3>
 <div class="outline-text-3" id="text-3-1">
 <div class="org-src-container">
 <pre class="src src-sh">export NIXPKGS_ALLOW_UNFREE=1	# allow unfree packages
@@ -271,12 +257,12 @@ ne			     # starts emacs with the new configuration
 </div>
 </div>
 </div>
-<div id="outline-container-org5efd695" class="outline-3">
-<h3 id="org5efd695"><span class="section-number-3">3.2.</span> 版本回滚</h3>
+<div id="outline-container-orgc733819" class="outline-3">
+<h3 id="orgc733819"><span class="section-number-3">3.2.</span> 版本回滚</h3>
 <div class="outline-text-3" id="text-3-2">
 </div>
-<div id="outline-container-orgae27a76" class="outline-4">
-<h4 id="orgae27a76"><span class="section-number-4">3.2.1.</span> 使用git</h4>
+<div id="outline-container-org69b6efe" class="outline-4">
+<h4 id="org69b6efe"><span class="section-number-4">3.2.1.</span> 使用git</h4>
 <div class="outline-text-4" id="text-3-2-1">
 <div class="org-src-container">
 <pre class="src src-sh">git checkout &lt;previous-commit&gt;
@@ -290,8 +276,8 @@ ne			     # starts emacs with the new configuration
 </div>
 </div>
 </div>
-<div id="outline-container-org99dea77" class="outline-4">
-<h4 id="org99dea77"><span class="section-number-4">3.2.2.</span> 备份lock文件</h4>
+<div id="outline-container-orge0aa415" class="outline-4">
+<h4 id="orge0aa415"><span class="section-number-4">3.2.2.</span> 备份lock文件</h4>
 <div class="outline-text-4" id="text-3-2-2">
 <div class="org-src-container">
 <pre class="src src-sh">nix flake metadata		# check flake metadata
@@ -303,8 +289,8 @@ nix run --recreate-lock-file --inputs-from ./flake.lock.backup # recreate lock f
 </div>
 </div>
 </div>
-<div id="outline-container-org46e8b8d" class="outline-2">
-<h2 id="org46e8b8d"><span class="section-number-2">4.</span> 配置入口 (<code>flake.nix</code>)</h2>
+<div id="outline-container-orgea2f005" class="outline-2">
+<h2 id="orgea2f005"><span class="section-number-2">4.</span> 配置入口 (<code>flake.nix</code>)</h2>
 <div class="outline-text-2" id="text-4">
 <p>
 包的安装基于下面的 <code>flake.nix</code> 。可以看到这里使用了几个占位符：
@@ -1447,15 +1433,6 @@ nix run --recreate-lock-file --inputs-from ./flake.lock.backup # recreate lock f
               (setq org-plantuml-exec-mode 'plantuml))
             (add-to-list 'exec-path "${pkgs.graphviz}/bin")
             (add-hook 'org-mode-hook 'idiig/run-prog-mode-hooks)
-            (with-eval-after-load 'org
-              (defun idiig/org-insert-structure-template-src-advice (orig-fun type)
-                "Advice for org-insert-structure-template to handle src blocks."
-                (if (string= type "src")  ; 判断条件为 "src"
-                (let ((selected-type (ido-completing-read "Source code type: " idiig/language-list)))
-                  (funcall orig-fun (format "src %s" selected-type)))
-                  (funcall orig-fun type)))
-
-              (advice-add 'org-insert-structure-template :around #'idiig/org-insert-structure-template-src-advice))
             (defun idiig/load-org-babel-languages ()
               "根据 `idiig/language-list` 启用 `org-babel` 语言。"
               (let ((languages '()))
@@ -1475,7 +1452,23 @@ nix run --recreate-lock-file --inputs-from ./flake.lock.backup # recreate lock f
 
             ;; 特殊
             (setq org-babel-shell-command (executable-find "bash"))
+            (with-eval-after-load 'org
+              (defun idiig/org-insert-structure-template-src-advice (orig-fun type)
+                "Advice for org-insert-structure-template to handle src blocks."
+                (if (string= type "src")  ; 判断条件为 "src"
+                (let ((selected-type (ido-completing-read "Source code type: " idiig/language-list)))
+                  (funcall orig-fun (format "src %s" selected-type)))
+                  (funcall orig-fun type)))
 
+              (advice-add 'org-insert-structure-template :around #'idiig/org-insert-structure-template-src-advice))
+            (with-eval-after-load 'org
+              (setq org-startup-with-inline-images t) ; 启动时显示图片
+              (setq org-startup-with-latex-preview t) ; 启动时显示 LaTeX 公式
+              (add-hook 'org-mode-hook
+                        (lambda ()
+                          (org-overview)		; 显示所有顶层节点
+                      (org-show-entry)		; 显示当前节点内容
+                          (org-show-children))))	; 显示所有子节点但不展开
             (with-eval-after-load 'org
               (setq org-support-shift-select 2))
             (with-eval-after-load 'org
@@ -1484,31 +1477,48 @@ nix run --recreate-lock-file --inputs-from ./flake.lock.backup # recreate lock f
               (setq org-export-allow-bind-keywords t))
             (with-eval-after-load 'org
              ;; Edit settings
-             org-auto-align-tags nil                    ; 禁用标签自动对齐功能
-             org-tags-column 0                          ; 标签紧贴标题文本，不右对齐
-             org-catch-invisible-edits 'show-and-error  ; 编辑折叠内容时显示并报错提醒
-             org-special-ctrl-a/e t                     ; 增强 C-a/C-e，先跳到内容开始/结束，再跳到行首/尾
-             org-insert-heading-respect-content t       ; 插入标题时考虑内容结构，在内容后插入
+             (setq org-auto-align-tags nil		; 禁用标签自动对齐功能
+                   org-tags-column 0		; 标签紧贴标题文本，不右对齐
+                   org-catch-invisible-edits 'show-and-error  ; 编辑折叠内容时显示并报错提醒
+                   org-special-ctrl-a/e t ; 增强 C-a/C-e，先跳到内容开始/结束，再跳到行首/尾
+                   org-insert-heading-respect-content t ; 插入标题时考虑内容结构，在内容后插入
 
-             ;; Org styling, hide markup etc.
-             org-hide-emphasis-markers t                ; 隐藏强调标记符号 (*粗体* 显示为 粗体)
-             org-pretty-entities t)                     ; 美化显示实体字符 (\alpha 显示为 α)
+                   ;; Org styling, hide markup etc.
+                   org-hide-emphasis-markers t ; 隐藏强调标记符号 (*粗体* 显示为 粗体)
+                   org-pretty-entities t))	  ; 美化显示实体字符 (\alpha 显示为 α)
             (defun idiig/org-mode-face-settings ()
               "Set custom face attributes for Org mode headings in current buffer only."
 
-              (auto-fill-mode 0)
-              (require 'org-indent)
-              (org-indent-mode)
-              (variable-pitch-mode 1)
-              (visual-line-mode 1)
+              (auto-fill-mode 0)			; Disable auto-fill mode
+              (require 'org-indent)			; Ensure org-indent is loaded
+              (org-indent-mode)			; Enable org-indent mode
+              (variable-pitch-mode 1)		; Enable variable-pitch mode
+              (visual-line-mode 1)			; Enable visual-line mode for soft wrapping
 
-              (set-face-attribute 'variable-pitch nil :family "Sarasa Gothic J" :height 150)
-              (set-face-attribute 'fixed-pitch nil    :family "Sarasa Mono J"   :height 120)
-              (buffer-face-set '(:family "Sarasa Gothic J" :height 1.1))
-              (setq-local line-spacing 0.3)
+              (defvar idiig/fixed-width-font "Sarasa Mono J"
+                "The font to use for monospaced (fixed width) text.")
 
-              (let ((my-font "Sarasa Mono J")
-                (faces '((org-level-1 . 1.2)
+              (defvar idiig/variable-width-font "Sarasa Gothic J"
+                "The font to use for variable-pitch (document) text.")
+
+              (set-face-attribute 'default nil
+                              :font idiig/fixed-width-font
+                              :weight 'regular
+                              :height 160)
+              (set-face-attribute 'fixed-pitch nil
+                              :font idiig/fixed-width-font
+                              :weight 'regular
+                              :height 170)
+              (set-face-attribute 'variable-pitch nil
+                              :font idiig/variable-width-font
+                              :weight 'regular
+                              :height 1.3)
+              (buffer-face-set `(:family ,idiig/fixed-width-font
+                                     :height 1.1)) ; Set buffer face
+
+              (setq-local line-spacing 0.3)		; Set line spacing
+
+              (let ((faces '((org-level-1 . 1.2)
                              (org-level-2 . 1.1)
                              (org-level-3 . 1.05)
                              (org-level-4 . 1.0)
@@ -1517,15 +1527,23 @@ nix run --recreate-lock-file --inputs-from ./flake.lock.backup # recreate lock f
                              (org-level-7 . 1.1)
                              (org-level-8 . 1.1))))
                 (dolist (face faces)
-                  (face-remap-add-relative (car face) :family my-font :weight 'regular :height (cdr face))))
+                  `(face-remap-add-relative (car face)
+                                       :family ,idiig/variable-width-font
+                                       :weight 'regular
+                                       :height (cdr face))))
 
+              ;; Make sure certain org faces use the fixed-pitch face when variable-pitch-mode is on
               (set-face-attribute 'org-block nil :foreground nil :inherit 'fixed-pitch)
-              (set-face-attribute 'org-code nil   :inherit '(shadow fixed-pitch))
-              (set-face-attribute 'org-indent nil :inherit '(org-hide fixed-pitch))
+              (set-face-attribute 'org-table nil :inherit 'fixed-pitch)
+              (set-face-attribute 'org-formula nil :inherit 'fixed-pitch)
+              (set-face-attribute 'org-code nil :inherit '(shadow fixed-pitch))
               (set-face-attribute 'org-verbatim nil :inherit '(shadow fixed-pitch))
               (set-face-attribute 'org-special-keyword nil :inherit '(font-lock-comment-face fixed-pitch))
               (set-face-attribute 'org-meta-line nil :inherit '(font-lock-comment-face fixed-pitch))
               (set-face-attribute 'org-checkbox nil :inherit 'fixed-pitch)
+
+              ;; Make the document title a bit bigger
+              (set-face-attribute 'org-document-title nil :font idiig/variable-width-font :weight 'bold :height 1.3)
 
               (with-eval-after-load 'diminish
                 (diminish 'org-indent-mode)
@@ -1985,7 +2003,7 @@ nix run --recreate-lock-file --inputs-from ./flake.lock.backup # recreate lock f
               ob-go
             org-bullets
             citeproc
-            org-tree-slide
+            org-present
             copilot
             gptel
             aidermacs
@@ -2037,12 +2055,12 @@ nix run --recreate-lock-file --inputs-from ./flake.lock.backup # recreate lock f
 </div>
 </div>
 </div>
-<div id="outline-container-orgabc01c7" class="outline-2">
-<h2 id="orgabc01c7"><span class="section-number-2">5.</span> 配置本体</h2>
+<div id="outline-container-org090a592" class="outline-2">
+<h2 id="org090a592"><span class="section-number-2">5.</span> 配置本体</h2>
 <div class="outline-text-2" id="text-5">
 </div>
-<div id="outline-container-org9128ecf" class="outline-3">
-<h3 id="org9128ecf"><span class="section-number-3">5.1.</span> Early-init</h3>
+<div id="outline-container-org427eda8" class="outline-3">
+<h3 id="org427eda8"><span class="section-number-3">5.1.</span> Early-init</h3>
 <div class="outline-text-3" id="text-5-1">
 <div class="org-src-container">
 <pre class="src src-emacs-lisp">;; 增加 GC 阈值，加快启动
@@ -2064,12 +2082,12 @@ nix run --recreate-lock-file --inputs-from ./flake.lock.backup # recreate lock f
 </div>
 </div>
 </div>
-<div id="outline-container-org485fa1c" class="outline-3">
-<h3 id="org485fa1c"><span class="section-number-3">5.2.</span> Emacs基建</h3>
+<div id="outline-container-org28fff55" class="outline-3">
+<h3 id="org28fff55"><span class="section-number-3">5.2.</span> Emacs基建</h3>
 <div class="outline-text-3" id="text-5-2">
 </div>
-<div id="outline-container-orgc0859f8" class="outline-4">
-<h4 id="orgc0859f8"><span class="section-number-4">5.2.1.</span> Mac OS 键位设定</h4>
+<div id="outline-container-org6239f67" class="outline-4">
+<h4 id="org6239f67"><span class="section-number-4">5.2.1.</span> Mac OS 键位设定</h4>
 <div class="outline-text-4" id="text-5-2-1">
 <div class="org-src-container">
 <pre class="src src-emacs-lisp">;; 在mac中使用Command key作为meta
@@ -2084,20 +2102,18 @@ nix run --recreate-lock-file --inputs-from ./flake.lock.backup # recreate lock f
 </div>
 </div>
 </div>
-<div id="outline-container-org045bbd7" class="outline-4">
-<h4 id="org045bbd7"><span class="section-number-4">5.2.2.</span> 包管理和其他基础</h4>
+<div id="outline-container-orge177349" class="outline-4">
+<h4 id="orge177349"><span class="section-number-4">5.2.2.</span> 包管理和其他基础</h4>
 <div class="outline-text-4" id="text-5-2-2">
 <p>
 这里我考虑了到底是否要使用 <code>use-package</code> 。因为我现在在使用 org mode
 写配置文件的目的是希望可以穿插自然语言的代码描述，所以需要拆分代码。
-<code>use-package</code> 这种一体成型的写法不是很适合这种风格。但考虑了实际写的过
-程，我觉得大多数情况可以在配置代码前面作完整的整理，而不需要过于细粒度
-的代码表述，然后在迁移的过程可能也比较简单。所以我最后还是决定改成使用
+<code>use-package</code> 这种一体成型的写法不是很适合这种风格。但考虑了实际写的过程，我觉得大多数情况可以在配置代码前面作完整的整理，而不需要过于细粒度的代码表述，然后在迁移的过程可能也比较简单。所以我最后还是决定改成使用
 <code>use-package</code> 了。
 </p>
 </div>
 <ol class="org-ol">
-<li><a id="org52a679a"></a>依赖<br />
+<li><a id="org90d7550"></a>依赖<br />
 <div class="outline-text-5" id="text-5-2-2-1">
 <ul class="org-ul">
 <li><code>use-package</code> ：用简介的宏语言描述包</li>
@@ -2110,7 +2126,7 @@ nix run --recreate-lock-file --inputs-from ./flake.lock.backup # recreate lock f
 </div>
 </div>
 </li>
-<li><a id="org0785517"></a>配置<br />
+<li><a id="org28baf26"></a>配置<br />
 <div class="outline-text-5" id="text-5-2-2-2">
 <div class="org-src-container">
 <pre class="src src-emacs-lisp">(require 'use-package)
@@ -2121,12 +2137,12 @@ nix run --recreate-lock-file --inputs-from ./flake.lock.backup # recreate lock f
 </li>
 </ol>
 </div>
-<div id="outline-container-org7f5bf5d" class="outline-4">
-<h4 id="org7f5bf5d"><span class="section-number-4">5.2.3.</span> 更好的默认设置</h4>
+<div id="outline-container-org47beaf3" class="outline-4">
+<h4 id="org47beaf3"><span class="section-number-4">5.2.3.</span> 更好的默认设置</h4>
 <div class="outline-text-4" id="text-5-2-3">
 </div>
 <ol class="org-ol">
-<li><a id="org2620159"></a>本体的设定<br />
+<li><a id="org00e8920"></a>本体的设定<br />
 <div class="outline-text-5" id="text-5-2-3-1">
 <div class="org-src-container">
 <pre class="src src-emacs-lisp">;; 关闭警告声
@@ -2150,9 +2166,9 @@ nix run --recreate-lock-file --inputs-from ./flake.lock.backup # recreate lock f
 </div>
 </div>
 </li>
-<li><a id="orgaf9b34f"></a>优化长文档 (<code>so-long</code>)<br />
+<li><a id="org8017219"></a>优化长文档 (<code>so-long</code>)<br />
 <ol class="org-ol">
-<li><a id="orgfe9e11b"></a>依赖<br />
+<li><a id="org38339ff"></a>依赖<br />
 <div class="outline-text-6" id="text-5-2-3-2-1">
 <div class="org-src-container">
 <pre class="src src-nix">so-long
@@ -2160,7 +2176,7 @@ nix run --recreate-lock-file --inputs-from ./flake.lock.backup # recreate lock f
 </div>
 </div>
 </li>
-<li><a id="orgcac6752"></a>配置<br />
+<li><a id="orgfd511bf"></a>配置<br />
 <div class="outline-text-6" id="text-5-2-3-2-2">
 <div class="org-src-container">
 <pre class="src src-emacs-lisp">(use-package so-long
@@ -2172,11 +2188,11 @@ nix run --recreate-lock-file --inputs-from ./flake.lock.backup # recreate lock f
 </li>
 </ol>
 </li>
-<li><a id="orgcb20e96"></a>UI<br />
+<li><a id="org7d105fd"></a>UI<br />
 <div class="outline-text-5" id="text-5-2-3-3">
 </div>
 <ol class="org-ol">
-<li><a id="org63761ff"></a>基础<br />
+<li><a id="orgb1131fd"></a>基础<br />
 <div class="outline-text-6" id="text-5-2-3-3-1">
 <div class="org-src-container">
 <pre class="src src-emacs-lisp">;; 基础设置
@@ -2196,7 +2212,7 @@ nix run --recreate-lock-file --inputs-from ./flake.lock.backup # recreate lock f
 </div>
 </div>
 </li>
-<li><a id="org1fd108a"></a>主题<br />
+<li><a id="org97b1e26"></a>主题<br />
 <div class="outline-text-6" id="text-5-2-3-3-2">
 <div class="org-src-container">
 <pre class="src src-emacs-lisp">(require-theme 'modus-themes)
@@ -2204,9 +2220,9 @@ nix run --recreate-lock-file --inputs-from ./flake.lock.backup # recreate lock f
 </div>
 </div>
 </li>
-<li><a id="org59e0220"></a>写作和展示UI（手动开启）<br />
+<li><a id="org990bad2"></a>写作和展示UI（手动开启）<br />
 <ol class="org-ol">
-<li><a id="orgdb291e8"></a>依赖<br />
+<li><a id="orga103fca"></a>依赖<br />
 <div class="outline-text-7" id="text-5-2-3-3-3-1">
 <div class="org-src-container">
 <pre class="src src-nix">spacious-padding
@@ -2215,7 +2231,7 @@ nix run --recreate-lock-file --inputs-from ./flake.lock.backup # recreate lock f
 </div>
 </div>
 </li>
-<li><a id="orgd875751"></a>配置<br />
+<li><a id="org7040abb"></a>配置<br />
 <div class="outline-text-7" id="text-5-2-3-3-3-2">
 <div class="org-src-container">
 <pre class="src src-emacs-lisp">(use-package spacious-padding
@@ -2241,18 +2257,16 @@ nix run --recreate-lock-file --inputs-from ./flake.lock.backup # recreate lock f
 </li>
 </ol>
 </li>
-<li><a id="org4af87d2"></a>光标跳到新窗口<br />
+<li><a id="org51feed7"></a>光标跳到新窗口<br />
 <div class="outline-text-5" id="text-5-2-3-4">
 <p>
 emacs在打开新的窗口时，默认光标维持在原来的窗口。比如当你使用
-<code>describe-function</code> 时，光标不会跳到函数的简介窗口。在这类窗口我们本身
-可以按 <code>q</code> 来退出和关闭窗口。所以跳转到新窗口非常便利。
+<code>describe-function</code> 时，光标不会跳到函数的简介窗口。在这类窗口我们本身可以按 <code>q</code> 来退出和关闭窗口。所以跳转到新窗口非常便利。
 </p>
 
 <ul class="org-ul">
 <li>专用buffer（display-buffer行为；主要影响 Emacs 自动创建的窗口（如
-help、compilation 等）。注意这里也会影响到 <code>magit</code> 这类 transient 窗
-口</li>
+help、compilation 等）。注意这里也会影响到 <code>magit</code> 这类 transient 窗口</li>
 </ul>
 
 <div class="org-src-container">
@@ -2282,7 +2296,7 @@ help、compilation 等）。注意这里也会影响到 <code>magit</code> 这�
 </div>
 </div>
 </li>
-<li><a id="orge534d81"></a>窗口的放大缩小转变为持续的行为<br />
+<li><a id="orgb55aa88"></a>窗口的放大缩小转变为持续的行为<br />
 <div class="outline-text-5" id="text-5-2-3-5">
 <p>
 而不是要一直要重复 <code>C-x</code> 按键。后续行为使用默认 <code>^, V, {, }</code> 。这里我没用
@@ -2338,7 +2352,7 @@ help、compilation 等）。注意这里也会影响到 <code>magit</code> 这�
 </div>
 </div>
 </li>
-<li><a id="orgcab3798"></a>文件的保存与新建<br />
+<li><a id="org11c7a0e"></a>文件的保存与新建<br />
 <div class="outline-text-5" id="text-5-2-3-6">
 <div class="org-src-container">
 <pre class="src src-emacs-lisp">;; 不存在文档时询问是否新建
@@ -2363,7 +2377,7 @@ help、compilation 等）。注意这里也会影响到 <code>magit</code> 这�
 </div>
 </div>
 </li>
-<li><a id="org1ab1b71"></a>最近文件<br />
+<li><a id="org6b2e7a9"></a>最近文件<br />
 <div class="outline-text-5" id="text-5-2-3-7">
 <div class="org-src-container">
 <pre class="src src-emacs-lisp">(use-package recentf
@@ -2448,7 +2462,7 @@ help、compilation 等）。注意这里也会影响到 <code>magit</code> 这�
 </div>
 </div>
 </li>
-<li><a id="org53d2a39"></a>文件管理 (<code>Dired</code>)<br />
+<li><a id="org029efcf"></a>文件管理 (<code>Dired</code>)<br />
 <div class="outline-text-5" id="text-5-2-3-8">
 <div class="org-src-container">
 <pre class="src src-emacs-lisp">(use-package dired
@@ -2468,9 +2482,9 @@ help、compilation 等）。注意这里也会影响到 <code>magit</code> 这�
 </div>
 </div>
 </li>
-<li><a id="org4836888"></a>便利的光标首尾移动<br />
+<li><a id="org7b51147"></a>便利的光标首尾移动<br />
 <ol class="org-ol">
-<li><a id="org8431003"></a>依赖<br />
+<li><a id="orgdce5e65"></a>依赖<br />
 <div class="outline-text-6" id="text-5-2-3-9-1">
 <div class="org-src-container">
 <pre class="src src-nix">mwim
@@ -2478,7 +2492,7 @@ help、compilation 等）。注意这里也会影响到 <code>magit</code> 这�
 </div>
 </div>
 </li>
-<li><a id="orgf302fdc"></a>配置<br />
+<li><a id="org1f4fd06"></a>配置<br />
 <div class="outline-text-6" id="text-5-2-3-9-2">
 <p>
 <b>mwim</b>: 跳到代码之前而非最前，或者代码后面而不是最后
@@ -2497,9 +2511,9 @@ help、compilation 等）。注意这里也会影响到 <code>magit</code> 这�
 </li>
 </ol>
 </li>
-<li><a id="orgc5a5581"></a>折行与复原<br />
+<li><a id="org3a773a3"></a>折行与复原<br />
 <ol class="org-ol">
-<li><a id="org720ec4e"></a>依赖<br />
+<li><a id="org3683064"></a>依赖<br />
 <div class="outline-text-6" id="text-5-2-3-10-1">
 <div class="org-src-container">
 <pre class="src src-nix">unfill
@@ -2507,7 +2521,7 @@ help、compilation 等）。注意这里也会影响到 <code>magit</code> 这�
 </div>
 </div>
 </li>
-<li><a id="org76deef8"></a>配置<br />
+<li><a id="org4092f43"></a>配置<br />
 <div class="outline-text-6" id="text-5-2-3-10-2">
 <ul class="org-ul">
 <li>物理折行与复原</li>
@@ -2524,11 +2538,11 @@ help、compilation 等）。注意这里也会影响到 <code>magit</code> 这�
 </li>
 </ol>
 </li>
-<li><a id="orgd5db8f8"></a>更好的minibuffer<br />
+<li><a id="orgf9f2217"></a>更好的minibuffer<br />
 <div class="outline-text-5" id="text-5-2-3-11">
 </div>
 <ol class="org-ol">
-<li><a id="org0df81c5"></a>原生设定<br />
+<li><a id="orgebc6578"></a>原生设定<br />
 <div class="outline-text-6" id="text-5-2-3-11-1">
 <div class="org-src-container">
 <pre class="src src-emacs-lisp">(use-package emacs
@@ -2568,9 +2582,9 @@ help、compilation 等）。注意这里也会影响到 <code>magit</code> 这�
 </div>
 </div>
 </li>
-<li><a id="org564c190"></a>基础五件套<br />
+<li><a id="orgccac00e"></a>基础五件套<br />
 <ol class="org-ol">
-<li><a id="org870b1fa"></a>依赖<br />
+<li><a id="org8f782f8"></a>依赖<br />
 <div class="outline-text-7" id="text-5-2-3-11-2-1">
 <div class="org-src-container">
 <pre class="src src-nix">vertico
@@ -2583,9 +2597,9 @@ help、compilation 等）。注意这里也会影响到 <code>magit</code> 这�
 </div>
 </div>
 </li>
-<li><a id="orgfa2e2dd"></a>配置<br />
+<li><a id="orgd274d13"></a>配置<br />
 <ol class="org-ol">
-<li><a id="org610faa4"></a><b>Vertico</b>: 提供minibuffer补全UI<br />
+<li><a id="orgeacabc7"></a><b>Vertico</b>: 提供minibuffer补全UI<br />
 <div class="outline-text-8" id="text-5-2-3-11-2-2-1">
 <div class="org-src-container">
 <pre class="src src-emacs-lisp">(use-package vertico
@@ -2599,7 +2613,7 @@ help、compilation 等）。注意这里也会影响到 <code>magit</code> 这�
 </div>
 </div>
 </li>
-<li><a id="orgb098367"></a><b>Orderless</b>: 提供补全格式选择<br />
+<li><a id="org1451333"></a><b>Orderless</b>: 提供补全格式选择<br />
 <div class="outline-text-8" id="text-5-2-3-11-2-2-2">
 <div class="org-src-container">
 <pre class="src src-emacs-lisp">(use-package orderless
@@ -2673,7 +2687,7 @@ help、compilation 等）。注意这里也会影响到 <code>magit</code> 这�
 </div>
 </div>
 </li>
-<li><a id="org33f1e3c"></a><b>Maginalia</b>: 增强minubuffer的annotation<br />
+<li><a id="orga71a7f3"></a><b>Maginalia</b>: 增强minubuffer的annotation<br />
 <div class="outline-text-8" id="text-5-2-3-11-2-2-3">
 <div class="org-src-container">
 <pre class="src src-emacs-lisp">(use-package marginalia
@@ -2688,7 +2702,7 @@ help、compilation 等）。注意这里也会影响到 <code>magit</code> 这�
 </div>
 </div>
 </li>
-<li><a id="orgc6377b7"></a><b>Consult</b>: 增强minibuffer的检索<br />
+<li><a id="orgb37c536"></a><b>Consult</b>: 增强minibuffer的检索<br />
 <div class="outline-text-8" id="text-5-2-3-11-2-2-4">
 <div class="org-src-container">
 <pre class="src src-emacs-lisp">(use-package consult
@@ -2758,7 +2772,7 @@ help、compilation 等）。注意这里也会影响到 <code>magit</code> 这�
 </div>
 </div>
 </li>
-<li><a id="org6d9cdc1"></a><b>Embark</b>: minibuffer action 和自适应的context menu<br />
+<li><a id="org8815613"></a><b>Embark</b>: minibuffer action 和自适应的context menu<br />
 <div class="outline-text-8" id="text-5-2-3-11-2-2-5">
 <div class="org-src-container">
 <pre class="src src-emacs-lisp">(use-package embark
@@ -2792,15 +2806,14 @@ help、compilation 等）。注意这里也会影响到 <code>magit</code> 这�
 </li>
 </ol>
 </li>
-<li><a id="org560be9e"></a>撤销 (<code>vundo</code>)<br />
+<li><a id="org24ac786"></a>撤销 (<code>vundo</code>)<br />
 <div class="outline-text-5" id="text-5-2-3-12">
 <p>
-我原来使用 undotree ，现在使用 vundo。这些用于视觉化撤销树。这里我之绑
-定了 <code>C-x u</code> ， <code>C-/</code> 我依然用的原生的 Undo，这样适合区分使用。
+我原来使用 undotree ，现在使用 vundo。这些用于视觉化撤销树。这里我之绑定了 <code>C-x u</code> ， <code>C-/</code> 我依然用的原生的 Undo，这样适合区分使用。
 </p>
 </div>
 <ol class="org-ol">
-<li><a id="orgd35ec8c"></a>依赖<br />
+<li><a id="org7119b61"></a>依赖<br />
 <div class="outline-text-6" id="text-5-2-3-12-1">
 <div class="org-src-container">
 <pre class="src src-nix">vundo
@@ -2808,7 +2821,7 @@ help、compilation 等）。注意这里也会影响到 <code>magit</code> 这�
 </div>
 </div>
 </li>
-<li><a id="org5c183e7"></a>配置<br />
+<li><a id="org251c33a"></a>配置<br />
 <div class="outline-text-6" id="text-5-2-3-12-2">
 <div class="org-src-container">
 <pre class="src src-emacs-lisp">(use-package vundo
@@ -2823,18 +2836,16 @@ help、compilation 等）。注意这里也会影响到 <code>magit</code> 这�
 </li>
 </ol>
 </li>
-<li><a id="org5ec5f56"></a>检索 (<code>ctrlf</code>)<br />
+<li><a id="org6d6e7d3"></a>检索 (<code>ctrlf</code>)<br />
 <div class="outline-text-5" id="text-5-2-3-13">
 <p>
-针对当前 buffer 利用 <code>Ctrlf</code> 而不在使用 <code>swiper</code> 和 <code>helm</code> 这类型的检索方式。
-用于替代 <code>isearch</code> 的 <code>C-s</code> 键。另外的选项是 <code>consult-line</code> ，我映射到了 <code>C-c
-s</code> 键位，用于不移动当前位置预览检索行，尤其是在类似与 org 存在折叠的情
-况下，我不需要移动光标和展开折叠。关于 <code>consult</code> ，可见<a href="#orgc6377b7"><b>Consult</b>: 增强
+针对当前 buffer 利用 <code>Ctrlf</code> 而不在使用 <code>swiper</code> 和 <code>helm</code> 这类型的检索方式。用于替代 <code>isearch</code> 的 <code>C-s</code> 键。另外的选项是 <code>consult-line</code> ，我映射到了 <code>C-c
+s</code> 键位，用于不移动当前位置预览检索行，尤其是在类似与 org 存在折叠的情况下，我不需要移动光标和展开折叠。关于 <code>consult</code> ，可见<a href="#orgb37c536"><b>Consult</b>: 增强
 minibuffer的检索</a>。
 </p>
 </div>
 <ol class="org-ol">
-<li><a id="org5d0d6b6"></a>依赖<br />
+<li><a id="org02f3bf7"></a>依赖<br />
 <div class="outline-text-6" id="text-5-2-3-13-1">
 <div class="org-src-container">
 <pre class="src src-nix">ctrlf
@@ -2842,11 +2853,11 @@ minibuffer的检索</a>。
 </div>
 </div>
 </li>
-<li><a id="org0aee705"></a>配置<br />
+<li><a id="org0ef8c74"></a>配置<br />
 <div class="outline-text-6" id="text-5-2-3-13-2">
 </div>
 <ol class="org-ol">
-<li><a id="org9740a9a"></a>启动 <code>ctrf</code><br />
+<li><a id="orgf9177a9"></a>启动 <code>ctrf</code><br />
 <div class="outline-text-7" id="text-5-2-3-13-2-1">
 <div class="org-src-container">
 <pre class="src src-emacs-lisp">(require 'ctrlf)
@@ -2855,7 +2866,7 @@ minibuffer的检索</a>。
 </div>
 </div>
 </li>
-<li><a id="orgba642a4"></a>切换检索风格<br />
+<li><a id="org7623726"></a>切换检索风格<br />
 <div class="outline-text-7" id="text-5-2-3-13-2-2">
 <div class="org-src-container">
 <pre class="src src-emacs-lisp">(with-eval-after-load 'ctrlf
@@ -2876,7 +2887,7 @@ This ensures the selected style becomes the new default for future sessions."
 </li>
 </ol>
 </li>
-<li><a id="org586cffe"></a>重构 (<code>wgrep</code>)<br />
+<li><a id="org0c392a2"></a>重构 (<code>wgrep</code>)<br />
 <div class="outline-text-5" id="text-5-2-3-14">
 <p>
 在 <code>grep</code> , <code>ag</code>, <code>ripgrep</code> 等检索的结果中按下 <code>e</code> 进入编辑模式，按下 <code>C-c C-c</code>
@@ -2884,7 +2895,7 @@ This ensures the selected style becomes the new default for future sessions."
 </p>
 </div>
 <ol class="org-ol">
-<li><a id="org603a397"></a>依赖<br />
+<li><a id="orgf7ba3ec"></a>依赖<br />
 <div class="outline-text-6" id="text-5-2-3-14-1">
 <div class="org-src-container">
 <pre class="src src-nix">wgrep
@@ -2892,7 +2903,7 @@ This ensures the selected style becomes the new default for future sessions."
 </div>
 </div>
 </li>
-<li><a id="org0384b34"></a>配置<br />
+<li><a id="org083403b"></a>配置<br />
 <div class="outline-text-6" id="text-5-2-3-14-2">
 <div class="org-src-container">
 <pre class="src src-emacs-lisp">(use-package wgrep
@@ -2905,7 +2916,7 @@ This ensures the selected style becomes the new default for future sessions."
 </li>
 </ol>
 </li>
-<li><a id="orge8ec66f"></a>括号匹配<br />
+<li><a id="org22556df"></a>括号匹配<br />
 <div class="outline-text-5" id="text-5-2-3-15">
 <div class="org-src-container">
 <pre class="src src-emacs-lisp">(use-package emacs
@@ -2954,9 +2965,9 @@ This ensures the selected style becomes the new default for future sessions."
 </div>
 </div>
 </li>
-<li><a id="org93dad88"></a>语言无关的结构化编程 (<code>puni</code>)<br />
+<li><a id="org23e855c"></a>语言无关的结构化编程 (<code>puni</code>)<br />
 <ol class="org-ol">
-<li><a id="org32993c9"></a>依赖<br />
+<li><a id="org96eb0fe"></a>依赖<br />
 <div class="outline-text-6" id="text-5-2-3-16-1">
 <div class="org-src-container">
 <pre class="src src-nix">puni
@@ -2964,7 +2975,7 @@ This ensures the selected style becomes the new default for future sessions."
 </div>
 </div>
 </li>
-<li><a id="org163062e"></a>配置<br />
+<li><a id="org9aa2243"></a>配置<br />
 <div class="outline-text-6" id="text-5-2-3-16-2">
 <div class="org-src-container">
 <pre class="src src-emacs-lisp">(use-package puni
@@ -3012,11 +3023,10 @@ This ensures the selected style becomes the new default for future sessions."
 </div>
 </div>
 <ol class="org-ol">
-<li><a id="orgebe4f0d"></a><code>puni-kill-line</code><br />
+<li><a id="orgcf5b5d0"></a><code>puni-kill-line</code><br />
 <div class="outline-text-7" id="text-5-2-3-16-2-1">
 <p>
-基于 <code>puni</code> 更改 <code>kill-line</code> ，在删除行的时候可以确认是否被包围在某个环境
-中。如果被包围在某个环境中则删除到该环境的最后，如果没有则正常执行
+基于 <code>puni</code> 更改 <code>kill-line</code> ，在删除行的时候可以确认是否被包围在某个环境中。如果被包围在某个环境中则删除到该环境的最后，如果没有则正常执行
 <code>kill-line</code> 。
 </p>
 <div class="org-src-container">
@@ -3043,7 +3053,7 @@ can be deleted, kill the balanced expression around point."
 </div>
 </div>
 </li>
-<li><a id="orgbcbee7a"></a><code>idiig/puni-contract-region</code><br />
+<li><a id="org80a3267"></a><code>idiig/puni-contract-region</code><br />
 <div class="outline-text-7" id="text-5-2-3-16-2-2">
 <p>
 如无选中则保持 negative-argument,如有选中则缩小范围
@@ -3098,11 +3108,11 @@ can be deleted, kill the balanced expression around point."
 </li>
 </ol>
 </li>
-<li><a id="org0ab6c3b"></a>覆盖 <code>&lt;Backspace&gt;</code> 和 <code>&lt;DEL&gt;</code> 等删除动作<br />
+<li><a id="org14d7665"></a>覆盖 <code>&lt;Backspace&gt;</code> 和 <code>&lt;DEL&gt;</code> 等删除动作<br />
 <div class="outline-text-5" id="text-5-2-3-17">
 </div>
 <ol class="org-ol">
-<li><a id="org7f21356"></a><code>backward-hungry-delete</code><br />
+<li><a id="orgc8473e2"></a><code>backward-hungry-delete</code><br />
 <div class="outline-text-6" id="text-5-2-3-17-1">
 <p>
 向后删除时向后贪婪地删除连续的空白值。同时考虑对称的结构。
@@ -3143,7 +3153,7 @@ can be deleted, kill the balanced expression around point."
 </div>
 </div>
 </li>
-<li><a id="orgb8253af"></a><code>forward-hungry-delete</code><br />
+<li><a id="org1f19fb3"></a><code>forward-hungry-delete</code><br />
 <div class="outline-text-6" id="text-5-2-3-17-2">
 <p>
 向前删除时向前贪婪地删除连续的空白值。同时考虑对称的结构。
@@ -3186,7 +3196,7 @@ can be deleted, kill the balanced expression around point."
 </div>
 </div>
 </li>
-<li><a id="org161daa4"></a><code>backward-kill-word-or-region</code><br />
+<li><a id="orgfa13b98"></a><code>backward-kill-word-or-region</code><br />
 <div class="outline-text-6" id="text-5-2-3-17-3">
 <p>
 如无选中则杀掉前面的单词，如有选中则杀掉选中区域。
@@ -3223,8 +3233,8 @@ can be deleted, kill the balanced expression around point."
 </ol>
 </div>
 </div>
-<div id="outline-container-org7bdaeca" class="outline-3">
-<h3 id="org7bdaeca"><span class="section-number-3">5.3.</span> CJK字体</h3>
+<div id="outline-container-org6f25f7a" class="outline-3">
+<h3 id="org6f25f7a"><span class="section-number-3">5.3.</span> CJK字体</h3>
 <div class="outline-text-3" id="text-5-3">
 <p>
 这里我统一使用的是Sarasa的等宽字体，可以避免2个问题：
@@ -3234,8 +3244,8 @@ can be deleted, kill the balanced expression around point."
 <li>方便org等表格等宽表示</li>
 </ul>
 </div>
-<div id="outline-container-orgbed31cc" class="outline-4">
-<h4 id="orgbed31cc"><span class="section-number-4">5.3.1.</span> 依赖</h4>
+<div id="outline-container-org1fae257" class="outline-4">
+<h4 id="org1fae257"><span class="section-number-4">5.3.1.</span> 依赖</h4>
 <div class="outline-text-4" id="text-5-3-1">
 <div class="org-src-container">
 <pre class="src src-sh">if [ "$(uname)" = "Darwin" ]; then
@@ -3252,8 +3262,8 @@ fi
 </div>
 </div>
 </div>
-<div id="outline-container-org824727c" class="outline-4">
-<h4 id="org824727c"><span class="section-number-4">5.3.2.</span> 配置</h4>
+<div id="outline-container-orgf436fce" class="outline-4">
+<h4 id="orgf436fce"><span class="section-number-4">5.3.2.</span> 配置</h4>
 <div class="outline-text-4" id="text-5-3-2">
 <div class="org-src-container">
 <pre class="src src-emacs-lisp">(add-hook 'after-init-hook
@@ -3277,16 +3287,16 @@ fi
 </div>
 </div>
 </div>
-<div id="outline-container-orgb62c4e4" class="outline-3">
-<h3 id="orgb62c4e4"><span class="section-number-3">5.4.</span> 日文</h3>
+<div id="outline-container-org966bbc6" class="outline-3">
+<h3 id="org966bbc6"><span class="section-number-3">5.4.</span> 日文</h3>
 <div class="outline-text-3" id="text-5-4">
 </div>
-<div id="outline-container-orgac290e6" class="outline-4">
-<h4 id="orgac290e6"><span class="section-number-4">5.4.1.</span> 输入法 (ddskk)</h4>
+<div id="outline-container-orgfbb7fdc" class="outline-4">
+<h4 id="orgfbb7fdc"><span class="section-number-4">5.4.1.</span> 输入法 (ddskk)</h4>
 <div class="outline-text-4" id="text-5-4-1">
 </div>
 <ol class="org-ol">
-<li><a id="orgc98db4d"></a>依赖<br />
+<li><a id="orgda62714"></a>依赖<br />
 <div class="outline-text-5" id="text-5-4-1-1">
 <div class="org-src-container">
 <pre class="src src-nix">ddskk
@@ -3294,7 +3304,7 @@ fi
 </div>
 </div>
 </li>
-<li><a id="org5208e12"></a>配置<br />
+<li><a id="org55c923c"></a>配置<br />
 <div class="outline-text-5" id="text-5-4-1-2">
 <div class="org-src-container">
 <pre class="src src-emacs-lisp">(use-package ddskk
@@ -3333,12 +3343,12 @@ fi
 </li>
 </ol>
 </div>
-<div id="outline-container-org4af40a5" class="outline-4">
-<h4 id="org4af40a5"><span class="section-number-4">5.4.2.</span> 检索（Migemo）</h4>
+<div id="outline-container-org0cee40a" class="outline-4">
+<h4 id="org0cee40a"><span class="section-number-4">5.4.2.</span> 检索（Migemo）</h4>
 <div class="outline-text-4" id="text-5-4-2">
 </div>
 <ol class="org-ol">
-<li><a id="orge9259b4"></a>依赖<br />
+<li><a id="orgd1180d1"></a>依赖<br />
 <div class="outline-text-5" id="text-5-4-2-1">
 <div class="org-src-container">
 <pre class="src src-nix">migemo
@@ -3349,11 +3359,11 @@ fi
 </p>
 </div>
 </li>
-<li><a id="orge104871"></a>配置<br />
+<li><a id="org081d0a3"></a>配置<br />
 <div class="outline-text-5" id="text-5-4-2-2">
 </div>
 <ol class="org-ol">
-<li><a id="orgfeba8f3"></a>基础配置<br />
+<li><a id="org30f1ce3"></a>基础配置<br />
 <div class="outline-text-6" id="text-5-4-2-2-1">
 <div class="org-src-container">
 <pre class="src src-emacs-lisp">(require 'migemo)
@@ -3373,7 +3383,7 @@ fi
 </div>
 </div>
 </li>
-<li><a id="org524d8be"></a>buffer内字符检索 (<code>Ctrlf</code>) 交互<br />
+<li><a id="org86b6011"></a>buffer内字符检索 (<code>Ctrlf</code>) 交互<br />
 <div class="outline-text-6" id="text-5-4-2-2-2">
 <div class="org-src-container">
 <pre class="src src-emacs-lisp">(with-eval-after-load 'migemo
@@ -3386,7 +3396,7 @@ fi
 </div>
 </div>
 </li>
-<li><a id="orgdb2635f"></a>minibuffer内检索 (<code>Orderless</code>) 交互<br />
+<li><a id="orga1e03dd"></a>minibuffer内检索 (<code>Orderless</code>) 交互<br />
 <div class="outline-text-6" id="text-5-4-2-2-3">
 <p>
 用 <code>migemo</code> 在minibuffer的检索中用 <code>#</code> 前缀可开启罗马字检索日语。
@@ -3409,16 +3419,16 @@ fi
 </ol>
 </div>
 </div>
-<div id="outline-container-orgbe77447" class="outline-3">
-<h3 id="orgbe77447"><span class="section-number-3">5.5.</span> 中文</h3>
+<div id="outline-container-org10f36e4" class="outline-3">
+<h3 id="org10f36e4"><span class="section-number-3">5.5.</span> 中文</h3>
 <div class="outline-text-3" id="text-5-5">
 </div>
-<div id="outline-container-org38d5057" class="outline-4">
-<h4 id="org38d5057"><span class="section-number-4">5.5.1.</span> 输入法和基于输入法的检索 (pyim)</h4>
+<div id="outline-container-org83decea" class="outline-4">
+<h4 id="org83decea"><span class="section-number-4">5.5.1.</span> 输入法和基于输入法的检索 (pyim)</h4>
 <div class="outline-text-4" id="text-5-5-1">
 </div>
 <ol class="org-ol">
-<li><a id="org9482ab2"></a>依赖<br />
+<li><a id="org2237c57"></a>依赖<br />
 <div class="outline-text-5" id="text-5-5-1-1">
 <div class="org-src-container">
 <pre class="src src-nix">pyim
@@ -3427,11 +3437,11 @@ fi
 </div>
 </div>
 </li>
-<li><a id="org78991e4"></a>配置<br />
+<li><a id="org7dafc45"></a>配置<br />
 <div class="outline-text-5" id="text-5-5-1-2">
 </div>
 <ol class="org-ol">
-<li><a id="orgd57a54d"></a>基础配置<br />
+<li><a id="org2fc4423"></a>基础配置<br />
 <div class="outline-text-6" id="text-5-5-1-2-1">
 <div class="org-src-container">
 <pre class="src src-emacs-lisp">(use-package pyim
@@ -3454,7 +3464,7 @@ fi
 </div>
 </div>
 </li>
-<li><a id="orge7050f1"></a><span class="todo TODO">TODO</span> 正则表达交互<br />
+<li><a id="org7b9c92a"></a><span class="todo TODO">TODO</span> 正则表达交互<br />
 <div class="outline-text-6" id="text-5-5-1-2-2">
 <p>
 目前支持：
@@ -3508,16 +3518,14 @@ fi
 </div>
 </div>
 </li>
-<li><a id="org27fe77b"></a>buffer内检索 (<code>Ctrlf</code>) 交互<br />
+<li><a id="orge8724ea"></a>buffer内检索 (<code>Ctrlf</code>) 交互<br />
 <div class="outline-text-6" id="text-5-5-1-2-3">
 <p>
-这里我写了一个函数 <code>pyim-cregex-build-lazy</code> 。这个函数交互 <code>pyim</code> 。参见输
-入法。这个函数的工作逻辑如下：
+这里我写了一个函数 <code>pyim-cregex-build-lazy</code> 。这个函数交互 <code>pyim</code> 。参见输入法。这个函数的工作逻辑如下：
 </p>
 
 <ul class="org-ul">
-<li>如果还没有初始化拼音数据，就先进行预热预热时会加载 "a"、"e"、"o" 这
-三个字符的拼音映射数据设置初始化标志，避免重复初始化</li>
+<li>如果还没有初始化拼音数据，就先进行预热预热时会加载 "a"、"e"、"o" 这三个字符的拼音映射数据设置初始化标志，避免重复初始化</li>
 <li>接着分两种情况处理：
 <ol class="org-ol">
 <li>情况1 :: 单个字符且不是 a/e/o，双个字母不是 zh/ch/sh
@@ -3593,7 +3601,7 @@ fi
 </div>
 </div>
 </li>
-<li><a id="org5645b1b"></a>minibuffer内检索 (<code>Orderless</code>) 交互<br />
+<li><a id="org311c041"></a>minibuffer内检索 (<code>Orderless</code>) 交互<br />
 <div class="outline-text-6" id="text-5-5-1-2-4">
 <p>
 用 <code>pyim</code> 在minibuffer的检索中用 <code>◎</code> 前缀可开启拼音检索中文。
@@ -3637,15 +3645,15 @@ fi
 </ol>
 </div>
 </div>
-<div id="outline-container-orga3d8e53" class="outline-3">
-<h3 id="orga3d8e53"><span class="section-number-3">5.6.</span> Git (<code>magit</code>)</h3>
+<div id="outline-container-org947df27" class="outline-3">
+<h3 id="org947df27"><span class="section-number-3">5.6.</span> Git (<code>magit</code>)</h3>
 <div class="outline-text-3" id="text-5-6">
 <p>
 用 Magit 进行项目与版本的管理
 </p>
 </div>
-<div id="outline-container-org9582a9c" class="outline-4">
-<h4 id="org9582a9c"><span class="section-number-4">5.6.1.</span> 依赖</h4>
+<div id="outline-container-org9675fbd" class="outline-4">
+<h4 id="org9675fbd"><span class="section-number-4">5.6.1.</span> 依赖</h4>
 <div class="outline-text-4" id="text-5-6-1">
 <div class="org-src-container">
 <pre class="src src-nix">magit
@@ -3653,12 +3661,12 @@ fi
 </div>
 </div>
 </div>
-<div id="outline-container-org7a24555" class="outline-4">
-<h4 id="org7a24555"><span class="section-number-4">5.6.2.</span> 配置</h4>
+<div id="outline-container-org3ca0ec2" class="outline-4">
+<h4 id="org3ca0ec2"><span class="section-number-4">5.6.2.</span> 配置</h4>
 <div class="outline-text-4" id="text-5-6-2">
 </div>
 <ol class="org-ol">
-<li><a id="org5c632c5"></a>Magit<br />
+<li><a id="orgad4c361"></a>Magit<br />
 <div class="outline-text-5" id="text-5-6-2-1">
 <div class="org-src-container">
 <pre class="src src-emacs-lisp">(use-package magit
@@ -3674,12 +3682,12 @@ fi
 </ol>
 </div>
 </div>
-<div id="outline-container-org03063f8" class="outline-3">
-<h3 id="org03063f8"><span class="section-number-3">5.7.</span> 文档写作</h3>
+<div id="outline-container-orgda5335d" class="outline-3">
+<h3 id="orgda5335d"><span class="section-number-3">5.7.</span> 文档写作</h3>
 <div class="outline-text-3" id="text-5-7">
 </div>
-<div id="outline-container-org77dfd15" class="outline-4">
-<h4 id="org77dfd15"><span class="section-number-4">5.7.1.</span> 文档后缀</h4>
+<div id="outline-container-orgb19906d" class="outline-4">
+<h4 id="orgb19906d"><span class="section-number-4">5.7.1.</span> 文档后缀</h4>
 <div class="outline-text-4" id="text-5-7-1">
 <div class="org-src-container">
 <pre class="src src-emacs-lisp">(defvar idiig/writing-environment-list '("\\.org\\'"
@@ -3694,8 +3702,8 @@ fi
 </div>
 </div>
 </div>
-<div id="outline-container-orge04d047" class="outline-4">
-<h4 id="orge04d047"><span class="section-number-4">5.7.2.</span> 文档状态折行</h4>
+<div id="outline-container-org993a978" class="outline-4">
+<h4 id="org993a978"><span class="section-number-4">5.7.2.</span> 文档状态折行</h4>
 <div class="outline-text-4" id="text-5-7-2">
 <div class="org-src-container">
 <pre class="src src-emacs-lisp">(defun idiig/in-writing-environment-p ()
@@ -3716,8 +3724,8 @@ fi
 </div>
 </div>
 </div>
-<div id="outline-container-org1d6ec12" class="outline-4">
-<h4 id="org1d6ec12"><span class="section-number-4">5.7.3.</span> 在选中区域的状态下 <code>C-w</code> 删除选中的区域</h4>
+<div id="outline-container-org2aa7e2c" class="outline-4">
+<h4 id="org2aa7e2c"><span class="section-number-4">5.7.3.</span> 在选中区域的状态下 <code>C-w</code> 删除选中的区域</h4>
 <div class="outline-text-4" id="text-5-7-3">
 <p>
 在没选中的状态下删除上一个单词。
@@ -3735,8 +3743,8 @@ fi
 </div>
 </div>
 </div>
-<div id="outline-container-orgfb16aa5" class="outline-4">
-<h4 id="orgfb16aa5"><span class="section-number-4">5.7.4.</span> <code>C-M-\</code> 全局缩进</h4>
+<div id="outline-container-orgec93a74" class="outline-4">
+<h4 id="orgec93a74"><span class="section-number-4">5.7.4.</span> <code>C-M-\</code> 全局缩进</h4>
 <div class="outline-text-4" id="text-5-7-4">
 <div class="org-src-container">
 <pre class="src src-emacs-lisp">(defun idiig/indent-buffer()
@@ -3758,8 +3766,8 @@ fi
 </div>
 </div>
 </div>
-<div id="outline-container-orgf955779" class="outline-4">
-<h4 id="orgf955779"><span class="section-number-4">5.7.5.</span> <code>Shift-Ret</code> 下方插入空白行</h4>
+<div id="outline-container-orgf32a6fa" class="outline-4">
+<h4 id="orgf32a6fa"><span class="section-number-4">5.7.5.</span> <code>Shift-Ret</code> 下方插入空白行</h4>
 <div class="outline-text-4" id="text-5-7-5">
 <div class="org-src-container">
 <pre class="src src-emacs-lisp">(global-set-key [(shift return)] 'idiig/smart-open-line)
@@ -3767,8 +3775,8 @@ fi
 </div>
 </div>
 </div>
-<div id="outline-container-org5ef46cd" class="outline-4">
-<h4 id="org5ef46cd"><span class="section-number-4">5.7.6.</span> <code>M--</code> 匹配到括号</h4>
+<div id="outline-container-orgcee81d7" class="outline-4">
+<h4 id="orgcee81d7"><span class="section-number-4">5.7.6.</span> <code>M--</code> 匹配到括号</h4>
 <div class="outline-text-4" id="text-5-7-6">
 <p>
 TODO: 把 evil-jump-item 换成别的函数。
@@ -3790,8 +3798,8 @@ TODO: 把 evil-jump-item 换成别的函数。
 </div>
 </div>
 </div>
-<div id="outline-container-org589708b" class="outline-4">
-<h4 id="org589708b"><span class="section-number-4">5.7.7.</span> 点后插入空白</h4>
+<div id="outline-container-org4f86c67" class="outline-4">
+<h4 id="org4f86c67"><span class="section-number-4">5.7.7.</span> 点后插入空白</h4>
 <div class="outline-text-4" id="text-5-7-7">
 <div class="org-src-container">
 <pre class="src src-emacs-lisp">(defun idiig/insert-space-after-point ()
@@ -3804,12 +3812,12 @@ TODO: 把 evil-jump-item 换成别的函数。
 </div>
 </div>
 </div>
-<div id="outline-container-org4afffa1" class="outline-3">
-<h3 id="org4afffa1"><span class="section-number-3">5.8.</span> 编程工具</h3>
+<div id="outline-container-org1091962" class="outline-3">
+<h3 id="org1091962"><span class="section-number-3">5.8.</span> 编程工具</h3>
 <div class="outline-text-3" id="text-5-8">
 </div>
-<div id="outline-container-org4b296ff" class="outline-4">
-<h4 id="org4b296ff"><span class="section-number-4">5.8.1.</span> 我有可能使用的语言</h4>
+<div id="outline-container-org7137073" class="outline-4">
+<h4 id="org7137073"><span class="section-number-4">5.8.1.</span> 我有可能使用的语言</h4>
 <div class="outline-text-4" id="text-5-8-1">
 <div class="org-src-container">
 <pre class="src src-emacs-lisp">;; TODO: 这里未来需要改成在每个语言的设定的节点push进来
@@ -3831,13 +3839,11 @@ TODO: 把 evil-jump-item 换成别的函数。
 <h4 id="lsp-bridge"><span class="section-number-4">5.8.2.</span> 语言服务器 (<code>lsp-Bridge</code>)</h4>
 <div class="outline-text-4" id="text-lsp-bridge">
 <p>
-语言服务器用于补全代码，提示文档，参照转跳等。这里我使用了 LSP-Bridge，
-其主要优势是通过 python 后端调用语言服务器，不卡 emacs 进程达到高速的
-补全。其他倾向的代替选项有 emacs 捆绑 <code>eglot</code> 。
+语言服务器用于补全代码，提示文档，参照转跳等。这里我使用了 LSP-Bridge，其主要优势是通过 python 后端调用语言服务器，不卡 emacs 进程达到高速的补全。其他倾向的代替选项有 emacs 捆绑 <code>eglot</code> 。
 </p>
 </div>
 <ol class="org-ol">
-<li><a id="org025b8a3"></a>依赖<br />
+<li><a id="org21ed9d7"></a>依赖<br />
 <div class="outline-text-5" id="text-5-8-2-1">
 <div class="org-src-container">
 <pre class="src src-nix">(lsp-bridge.override {
@@ -3854,18 +3860,16 @@ TODO: 把 evil-jump-item 换成别的函数。
 </p>
 
 <ul class="org-ul">
-<li>首先尝试导入 <code>SimpleXMLRPCServer</code> 模块失败，这是因为在 Python 3 中，
-该模块已被移至 <code>xmlrpc.server</code></li>
+<li>首先尝试导入 <code>SimpleXMLRPCServer</code> 模块失败，这是因为在 Python 3 中，该模块已被移至 <code>xmlrpc.server</code></li>
 <li>随后在导入 <code>xmlrpc.client</code> 时出现了一个奇怪的错误:
 <code>'datetime.datetime' object has no attribute 'task'</code></li>
 </ul>
 
 <p>
-这可能是 Python 3.12.9 中的一个 bug，或者是 epc 包与 Python 3.12.9 不
-兼容的结果。因此我们在 <code>lsp-bridge</code> 的环境中使用了 311 的版本。
+这可能是 Python 3.12.9 中的一个 bug，或者是 epc 包与 Python 3.12.9 不兼容的结果。因此我们在 <code>lsp-bridge</code> 的环境中使用了 311 的版本。
 </p>
 
-<pre class="example" id="org16894c0">
+<pre class="example" id="orga7c8ef6">
 Traceback (most recent call last):
   File "/nix/store/1bn994va1akp3m0jvg4fj9wzlqmn1kkq-python3-3.12.9-env/lib/python3.12/site-packages/epc/py3compat.py", line 26, in &lt;module&gt;
     import SimpleXMLRPCServer
@@ -3892,11 +3896,11 @@ AttributeError: 'datetime.datetime' object has no attribute 'task'
 </pre>
 </div>
 </li>
-<li><a id="orgda73603"></a>配置<br />
+<li><a id="org1c2bead"></a>配置<br />
 <div class="outline-text-5" id="text-5-8-2-2">
 </div>
 <ol class="org-ol">
-<li><a id="org564e607"></a>后续的设置宏，用于配置 Nix 环境下的 LSP 服务器<br />
+<li><a id="orgc83c26f"></a>后续的设置宏，用于配置 Nix 环境下的 LSP 服务器<br />
 <div class="outline-text-6" id="text-5-8-2-2-1">
 <div class="org-src-container">
 <pre class="src src-emacs-lisp">(defvar idiig/lsp-extra-paths nil
@@ -3927,11 +3931,7 @@ LIB-PATH 是可选的库路径，添加到 LD_LIBRARY_PATH。"
 </div>
 
 <p>
-上面这个宏用于生成 LSP-Bridge 的设定，因为语言服务器本身需要用户自己安
-装，而本配置又需要 Nix 保证复现，所以我们需要把 nix 路径的语言服务器传
-递给 emacs ，而且语言服务器往往需要匹配的 C++ 的库。因此我希望通过上面
-的代码生成系列配置，同时设定语言，语言服务器，语言服务器的可执行文件路
-径，依赖的 C 库。宏使用如下：
+上面这个宏用于生成 LSP-Bridge 的设定，因为语言服务器本身需要用户自己安装，而本配置又需要 Nix 保证复现，所以我们需要把 nix 路径的语言服务器传递给 emacs ，而且语言服务器往往需要匹配的 C++ 的库。因此我希望通过上面的代码生成系列配置，同时设定语言，语言服务器，语言服务器的可执行文件路径，依赖的 C 库。宏使用如下：
 </p>
 
 <div class="org-src-container">
@@ -3986,12 +3986,11 @@ LIB-PATH 是可选的库路径，添加到 LD_LIBRARY_PATH。"
 </div>
 
 <p>
-<b>注意</b> ：语言服务器不会自动安装，如果在新电脑中出现缺少个别语言服务器
-的情况，我们可以手动安装。
+<b>注意</b> ：语言服务器不会自动安装，如果在新电脑中出现缺少个别语言服务器的情况，我们可以手动安装。
 </p>
 </div>
 </li>
-<li><a id="org003968e"></a>弹窗补全优先设置<br />
+<li><a id="org509e3e6"></a>弹窗补全优先设置<br />
 <div class="outline-text-6" id="text-5-8-2-2-2">
 <div class="org-src-container">
 <pre class="src src-emacs-lisp">(with-eval-after-load 'lsp-bridge
@@ -4022,15 +4021,15 @@ LIB-PATH 是可选的库路径，添加到 LD_LIBRARY_PATH。"
 </li>
 </ol>
 </div>
-<div id="outline-container-org1a6de8f" class="outline-4">
-<h4 id="org1a6de8f"><span class="section-number-4">5.8.3.</span> <span class="todo TODO">TODO</span> Treesitter</h4>
+<div id="outline-container-org2d4ab87" class="outline-4">
+<h4 id="org2d4ab87"><span class="section-number-4">5.8.3.</span> <span class="todo TODO">TODO</span> Treesitter</h4>
 <div class="outline-text-4" id="text-5-8-3">
 <p>
 用于解析语法和语法高亮
 </p>
 </div>
 <ol class="org-ol">
-<li><a id="org3cc7508"></a>依赖<br />
+<li><a id="orga41259a"></a>依赖<br />
 <div class="outline-text-5" id="text-5-8-3-1">
 <div class="org-src-container">
 <pre class="src src-nix"># treesit  # 目前 treesit 已经内置
@@ -4039,7 +4038,7 @@ treesit-auto
 </div>
 </div>
 </li>
-<li><a id="org7b1ba1c"></a>配置<br />
+<li><a id="orgc833046"></a>配置<br />
 <div class="outline-text-5" id="text-5-8-3-2">
 <div class="org-src-container">
 <pre class="src src-emacs-lisp">(use-package treesit-auto
@@ -4053,33 +4052,30 @@ treesit-auto
 </div>
 
 <p>
-这个配置设置了 <code>treesit-auto</code> 包，这是一个帮助管理和自动启用 Emacs 内
-置 <code>tree-sitter</code> 模式的工具。会在启动 major mode 的时候自动替换为
+这个配置设置了 <code>treesit-auto</code> 包，这是一个帮助管理和自动启用 Emacs 内置 <code>tree-sitter</code> 模式的工具。会在启动 major mode 的时候自动替换为
 <code>&lt;major&gt;-ts-mode</code> 。比如 python-mode 会变成 python-ts-mode。
 </p>
 
 <p>
-<b>注意</b> ：treesit 不会自动安装，如果在新电脑中出现缺少 treesit 的情况，
-我们可以手动 <code>treesit-auto-install-all</code> 。下载目前所有可能的语言的
+<b>注意</b> ：treesit 不会自动安装，如果在新电脑中出现缺少 treesit 的情况，我们可以手动 <code>treesit-auto-install-all</code> 。下载目前所有可能的语言的
 treesit。
 </p>
 </div>
 </li>
 </ol>
 </div>
-<div id="outline-container-org880941a" class="outline-4">
-<h4 id="org880941a"><span class="section-number-4">5.8.4.</span> Snippet (<code>yasnippet</code>)</h4>
+<div id="outline-container-orgcfad172" class="outline-4">
+<h4 id="orgcfad172"><span class="section-number-4">5.8.4.</span> Snippet (<code>yasnippet</code>)</h4>
 <div class="outline-text-4" id="text-5-8-4">
 <p>
 Snippet 用于快速插入模板
 </p>
 </div>
 <ol class="org-ol">
-<li><a id="org7b1fbcc"></a>依赖<br />
+<li><a id="org3bc283e"></a>依赖<br />
 <div class="outline-text-5" id="text-5-8-4-1">
 <p>
-这里 <code>yasnippet</code> 本体已经作为 <code>lsp-bridge</code> 的依赖被加入，我们这里只加
-入一个 snippet 的合集 <code>yasnippert-snippets</code> 。
+这里 <code>yasnippet</code> 本体已经作为 <code>lsp-bridge</code> 的依赖被加入，我们这里只加入一个 snippet 的合集 <code>yasnippert-snippets</code> 。
 </p>
 <div class="org-src-container">
 <pre class="src src-nix"># yasnippet
@@ -4089,7 +4085,7 @@ yasnippet-snippets
 </div>
 </div>
 </li>
-<li><a id="orgaefbea7"></a>配置<br />
+<li><a id="org005a971"></a>配置<br />
 <div class="outline-text-5" id="text-5-8-4-2">
 <div class="org-src-container">
 <pre class="src src-emacs-lisp">;; (defvar idiig/snippet-dir (concat user-emacs-directory "snippets"))
@@ -4121,12 +4117,12 @@ yasnippet-snippets
 </li>
 </ol>
 </div>
-<div id="outline-container-org19f5c7a" class="outline-4">
-<h4 id="org19f5c7a"><span class="section-number-4">5.8.5.</span> 基于 tresitter 的结构化编程</h4>
+<div id="outline-container-org11ff8b4" class="outline-4">
+<h4 id="org11ff8b4"><span class="section-number-4">5.8.5.</span> 基于 tresitter 的结构化编程</h4>
 <div class="outline-text-4" id="text-5-8-5">
 </div>
 <ol class="org-ol">
-<li><a id="org4c376c9"></a>依赖<br />
+<li><a id="orgb5248e2"></a>依赖<br />
 <div class="outline-text-5" id="text-5-8-5-1">
 <div class="org-src-container">
 <pre class="src src-nix">
@@ -4134,7 +4130,7 @@ yasnippet-snippets
 </div>
 </div>
 </li>
-<li><a id="org5132003"></a>配置<br />
+<li><a id="org4502a57"></a>配置<br />
 <div class="outline-text-5" id="text-5-8-5-2">
 <div class="org-src-container">
 <pre class="src src-emacs-lisp">
@@ -4144,12 +4140,12 @@ yasnippet-snippets
 </li>
 </ol>
 </div>
-<div id="outline-container-orgb7771d2" class="outline-4">
-<h4 id="orgb7771d2"><span class="section-number-4">5.8.6.</span> 自动化环境管理 (<code>direnv</code>)</h4>
+<div id="outline-container-orgd68ece4" class="outline-4">
+<h4 id="orgd68ece4"><span class="section-number-4">5.8.6.</span> 自动化环境管理 (<code>direnv</code>)</h4>
 <div class="outline-text-4" id="text-5-8-6">
 </div>
 <ol class="org-ol">
-<li><a id="orgb58e841"></a>依赖<br />
+<li><a id="org1b2c021"></a>依赖<br />
 <div class="outline-text-5" id="text-5-8-6-1">
 <div class="org-src-container">
 <pre class="src src-nix">direnv
@@ -4157,7 +4153,7 @@ yasnippet-snippets
 </div>
 </div>
 </li>
-<li><a id="org295b614"></a>配置<br />
+<li><a id="org4c15ff8"></a>配置<br />
 <div class="outline-text-5" id="text-5-8-6-2">
 <p>
 启用 direnv-mode 使用 flake 定环境变量。
@@ -4173,10 +4169,7 @@ yasnippet-snippets
 </div>
 
 <p>
-但是项目中的环境变量往往会修改PATH，导致 LSP 等工具找不到可执行文件。
-而我并不想在flake里写LSP相关的配置，因为倭人为LSP是为了了补全和跳转，
-而不是为了运行程序和复现环境。因此我们需要把 Emacs 的 exec-path 也合并
-进 PATH 里，供子进程继承。
+但是项目中的环境变量往往会修改PATH，导致 LSP 等工具找不到可执行文件。而我并不想在flake里写LSP相关的配置，因为倭人为LSP是为了了补全和跳转，而不是为了运行程序和复现环境。因此我们需要把 Emacs 的 exec-path 也合并进 PATH 里，供子进程继承。
 </p>
 <div class="org-src-container">
 <pre class="src src-emacs-lisp">(require 'cl-lib)
@@ -4226,12 +4219,12 @@ yasnippet-snippets
 </li>
 </ol>
 </div>
-<div id="outline-container-org65a0bf3" class="outline-4">
-<h4 id="org65a0bf3"><span class="section-number-4">5.8.7.</span> 终端 (<code>eat</code>)</h4>
+<div id="outline-container-org7692796" class="outline-4">
+<h4 id="org7692796"><span class="section-number-4">5.8.7.</span> 终端 (<code>eat</code>)</h4>
 <div class="outline-text-4" id="text-5-8-7">
 </div>
 <ol class="org-ol">
-<li><a id="org0446d8f"></a>依赖<br />
+<li><a id="orgeeb5538"></a>依赖<br />
 <div class="outline-text-5" id="text-5-8-7-1">
 <div class="org-src-container">
 <pre class="src src-nix">eat
@@ -4239,7 +4232,7 @@ yasnippet-snippets
 </div>
 </div>
 </li>
-<li><a id="orgb24ab6e"></a>配置<br />
+<li><a id="org2e97bf3"></a>配置<br />
 <div class="outline-text-5" id="text-5-8-7-2">
 <div class="org-src-container">
 <pre class="src src-emacs-lisp">;; For `eat-eshell-mode'.
@@ -4254,16 +4247,16 @@ yasnippet-snippets
 </ol>
 </div>
 </div>
-<div id="outline-container-orgd16169c" class="outline-3">
-<h3 id="orgd16169c"><span class="section-number-3">5.9.</span> 编程与文档语言</h3>
+<div id="outline-container-org9859c3b" class="outline-3">
+<h3 id="org9859c3b"><span class="section-number-3">5.9.</span> 编程与文档语言</h3>
 <div class="outline-text-3" id="text-5-9">
 </div>
-<div id="outline-container-org444590e" class="outline-4">
-<h4 id="org444590e"><span class="section-number-4">5.9.1.</span> Nix</h4>
+<div id="outline-container-org5bdb37a" class="outline-4">
+<h4 id="org5bdb37a"><span class="section-number-4">5.9.1.</span> Nix</h4>
 <div class="outline-text-4" id="text-5-9-1">
 </div>
 <ol class="org-ol">
-<li><a id="orgaa5cc8b"></a>依赖<br />
+<li><a id="orgda11f6a"></a>依赖<br />
 <div class="outline-text-5" id="text-5-9-1-1">
 <div class="org-src-container">
 <pre class="src src-nix">nix-mode
@@ -4288,19 +4281,19 @@ yasnippet-snippets
 </p>
 </div>
 </li>
-<li><a id="org7ff2cb9"></a>配置<br /></li>
+<li><a id="orgbc075b7"></a>配置<br /></li>
 </ol>
 </div>
-<div id="outline-container-org417e953" class="outline-4">
-<h4 id="org417e953"><span class="section-number-4">5.9.2.</span> Lisp</h4>
+<div id="outline-container-orgd58a2dc" class="outline-4">
+<h4 id="orgd58a2dc"><span class="section-number-4">5.9.2.</span> Lisp</h4>
 <div class="outline-text-4" id="text-5-9-2">
 </div>
 <ol class="org-ol">
-<li><a id="orgb2c6f82"></a>RERL<br />
+<li><a id="org67f0682"></a>RERL<br />
 <div class="outline-text-5" id="text-5-9-2-1">
 </div>
 <ol class="org-ol">
-<li><a id="orgd1c9dff"></a>依赖<br />
+<li><a id="orgde03a01"></a>依赖<br />
 <div class="outline-text-6" id="text-5-9-2-1-1">
 <div class="org-src-container">
 <pre class="src src-nix">slime
@@ -4309,7 +4302,7 @@ yasnippet-snippets
 </div>
 </div>
 </li>
-<li><a id="org7a52f9e"></a>配置<br />
+<li><a id="org551f4bc"></a>配置<br />
 <div class="outline-text-6" id="text-5-9-2-1-2">
 <div class="org-src-container">
 <pre class="src src-emacs-lisp">(use-package slime
@@ -4325,11 +4318,11 @@ yasnippet-snippets
 </li>
 </ol>
 </li>
-<li><a id="orgedfa46c"></a>方言<br />
+<li><a id="orgfec4475"></a>方言<br />
 <ol class="org-ol">
-<li><a id="org6b358f9"></a>Elisp<br />
+<li><a id="orgef6c3ee"></a>Elisp<br />
 <ol class="org-ol">
-<li><a id="org3c9b25c"></a>配置<br />
+<li><a id="org0f969e8"></a>配置<br />
 <div class="outline-text-7" id="text-5-9-2-2-1-1">
 <ul class="org-ul">
 <li><code>M-:</code> 时的 eval expression minibuffer 的时候加入 prog mode。</li>
@@ -4342,9 +4335,9 @@ yasnippet-snippets
 </li>
 </ol>
 </li>
-<li><a id="orgeb9eda7"></a>Clojure<br />
+<li><a id="orgf552bf0"></a>Clojure<br />
 <ol class="org-ol">
-<li><a id="org1124ecd"></a>依赖<br />
+<li><a id="org370c035"></a>依赖<br />
 <div class="outline-text-7" id="text-5-9-2-2-2-1">
 <div class="org-src-container">
 <pre class="src src-emacs-lisp">(idiig//setup-nix-lsp-bridge-server 
@@ -4362,14 +4355,14 @@ yasnippet-snippets
 </li>
 </ol>
 </div>
-<div id="outline-container-org379df0c" class="outline-4">
-<h4 id="org379df0c"><span class="section-number-4">5.9.3.</span> Python</h4>
+<div id="outline-container-org37018eb" class="outline-4">
+<h4 id="org37018eb"><span class="section-number-4">5.9.3.</span> Python</h4>
 <div class="outline-text-4" id="text-5-9-3">
 </div>
 <ol class="org-ol">
-<li><a id="org120e0e6"></a>本体<br />
+<li><a id="org9c4eb94"></a>本体<br />
 <ol class="org-ol">
-<li><a id="org227e20b"></a>依赖<br />
+<li><a id="orgea73392"></a>依赖<br />
 <div class="outline-text-6" id="text-5-9-3-1-1">
 <div class="org-src-container">
 <pre class="src src-emacs-lisp">(idiig//setup-nix-lsp-bridge-server 
@@ -4381,20 +4374,20 @@ yasnippet-snippets
 </div>
 </div>
 </li>
-<li><a id="orgdc7d8a0"></a>配置<br /></li>
+<li><a id="orgb8f19fd"></a>配置<br /></li>
 </ol>
 </li>
-<li><a id="orgd5fdae6"></a>虚拟环境<br /></li>
+<li><a id="org3945ae3"></a>虚拟环境<br /></li>
 </ol>
 </div>
-<div id="outline-container-orgc1d0cee" class="outline-4">
-<h4 id="orgc1d0cee"><span class="section-number-4">5.9.4.</span> Haskell</h4>
+<div id="outline-container-org805a26f" class="outline-4">
+<h4 id="org805a26f"><span class="section-number-4">5.9.4.</span> Haskell</h4>
 <div class="outline-text-4" id="text-5-9-4">
 </div>
 <ol class="org-ol">
-<li><a id="org5a47a70"></a>本体<br />
+<li><a id="org7a97911"></a>本体<br />
 <ol class="org-ol">
-<li><a id="org645a761"></a>依赖<br />
+<li><a id="org27a7eb5"></a>依赖<br />
 <div class="outline-text-6" id="text-5-9-4-1-1">
 <p>
 Major mode:
@@ -4418,17 +4411,17 @@ Major mode:
 </li>
 </ol>
 </div>
-<div id="outline-container-orgf9bdafa" class="outline-4">
-<h4 id="orgf9bdafa"><span class="section-number-4">5.9.5.</span> R</h4>
+<div id="outline-container-org24185ab" class="outline-4">
+<h4 id="org24185ab"><span class="section-number-4">5.9.5.</span> R</h4>
 </div>
-<div id="outline-container-org4c16af1" class="outline-4">
-<h4 id="org4c16af1"><span class="section-number-4">5.9.6.</span> Go</h4>
+<div id="outline-container-org14e3a26" class="outline-4">
+<h4 id="org14e3a26"><span class="section-number-4">5.9.6.</span> Go</h4>
 <div class="outline-text-4" id="text-5-9-6">
 </div>
 <ol class="org-ol">
-<li><a id="org0debbba"></a>本体<br />
+<li><a id="org1fb55a9"></a>本体<br />
 <ol class="org-ol">
-<li><a id="org3670f44"></a>依赖<br />
+<li><a id="org505d828"></a>依赖<br />
 <div class="outline-text-6" id="text-5-9-6-1-1">
 <p>
 Major mode:
@@ -4451,7 +4444,7 @@ LSP:
 </div>
 </div>
 </li>
-<li><a id="orgf2ebca2"></a>配置<br />
+<li><a id="org95fb93e"></a>配置<br />
 <div class="outline-text-6" id="text-5-9-6-1-2">
 <div class="org-src-container">
 <pre class="src src-emacs-lisp">(defun idiig/go-prefer-lsp ()
@@ -4477,12 +4470,12 @@ LSP:
 </li>
 </ol>
 </div>
-<div id="outline-container-org70205f9" class="outline-4">
-<h4 id="org70205f9"><span class="section-number-4">5.9.7.</span> Shell</h4>
+<div id="outline-container-orgd172290" class="outline-4">
+<h4 id="orgd172290"><span class="section-number-4">5.9.7.</span> Shell</h4>
 <div class="outline-text-4" id="text-5-9-7">
 </div>
 <ol class="org-ol">
-<li><a id="org0cbd11c"></a>依赖<br />
+<li><a id="org0e74e0b"></a>依赖<br />
 <div class="outline-text-5" id="text-5-9-7-1">
 <div class="org-src-container">
 <pre class="src src-emacs-lisp">(idiig//setup-nix-lsp-bridge-server 
@@ -4494,9 +4487,9 @@ LSP:
 </div>
 </div>
 </li>
-<li><a id="org83a4fa4"></a>配置<br />
+<li><a id="orge4b44a8"></a>配置<br />
 <ol class="org-ol">
-<li><a id="orgadd84f1"></a>用 <code>bash</code> 作为默认 shell<br />
+<li><a id="org0bcbebd"></a>用 <code>bash</code> 作为默认 shell<br />
 <div class="outline-text-6" id="text-5-9-7-2-1">
 <div class="org-src-container">
 <pre class="src src-emacs-lisp">;; (setq shell-command-switch "-ic")
@@ -4512,8 +4505,8 @@ LSP:
 </li>
 </ol>
 </div>
-<div id="outline-container-org72942fe" class="outline-4">
-<h4 id="org72942fe"><span class="section-number-4">5.9.8.</span> jq</h4>
+<div id="outline-container-org6a49d6d" class="outline-4">
+<h4 id="org6a49d6d"><span class="section-number-4">5.9.8.</span> jq</h4>
 <div class="outline-text-4" id="text-5-9-8">
 <div class="org-src-container">
 <pre class="src src-nix">jq-mode
@@ -4521,15 +4514,15 @@ LSP:
 </div>
 </div>
 </div>
-<div id="outline-container-orgf247e8d" class="outline-4">
-<h4 id="orgf247e8d"><span class="section-number-4">5.9.9.</span> Make</h4>
+<div id="outline-container-org5ca55c0" class="outline-4">
+<h4 id="org5ca55c0"><span class="section-number-4">5.9.9.</span> Make</h4>
 </div>
-<div id="outline-container-org01699a9" class="outline-4">
-<h4 id="org01699a9"><span class="section-number-4">5.9.10.</span> TeX</h4>
+<div id="outline-container-org66b1763" class="outline-4">
+<h4 id="org66b1763"><span class="section-number-4">5.9.10.</span> TeX</h4>
 <div class="outline-text-4" id="text-5-9-10">
 </div>
 <ol class="org-ol">
-<li><a id="org5648a0d"></a>依赖<br />
+<li><a id="orgb3980b1"></a>依赖<br />
 <div class="outline-text-5" id="text-5-9-10-1">
 <div class="org-src-container">
 <pre class="src src-nix">auctex
@@ -4547,7 +4540,7 @@ LSP:
 </div>
 </div>
 </li>
-<li><a id="org5e90317"></a>配置<br />
+<li><a id="orgb0c5d72"></a>配置<br />
 <div class="outline-text-5" id="text-5-9-10-2">
 <div class="org-src-container">
 <pre class="src src-emacs-lisp">(add-hook 'TeX-mode-hook 'idiig/run-prog-mode-hooks)
@@ -4563,27 +4556,27 @@ LSP:
 </li>
 </ol>
 </div>
-<div id="outline-container-org58ca5ee" class="outline-4">
-<h4 id="org58ca5ee"><span class="section-number-4">5.9.11.</span> Typst</h4>
+<div id="outline-container-org5bc426e" class="outline-4">
+<h4 id="org5bc426e"><span class="section-number-4">5.9.11.</span> Typst</h4>
 </div>
 
-<div id="outline-container-org24e7838" class="outline-4">
-<h4 id="org24e7838"><span class="section-number-4">5.9.12.</span> Markdown</h4>
+<div id="outline-container-org11b5bec" class="outline-4">
+<h4 id="org11b5bec"><span class="section-number-4">5.9.12.</span> Markdown</h4>
 </div>
 
-<div id="outline-container-org52defa4" class="outline-4">
-<h4 id="org52defa4"><span class="section-number-4">5.9.13.</span> Quarto</h4>
+<div id="outline-container-orgce1f1f6" class="outline-4">
+<h4 id="orgce1f1f6"><span class="section-number-4">5.9.13.</span> Quarto</h4>
 </div>
 
-<div id="outline-container-org8388d67" class="outline-4">
-<h4 id="org8388d67"><span class="section-number-4">5.9.14.</span> XML</h4>
+<div id="outline-container-org3746008" class="outline-4">
+<h4 id="org3746008"><span class="section-number-4">5.9.14.</span> XML</h4>
 </div>
-<div id="outline-container-org10a42b4" class="outline-4">
-<h4 id="org10a42b4"><span class="section-number-4">5.9.15.</span> JSON</h4>
+<div id="outline-container-org0d7321f" class="outline-4">
+<h4 id="org0d7321f"><span class="section-number-4">5.9.15.</span> JSON</h4>
 <div class="outline-text-4" id="text-5-9-15">
 </div>
 <ol class="org-ol">
-<li><a id="orge03ad4b"></a>依赖<br />
+<li><a id="orgd2169b7"></a>依赖<br />
 <div class="outline-text-5" id="text-5-9-15-1">
 <div class="org-src-container">
 <pre class="src src-nix">jsonian
@@ -4601,7 +4594,7 @@ LSP:
 </div>
 </div>
 </li>
-<li><a id="org262e5d3"></a>配置<br />
+<li><a id="org7060645"></a>配置<br />
 <div class="outline-text-5" id="text-5-9-15-2">
 <div class="org-src-container">
 <pre class="src src-emacs-lisp">(use-package jsonian
@@ -4614,16 +4607,16 @@ LSP:
 </li>
 </ol>
 </div>
-<div id="outline-container-org3577c95" class="outline-4">
-<h4 id="org3577c95"><span class="section-number-4">5.9.16.</span> Web</h4>
+<div id="outline-container-orge63066f" class="outline-4">
+<h4 id="orge63066f"><span class="section-number-4">5.9.16.</span> Web</h4>
 </div>
 
-<div id="outline-container-org6bf793a" class="outline-4">
-<h4 id="org6bf793a"><span class="section-number-4">5.9.17.</span> Java</h4>
+<div id="outline-container-orgc0efa34" class="outline-4">
+<h4 id="orgc0efa34"><span class="section-number-4">5.9.17.</span> Java</h4>
 <div class="outline-text-4" id="text-5-9-17">
 </div>
 <ol class="org-ol">
-<li><a id="orge4d2eeb"></a>依赖<br />
+<li><a id="org013f33c"></a>依赖<br />
 <div class="outline-text-5" id="text-5-9-17-1">
 <div class="org-src-container">
 <pre class="src src-nix">(pkgs.jre_minimal)
@@ -4633,12 +4626,12 @@ LSP:
 </li>
 </ol>
 </div>
-<div id="outline-container-orgd98781e" class="outline-4">
-<h4 id="orgd98781e"><span class="section-number-4">5.9.18.</span> PlantUML</h4>
+<div id="outline-container-org276ae8b" class="outline-4">
+<h4 id="org276ae8b"><span class="section-number-4">5.9.18.</span> PlantUML</h4>
 <div class="outline-text-4" id="text-5-9-18">
 </div>
 <ol class="org-ol">
-<li><a id="org3e6bae5"></a>依赖<br />
+<li><a id="org31a97b2"></a>依赖<br />
 <div class="outline-text-5" id="text-5-9-18-1">
 <div class="org-src-container">
 <pre class="src src-nix">plantuml-mode
@@ -4657,12 +4650,12 @@ LSP:
 </li>
 </ol>
 </div>
-<div id="outline-container-org5f7db72" class="outline-4">
-<h4 id="org5f7db72"><span class="section-number-4">5.9.19.</span> GraphViz</h4>
+<div id="outline-container-orgad530d6" class="outline-4">
+<h4 id="orgad530d6"><span class="section-number-4">5.9.19.</span> GraphViz</h4>
 <div class="outline-text-4" id="text-5-9-19">
 </div>
 <ol class="org-ol">
-<li><a id="org8621da1"></a>依赖<br />
+<li><a id="orgd4619a0"></a>依赖<br />
 <div class="outline-text-5" id="text-5-9-19-1">
 <div class="org-src-container">
 <pre class="src src-emacs-lisp">(add-to-list 'exec-path "${pkgs.graphviz}/bin")
@@ -4673,16 +4666,16 @@ LSP:
 </ol>
 </div>
 </div>
-<div id="outline-container-orgfa10409" class="outline-3">
-<h3 id="orgfa10409"><span class="section-number-3">5.10.</span> Org相关配置</h3>
+<div id="outline-container-orgb2aad78" class="outline-3">
+<h3 id="orgb2aad78"><span class="section-number-3">5.10.</span> Org相关配置</h3>
 <div class="outline-text-3" id="text-5-10">
 </div>
-<div id="outline-container-org14d2373" class="outline-4">
-<h4 id="org14d2373"><span class="section-number-4">5.10.1.</span> Org本体</h4>
+<div id="outline-container-orgf29628f" class="outline-4">
+<h4 id="orgf29628f"><span class="section-number-4">5.10.1.</span> Org本体</h4>
 <div class="outline-text-4" id="text-5-10-1">
 </div>
 <ol class="org-ol">
-<li><a id="org40c00a4"></a>绑定 prog mode<br />
+<li><a id="orgc29199f"></a>绑定 prog mode<br />
 <div class="outline-text-5" id="text-5-10-1-1">
 <div class="org-src-container">
 <pre class="src src-emacs-lisp">(add-hook 'org-mode-hook 'idiig/run-prog-mode-hooks)
@@ -4690,11 +4683,52 @@ LSP:
 </div>
 </div>
 </li>
-<li><a id="org9065499"></a><span class="todo TODO">TODO</span> 函数与advice<br />
-<div class="outline-text-5" id="text-5-10-1-2">
+<li><a id="org70e0e15"></a>代码块支持语言<br />
+<ol class="org-ol">
+<li><a id="org3fd9122"></a>依赖<br />
+<div class="outline-text-6" id="text-5-10-1-2-1">
 <p>
-<code>org-insert-structure-template</code> 后选择 <code>s</code> (src block) 时自动提示插入代码
-块的语言。
+由于 <code>ob-nix</code>, <code>ob-go</code> 还没有默认。我们需要添加这些依赖
+</p>
+<div class="org-src-container">
+<pre class="src src-nix">ob-nix
+  ob-go
+</pre>
+</div>
+</div>
+</li>
+<li><a id="orgf1c864a"></a>配置<br />
+<div class="outline-text-6" id="text-5-10-1-2-2">
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(defun idiig/load-org-babel-languages ()
+  "根据 `idiig/language-list` 启用 `org-babel` 语言。"
+  (let ((languages '()))
+    (dolist (lang idiig/language-list)
+      (push (cons (intern lang) t) languages)) ;; 将字符串转换为符号
+    (org-babel-do-load-languages 'org-babel-load-languages languages)))
+
+(defun idiig/set-org-babel-language-commands ()
+  "根据 `idiig/language-list` 甚至语言的命令。"
+  (dolist (lang idiig/language-list)
+    (let ((var-name (intern (format "org-babel-%s-command" lang))))
+      (when (boundp var-name)
+        (set var-name (executable-find lang))))))
+
+(add-hook 'org-mode-hook #'idiig/load-org-babel-languages)
+(add-hook 'org-mode-hook #'idiig/set-org-babel-language-commands)
+
+;; 特殊
+(setq org-babel-shell-command (executable-find "bash"))
+</pre>
+</div>
+</div>
+</li>
+</ol>
+</li>
+<li><a id="orgf926b7e"></a>结构化插入Babel模板<br />
+<div class="outline-text-5" id="text-5-10-1-3">
+<p>
+<code>org-insert-structure-template</code> 后选择 <code>s</code> (src block) 时自动提示插入代码块的语言。
 </p>
 
 <p>
@@ -4718,57 +4752,32 @@ LSP:
 </div>
 </div>
 </li>
-<li><a id="orgee5b726"></a>代码块支持语言<br />
+<li><a id="org5916227"></a>基础设定<br />
 <ol class="org-ol">
-<li><a id="org0db0a06"></a>依赖<br />
-<div class="outline-text-6" id="text-5-10-1-3-1">
-<p>
-由于 <code>ob-nix</code>, <code>ob-go</code> 还没有默认。我们需要添加这些依赖
-</p>
-<div class="org-src-container">
-<pre class="src src-nix">ob-nix
-  ob-go
-</pre>
-</div>
-</div>
-</li>
-<li><a id="orgd56bf58"></a>配置<br />
-<div class="outline-text-6" id="text-5-10-1-3-2">
-<div class="org-src-container">
-<pre class="src src-emacs-lisp">(defun idiig/load-org-babel-languages ()
-  "根据 `idiig/language-list` 启用 `org-babel` 语言。"
-  (let ((languages '()))
-    (dolist (lang idiig/language-list)
-      (push (cons (intern lang) t) languages)) ;; 将字符串转换为符号
-    (org-babel-do-load-languages 'org-babel-load-languages languages)))
-
-(defun idiig/set-org-babel-language-commands ()
-  "根据 `idiig/language-list` 甚至语言的命令。"
-  (dolist (lang idiig/language-list)
-    (let ((var-name (intern (format "org-babel-%s-command" lang))))
-      (when (boundp var-name)
-        (set var-name (executable-find lang))))))
-
-(add-hook 'org-mode-hook #'idiig/load-org-babel-languages)
-(add-hook 'org-mode-hook #'idiig/set-org-babel-language-commands)
-
-;; 特殊
-(setq org-babel-shell-command (executable-find "bash"))
-</pre>
-</div>
-
-<div class="org-src-container">
-<pre class="src src-emacs-lisp">
-</pre>
-</div>
-</div>
-</li>
-</ol>
-</li>
-<li><a id="orga799264"></a><span class="todo TODO">TODO</span> 基础设定<br />
-<ol class="org-ol">
-<li><a id="org2c896fe"></a>允许shift用于选择<br />
+<li><a id="orga6897f2"></a>默认进入 org-mode 时的设定<br />
 <div class="outline-text-6" id="text-5-10-1-4-1">
+<ul class="org-ul">
+<li>显示图片</li>
+<li>显示 LaTeX 公式</li>
+<li>折叠显示所有顶层节点</li>
+<li>展开显示当前节点内容</li>
+<li>展开显示所有子节点但不展开下一级</li>
+</ul>
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(with-eval-after-load 'org
+  (setq org-startup-with-inline-images t) ; 启动时显示图片
+  (setq org-startup-with-latex-preview t) ; 启动时显示 LaTeX 公式
+  (add-hook 'org-mode-hook
+            (lambda ()
+              (org-overview)		; 显示所有顶层节点
+              (org-show-entry)		; 显示当前节点内容
+              (org-show-children))))	; 显示所有子节点但不展开
+</pre>
+</div>
+</div>
+</li>
+<li><a id="orga3be730"></a>允许shift用于选择<br />
+<div class="outline-text-6" id="text-5-10-1-4-2">
 <div class="org-src-container">
 <pre class="src src-emacs-lisp">(with-eval-after-load 'org
   (setq org-support-shift-select 2))
@@ -4776,8 +4785,8 @@ LSP:
 </div>
 </div>
 </li>
-<li><a id="org470baf9"></a>远程图片文件可以通过 <code>C-u C-c C-x C-v</code> 被看到<br />
-<div class="outline-text-6" id="text-5-10-1-4-2">
+<li><a id="orga91f3a6"></a>远程图片文件可以通过 <code>C-u C-c C-x C-v</code> 被看到<br />
+<div class="outline-text-6" id="text-5-10-1-4-3">
 <div class="org-src-container">
 <pre class="src src-emacs-lisp">(with-eval-after-load 'org
   (setq org-display-remote-inline-images t))
@@ -4785,8 +4794,8 @@ LSP:
 </div>
 </div>
 </li>
-<li><a id="orga2719be"></a>允许 <code>#+bind</code> 关键词<br />
-<div class="outline-text-6" id="text-5-10-1-4-3">
+<li><a id="org852bfef"></a>允许 <code>#+bind</code> 关键词<br />
+<div class="outline-text-6" id="text-5-10-1-4-4">
 <div class="org-src-container">
 <pre class="src src-emacs-lisp">(with-eval-after-load 'org
   (setq org-export-allow-bind-keywords t))
@@ -4796,45 +4805,62 @@ LSP:
 </li>
 </ol>
 </li>
-<li><a id="org8619132"></a>面貌<br />
+<li><a id="org06133af"></a>面貌<br />
 <ol class="org-ol">
-<li><a id="orga708e2d"></a>基础美化<br />
+<li><a id="org7c036e3"></a>基础美化<br />
 <div class="outline-text-6" id="text-5-10-1-5-1">
 <div class="org-src-container">
 <pre class="src src-emacs-lisp">(with-eval-after-load 'org
  ;; Edit settings
- org-auto-align-tags nil                    ; 禁用标签自动对齐功能
- org-tags-column 0                          ; 标签紧贴标题文本，不右对齐
- org-catch-invisible-edits 'show-and-error  ; 编辑折叠内容时显示并报错提醒
- org-special-ctrl-a/e t                     ; 增强 C-a/C-e，先跳到内容开始/结束，再跳到行首/尾
- org-insert-heading-respect-content t       ; 插入标题时考虑内容结构，在内容后插入
+ (setq org-auto-align-tags nil		; 禁用标签自动对齐功能
+       org-tags-column 0		; 标签紧贴标题文本，不右对齐
+       org-catch-invisible-edits 'show-and-error  ; 编辑折叠内容时显示并报错提醒
+       org-special-ctrl-a/e t ; 增强 C-a/C-e，先跳到内容开始/结束，再跳到行首/尾
+       org-insert-heading-respect-content t ; 插入标题时考虑内容结构，在内容后插入
 
- ;; Org styling, hide markup etc.
- org-hide-emphasis-markers t                ; 隐藏强调标记符号 (*粗体* 显示为 粗体)
- org-pretty-entities t)                     ; 美化显示实体字符 (\alpha 显示为 α)
+       ;; Org styling, hide markup etc.
+       org-hide-emphasis-markers t ; 隐藏强调标记符号 (*粗体* 显示为 粗体)
+       org-pretty-entities t))	  ; 美化显示实体字符 (\alpha 显示为 α)
 </pre>
 </div>
 </div>
 </li>
-<li><a id="org4bf4163"></a>字体，缩进，换行设定<br />
+<li><a id="org693d6ea"></a>字体，缩进，换行设定<br />
 <div class="outline-text-6" id="text-5-10-1-5-2">
 <div class="org-src-container">
 <pre class="src src-emacs-lisp">(defun idiig/org-mode-face-settings ()
   "Set custom face attributes for Org mode headings in current buffer only."
 
-  (auto-fill-mode 0)
-  (require 'org-indent)
-  (org-indent-mode)
-  (variable-pitch-mode 1)
-  (visual-line-mode 1)
+  (auto-fill-mode 0)			; Disable auto-fill mode
+  (require 'org-indent)			; Ensure org-indent is loaded
+  (org-indent-mode)			; Enable org-indent mode
+  (variable-pitch-mode 1)		; Enable variable-pitch mode
+  (visual-line-mode 1)			; Enable visual-line mode for soft wrapping
 
-  (set-face-attribute 'variable-pitch nil :family "Sarasa Gothic J" :height 150)
-  (set-face-attribute 'fixed-pitch nil    :family "Sarasa Mono J"   :height 120)
-  (buffer-face-set '(:family "Sarasa Gothic J" :height 1.1))
-  (setq-local line-spacing 0.3)
+  (defvar idiig/fixed-width-font "Sarasa Mono J"
+    "The font to use for monospaced (fixed width) text.")
 
-  (let ((my-font "Sarasa Mono J")
-        (faces '((org-level-1 . 1.2)
+  (defvar idiig/variable-width-font "Sarasa Gothic J"
+    "The font to use for variable-pitch (document) text.")
+
+  (set-face-attribute 'default nil
+                      :font idiig/fixed-width-font
+                      :weight 'regular
+                      :height 160)
+  (set-face-attribute 'fixed-pitch nil
+                      :font idiig/fixed-width-font
+                      :weight 'regular
+                      :height 170)
+  (set-face-attribute 'variable-pitch nil
+                      :font idiig/variable-width-font
+                      :weight 'regular
+                      :height 1.3)
+  (buffer-face-set `(:family ,idiig/fixed-width-font
+                             :height 1.1)) ; Set buffer face
+
+  (setq-local line-spacing 0.3)		; Set line spacing
+
+  (let ((faces '((org-level-1 . 1.2)
                  (org-level-2 . 1.1)
                  (org-level-3 . 1.05)
                  (org-level-4 . 1.0)
@@ -4843,15 +4869,23 @@ LSP:
                  (org-level-7 . 1.1)
                  (org-level-8 . 1.1))))
     (dolist (face faces)
-      (face-remap-add-relative (car face) :family my-font :weight 'regular :height (cdr face))))
+      `(face-remap-add-relative (car face)
+                               :family ,idiig/variable-width-font
+                               :weight 'regular
+                               :height (cdr face))))
 
+  ;; Make sure certain org faces use the fixed-pitch face when variable-pitch-mode is on
   (set-face-attribute 'org-block nil :foreground nil :inherit 'fixed-pitch)
-  (set-face-attribute 'org-code nil   :inherit '(shadow fixed-pitch))
-  (set-face-attribute 'org-indent nil :inherit '(org-hide fixed-pitch))
+  (set-face-attribute 'org-table nil :inherit 'fixed-pitch)
+  (set-face-attribute 'org-formula nil :inherit 'fixed-pitch)
+  (set-face-attribute 'org-code nil :inherit '(shadow fixed-pitch))
   (set-face-attribute 'org-verbatim nil :inherit '(shadow fixed-pitch))
   (set-face-attribute 'org-special-keyword nil :inherit '(font-lock-comment-face fixed-pitch))
   (set-face-attribute 'org-meta-line nil :inherit '(font-lock-comment-face fixed-pitch))
   (set-face-attribute 'org-checkbox nil :inherit 'fixed-pitch)
+
+  ;; Make the document title a bit bigger
+  (set-face-attribute 'org-document-title nil :font idiig/variable-width-font :weight 'bold :height 1.3)
 
   (with-eval-after-load 'diminish
     (diminish 'org-indent-mode)
@@ -4862,7 +4896,7 @@ LSP:
 </div>
 </div>
 </li>
-<li><a id="org42a2204"></a>数学渲染<br />
+<li><a id="org52417cf"></a>数学渲染<br />
 <div class="outline-text-6" id="text-5-10-1-5-3">
 <div class="org-src-container">
 <pre class="src src-emacs-lisp">(with-eval-after-load 'org
@@ -4883,9 +4917,9 @@ LSP:
 </div>
 </div>
 </li>
-<li><a id="org807d8d4"></a>Bullets<br />
+<li><a id="org6e7c9d7"></a>Bullets<br />
 <ol class="org-ol">
-<li><a id="org23387ec"></a>依赖<br />
+<li><a id="orgbc5ff46"></a>依赖<br />
 <div class="outline-text-7" id="text-5-10-1-5-4-1">
 <div class="org-src-container">
 <pre class="src src-nix">org-bullets
@@ -4893,7 +4927,7 @@ LSP:
 </div>
 </div>
 </li>
-<li><a id="org4eb3b54"></a>配置<br />
+<li><a id="orge13eddc"></a>配置<br />
 <div class="outline-text-7" id="text-5-10-1-5-4-2">
 <div class="org-src-container">
 <pre class="src src-emacs-lisp">(use-package org-bullets
@@ -4919,12 +4953,12 @@ LSP:
 </li>
 </ol>
 </div>
-<div id="outline-container-org8f3eab7" class="outline-4">
-<h4 id="org8f3eab7"><span class="section-number-4">5.10.2.</span> 文献引用处理器 (<code>citeproc-el</code>)</h4>
+<div id="outline-container-org2cbab1a" class="outline-4">
+<h4 id="org2cbab1a"><span class="section-number-4">5.10.2.</span> 文献引用处理器 (<code>citeproc-el</code>)</h4>
 <div class="outline-text-4" id="text-5-10-2">
 </div>
 <ol class="org-ol">
-<li><a id="org261032c"></a>依赖<br />
+<li><a id="orgf313813"></a>依赖<br />
 <div class="outline-text-5" id="text-5-10-2-1">
 <div class="org-src-container">
 <pre class="src src-nix">citeproc
@@ -4932,7 +4966,7 @@ LSP:
 </div>
 </div>
 </li>
-<li><a id="org940df45"></a>配置<br />
+<li><a id="org9360e5c"></a>配置<br />
 <div class="outline-text-5" id="text-5-10-2-2">
 <div class="org-src-container">
 <pre class="src src-emacs-lisp">(with-eval-after-load 'org
@@ -4947,15 +4981,15 @@ LSP:
 </li>
 </ol>
 </div>
-<div id="outline-container-org77e5849" class="outline-4">
-<h4 id="org77e5849"><span class="section-number-4">5.10.3.</span> 出入引用配置 (<code>oc</code>, <code>oc-basic</code>)</h4>
+<div id="outline-container-org7942b11" class="outline-4">
+<h4 id="org7942b11"><span class="section-number-4">5.10.3.</span> 出入引用配置 (<code>oc</code>, <code>oc-basic</code>)</h4>
 <div class="outline-text-4" id="text-5-10-3">
 <p>
 <code>org-cite</code> 增强：插入后选择样式和参数。
 </p>
 </div>
 <ol class="org-ol">
-<li><a id="orgf4887a2"></a>配置<br />
+<li><a id="org72cbc0c"></a>配置<br />
 <div class="outline-text-5" id="text-5-10-3-1">
 <div class="org-src-container">
 <pre class="src src-emacs-lisp">(with-eval-after-load 'oc
@@ -5084,18 +5118,18 @@ Style examples:
 </li>
 </ol>
 </div>
-<div id="outline-container-org83c7cbd" class="outline-4">
-<h4 id="org83c7cbd"><span class="section-number-4">5.10.4.</span> 幻灯片 (<code>org-tree-slide</code>)</h4>
+<div id="outline-container-org87c80dc" class="outline-4">
+<h4 id="org87c80dc"><span class="section-number-4">5.10.4.</span> 幻灯片 (<code>org-present</code>)</h4>
 <div class="outline-text-4" id="text-5-10-4">
 <p>
-用 <code>org-tree-slide</code> 作幻灯片发表。手动开启。
+用 <code>org-present</code> 作幻灯片发表。手动开启。
 </p>
 </div>
 <ol class="org-ol">
-<li><a id="orge24d5fe"></a>依赖<br />
+<li><a id="org4f7ea94"></a>依赖<br />
 <div class="outline-text-5" id="text-5-10-4-1">
 <div class="org-src-container">
-<pre class="src src-nix">org-tree-slide
+<pre class="src src-nix">org-present
 </pre>
 </div>
 </div>
@@ -5103,16 +5137,16 @@ Style examples:
 </ol>
 </div>
 </div>
-<div id="outline-container-orga5ad42c" class="outline-3">
-<h3 id="orga5ad42c"><span class="section-number-3">5.11.</span> AI辅助功能</h3>
+<div id="outline-container-orgb3a30b2" class="outline-3">
+<h3 id="orgb3a30b2"><span class="section-number-3">5.11.</span> AI辅助功能</h3>
 <div class="outline-text-3" id="text-5-11">
 </div>
-<div id="outline-container-orge7b46e1" class="outline-4">
-<h4 id="orge7b46e1"><span class="section-number-4">5.11.1.</span> Copilot</h4>
+<div id="outline-container-orgb442a04" class="outline-4">
+<h4 id="orgb442a04"><span class="section-number-4">5.11.1.</span> Copilot</h4>
 <div class="outline-text-4" id="text-5-11-1">
 </div>
 <ol class="org-ol">
-<li><a id="org063cfbd"></a>依赖<br />
+<li><a id="org64e5c68"></a>依赖<br />
 <div class="outline-text-5" id="text-5-11-1-1">
 <div class="org-src-container">
 <pre class="src src-nix">copilot
@@ -5120,7 +5154,7 @@ Style examples:
 </div>
 </div>
 </li>
-<li><a id="orgf25229f"></a>配置<br />
+<li><a id="org19e1107"></a>配置<br />
 <div class="outline-text-5" id="text-5-11-1-2">
 <div class="org-src-container">
 <pre class="src src-emacs-lisp">(use-package copilot
@@ -5140,12 +5174,12 @@ Style examples:
 </li>
 </ol>
 </div>
-<div id="outline-container-org7c298bd" class="outline-4">
-<h4 id="org7c298bd"><span class="section-number-4">5.11.2.</span> Chatbot (<code>gptel)</code></h4>
+<div id="outline-container-orgac02828" class="outline-4">
+<h4 id="orgac02828"><span class="section-number-4">5.11.2.</span> Chatbot (<code>gptel)</code></h4>
 <div class="outline-text-4" id="text-5-11-2">
 </div>
 <ol class="org-ol">
-<li><a id="org0180956"></a>依赖<br />
+<li><a id="org7c7b218"></a>依赖<br />
 <div class="outline-text-5" id="text-5-11-2-1">
 <div class="org-src-container">
 <pre class="src src-nix">gptel
@@ -5153,7 +5187,7 @@ Style examples:
 </div>
 </div>
 </li>
-<li><a id="orgeb0f5c8"></a>配置<br />
+<li><a id="org786a3b3"></a>配置<br />
 <div class="outline-text-5" id="text-5-11-2-2">
 <div class="org-src-container">
 <pre class="src src-emacs-lisp">(add-hook 'org-mode-hook
@@ -5166,16 +5200,16 @@ Style examples:
 </li>
 </ol>
 </div>
-<div id="outline-container-org5808aed" class="outline-4">
-<h4 id="org5808aed"><span class="section-number-4">5.11.3.</span> AI-pairing programming (<code>Aidermacs</code>)</h4>
+<div id="outline-container-org676a018" class="outline-4">
+<h4 id="org676a018"><span class="section-number-4">5.11.3.</span> AI-pairing programming (<code>Aidermacs</code>)</h4>
 <div class="outline-text-4" id="text-5-11-3">
 </div>
 <ol class="org-ol">
-<li><a id="org3bab5da"></a>依赖<br />
+<li><a id="org810d34f"></a>依赖<br />
 <div class="outline-text-5" id="text-5-11-3-1">
 </div>
 <ol class="org-ol">
-<li><a id="orgc3ef85e"></a>aidermacs.el<br />
+<li><a id="orgd15dcc5"></a>aidermacs.el<br />
 <div class="outline-text-6" id="text-5-11-3-1-1">
 <div class="org-src-container">
 <pre class="src src-nix">aidermacs
@@ -5183,7 +5217,7 @@ Style examples:
 </div>
 </div>
 </li>
-<li><a id="org45d833f"></a>Aider 目录路径<br />
+<li><a id="orgd4ccad9"></a>Aider 目录路径<br />
 <div class="outline-text-6" id="text-5-11-3-1-2">
 <div class="org-src-container">
 <pre class="src src-emacs-lisp">(add-to-list 'exec-path "${pkgs.aider-chat}/bin")
@@ -5193,19 +5227,17 @@ Style examples:
 </li>
 </ol>
 </li>
-<li><a id="org0659d53"></a>配置<br />
+<li><a id="orge91c214"></a>配置<br />
 <div class="outline-text-5" id="text-5-11-3-2">
 <p>
-<code>Aidermacs</code> 是一个用于在 Emacs 中使用 <code>Aider</code> 的 AI 辅助编程工具，集成了多
-种 AI 模型服务，帮助用户在编程过程中获得智能建议和辅助。
+<code>Aidermacs</code> 是一个用于在 Emacs 中使用 <code>Aider</code> 的 AI 辅助编程工具，集成了多种 AI 模型服务，帮助用户在编程过程中获得智能建议和辅助。
 </p>
 </div>
 <ol class="org-ol">
-<li><a id="orgc01156d"></a>API Key 环境变量<br />
+<li><a id="org185cd8f"></a>API Key 环境变量<br />
 <div class="outline-text-6" id="text-5-11-3-2-1">
 <p>
-它需要 API Key 来使用 OpenAI 或者其他模型服务。目前我主要支持的模型服
-务提供商有 OpenAI、Anthropic 和 Google。
+它需要 API Key 来使用 OpenAI 或者其他模型服务。目前我主要支持的模型服务提供商有 OpenAI、Anthropic 和 Google。
 </p>
 
 <div class="org-src-container">
@@ -5297,7 +5329,7 @@ Interactively prompts for the directory with smart default."
 </div>
 </div>
 </li>
-<li><a id="org189d67d"></a><code>Aidermacs</code> 配置<br />
+<li><a id="orgfa94312"></a><code>Aidermacs</code> 配置<br />
 <div class="outline-text-6" id="text-5-11-3-2-2">
 <p>
 启用 <code>C-c a</code> 快捷键打开菜单。默认使用 <code>sonnet</code> 模型。
@@ -5319,12 +5351,12 @@ Interactively prompts for the directory with smart default."
 </li>
 </ol>
 </div>
-<div id="outline-container-orgc8ab8bb" class="outline-4">
-<h4 id="orgc8ab8bb"><span class="section-number-4">5.11.4.</span> <span class="todo TODO">TODO</span> AI-Client (<code>claude-code</code>)</h4>
+<div id="outline-container-orgb67bf42" class="outline-4">
+<h4 id="orgb67bf42"><span class="section-number-4">5.11.4.</span> <span class="todo TODO">TODO</span> AI-Client (<code>claude-code</code>)</h4>
 <div class="outline-text-4" id="text-5-11-4">
 </div>
 <ol class="org-ol">
-<li><a id="orgda0f5a8"></a>依赖<br />
+<li><a id="orgb71a80c"></a>依赖<br />
 <div class="outline-text-5" id="text-5-11-4-1">
 <div class="org-src-container">
 <pre class="src src-nix">claude-code
@@ -5332,7 +5364,7 @@ Interactively prompts for the directory with smart default."
 </div>
 </div>
 </li>
-<li><a id="orge02ba26"></a>配置<br />
+<li><a id="orgaa41904"></a>配置<br />
 <div class="outline-text-5" id="text-5-11-4-2">
 <div class="org-src-container">
 <pre class="src src-emacs-lisp">;; Add to your init.el
@@ -5347,12 +5379,12 @@ Interactively prompts for the directory with smart default."
 </ol>
 </div>
 </div>
-<div id="outline-container-orgf77de6e" class="outline-3">
-<h3 id="orgf77de6e"><span class="section-number-3">5.12.</span> 模态编辑 (<code>meow</code>)</h3>
+<div id="outline-container-org091a0de" class="outline-3">
+<h3 id="org091a0de"><span class="section-number-3">5.12.</span> 模态编辑 (<code>meow</code>)</h3>
 <div class="outline-text-3" id="text-5-12">
 </div>
-<div id="outline-container-orgaef2d01" class="outline-4">
-<h4 id="orgaef2d01"><span class="section-number-4">5.12.1.</span> 依赖</h4>
+<div id="outline-container-org07c8a33" class="outline-4">
+<h4 id="org07c8a33"><span class="section-number-4">5.12.1.</span> 依赖</h4>
 <div class="outline-text-4" id="text-5-12-1">
 <div class="org-src-container">
 <pre class="src src-nix">meow
@@ -5361,8 +5393,8 @@ Interactively prompts for the directory with smart default."
 </div>
 </div>
 </div>
-<div id="outline-container-org551c9c9" class="outline-4">
-<h4 id="org551c9c9"><span class="section-number-4">5.12.2.</span> 配置</h4>
+<div id="outline-container-orgc6e1886" class="outline-4">
+<h4 id="orgc6e1886"><span class="section-number-4">5.12.2.</span> 配置</h4>
 <div class="outline-text-4" id="text-5-12-2">
 <div class="org-src-container">
 <pre class="src src-emacs-lisp">(use-package meow
@@ -5484,16 +5516,15 @@ insert-state 时重新打开输入方式：
 </div>
 </div>
 </div>
-<div id="outline-container-org68fe682" class="outline-3">
-<h3 id="org68fe682"><span class="section-number-3">5.13.</span> 多线程丰富功能 (<code>EAF</code>)</h3>
+<div id="outline-container-org10853f9" class="outline-3">
+<h3 id="org10853f9"><span class="section-number-3">5.13.</span> 多线程丰富功能 (<code>EAF</code>)</h3>
 <div class="outline-text-3" id="text-5-13">
 <p>
-EAF（Emacs Application Framework）是一个在 Emacs 中运行的应用框架，我
-偶尔使用这个框架来使用浏览器和 PDF 阅读器等应用。
+EAF（Emacs Application Framework）是一个在 Emacs 中运行的应用框架，我偶尔使用这个框架来使用浏览器和 PDF 阅读器等应用。
 </p>
 </div>
-<div id="outline-container-org1b29dd3" class="outline-4">
-<h4 id="org1b29dd3"><span class="section-number-4">5.13.1.</span> 依赖</h4>
+<div id="outline-container-org1fabbd5" class="outline-4">
+<h4 id="org1fabbd5"><span class="section-number-4">5.13.1.</span> 依赖</h4>
 <div class="outline-text-4" id="text-5-13-1">
 <div class="org-src-container">
 <pre class="src src-nix">(eaf.withApplications [ eaf-browser eaf-pdf-viewer ])
@@ -5501,8 +5532,8 @@ EAF（Emacs Application Framework）是一个在 Emacs 中运行的应用框架�
 </div>
 </div>
 </div>
-<div id="outline-container-orge3e70ad" class="outline-4">
-<h4 id="orge3e70ad"><span class="section-number-4">5.13.2.</span> 配置</h4>
+<div id="outline-container-org7527fcf" class="outline-4">
+<h4 id="org7527fcf"><span class="section-number-4">5.13.2.</span> 配置</h4>
 <div class="outline-text-4" id="text-5-13-2">
 <div class="org-src-container">
 <pre class="src src-emacs-lisp">(require 'eaf)
@@ -5519,12 +5550,11 @@ EAF（Emacs Application Framework）是一个在 Emacs 中运行的应用框架�
 </div>
 </div>
 </div>
-<div id="outline-container-org84ce517" class="outline-3">
-<h3 id="org84ce517"><span class="section-number-3">5.14.</span> 特殊扩展</h3>
+<div id="outline-container-org4c23f4b" class="outline-3">
+<h3 id="org4c23f4b"><span class="section-number-3">5.14.</span> 特殊扩展</h3>
 <div class="outline-text-3" id="text-5-14">
 <p>
-扩展主要针对不存在于 <code>nixpkgs</code> 中的包，这里我基本上使用了<a href="https://codeberg.org/heraplem/nix-emacs-extra/src/branch/emacs-application-framework/packages/eaf">这个链接的代
-码和方法</a>，由于Nix水平有限，我在代码中增加了一些注释提示自己：
+扩展主要针对不存在于 <code>nixpkgs</code> 中的包，这里我基本上使用了<a href="https://codeberg.org/heraplem/nix-emacs-extra/src/branch/emacs-application-framework/packages/eaf">这个链接的代码和方法</a>，由于Nix水平有限，我在代码中增加了一些注释提示自己：
 </p>
 
 <div class="org-src-container">
@@ -5631,7 +5661,7 @@ in pipe packagesDir [                            # =&gt; ./. (当前包目录)
 </div></div>
 <div id="postamble" class="status">
 <p class="author">Author: idiig</p>
-<p class="date">Created: 2025-11-04 Tue 00:30</p>
+<p class="date">Created: 2025-11-04 Tue 02:03</p>
 <p class="validation"><a href="https://validator.w3.org/check?uri=referer">Validate</a></p>
 </div>
 </body>

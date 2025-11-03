@@ -10,11 +10,11 @@
 过程中会调用的外部程序。使用这个方法的主要目的是有以下理由：
 - 同时协同 emacs 插件和其依赖的外部工具 ::
   emacs 内置的包管理器无法管理系统级别工具，比如用于检索的
-  =consult-ripgrep= 会寻找可运行的 =ripgrep= 调用。这样我需要脱离 elisp 的
-  设定文件去下载这个外部工具。还有很多编程语言也有这个问题。我的习惯是
-  希望针对特定的项目文件夹定制所需的环境（比如使用 nix 和
-  .dir-locals.el）。但是，类似于语言服务器这类本质与项目无关，但与我的
-  编辑环境有关的设定，我倾向于使用与项目无关的环境。
+  =consult-ripgrep= 会寻找可运行的 =ripgrep= 调用。这样我需要脱离 elisp 的设
+  定文件去下载这个外部工具。还有很多编程语言也有这个问题。我的习惯是希
+  望针对特定的项目文件夹定制所需的环境（比如使用 nix 和.dir-locals.el）。
+  但是，类似于语言服务器这类本质与项目无关，但与我的编辑环境有关的设定，
+  我倾向于使用与项目无关的环境。
 ** 其他方式做不到的
 目前不依赖 emacs 的其他包管理工具的其他方式也有一些：
 - git 子模块 ::
@@ -46,10 +46,15 @@
 emacs 外部依赖（系统工具如 =git= ）。然后从 =epkgs=
 (=pkgs.emacs.pkgs.withPackages=) 中安装emacs 的包。
 
-这里稍微多做一些解释。在配置节里面，我利用了org-babel的一些特性。首先
-我们在一个入口代码块中使用了 =:noweb=yes= 。然后在后面的代码块中我们使用
-=:noweb-ref= 参照入口代码块，最后后续的这些代码块都会在 =org-babel-tangle=
-(=C-c C-v C-t=) 时合并到这个入口代码块中输出为 flake.nix。
+这里稍微多做一些解释。在配置节里面，我利用了org-babel的一些文学编程特
+性。首先我们在一个入口代码块中使用了 =:noweb=yes= [fn:lit-prog]。然后在
+后面的代码块中我们使用 =:noweb-ref= 参照入口代码块，最后后续的这些代码块
+都会在 =org-babel-tangle= (=C-c C-v C-t=) 时合并到这个入口代码块中输出为
+flake.nix。
+
+[fn:lit-prog] 关于文学编程中 =noweb= 的解释可以参考 [[https://www.cs.tufts.edu/~nr/noweb/][这个链接]] 。本身我们还有一个
+=:session= 的方式更适合一些数据科学的工作流。这里我们主要为了和 =:tangle=
+以前使用。
 * 如何使用
 :PROPERTIES:
 :header-args: :tangle no
@@ -83,13 +88,14 @@ flake.nix。接下去运行可以通过在终端运行下面进行调试和版�
   cp flake.lock flake.lock.bachup	# backup current lock file
   nix run --recreate-lock-file --inputs-from ./flake.lock.backup # recreate lock file
 #+end_src
+* 配置入口 (=flake.nix=)
+包的安装基于下面的 =flake.nix= 。可以看到这里使用了几个占位符：
+- =<<epkgs>>= :: 这里放置 emacs 包的列表
+- =<<ecfg>>= :: 这里放置 emacs 的配置代码
+- =<<emacs-early-init-config>>= :: 这里放置 emacs 的 early-init 配置代码
+- =<<externals>>= :: 这里放置外部包的定义
 
-* 配置本体
-:PROPERTIES:
-:header-args: :tangle no
-:END:
-** Flake入口
-包的安装基于下面的 =flake.nix= 和 =init.nix= 。
+这些占位符会在后续的代码块中被替换。  
 #+BEGIN_SRC nix :tangle flake.nix :noweb yes
   {
     description = "idiig's Emacs Configuration with Nix Flakes";
@@ -167,6 +173,10 @@ flake.nix。接下去运行可以通过在终端运行下面进行调试和版�
   	      });
   }
 #+END_SRC
+* 配置本体
+:PROPERTIES:
+:header-args: :tangle no
+:END:
 ** Early-init
 :PROPERTIES:
 :header-args: :noweb-ref emacs-early-init-config
@@ -2184,25 +2194,6 @@ LSP:
   (add-hook 'org-mode-hook 'idiig/run-prog-mode-hooks)
 #+end_src
 
-**** TODO 函数与advice
-=org-insert-structure-template= 后选择 =s= (src block) 时自动提示插入代码
-块的语言。
-
-更改这个函数：
-- 新增一个功能，如果输入的语言不在列表里，则把语言加入列表。但仅限于当前org文档
-- 新增一个功能，根据输入的语言更新推荐语言的排序。
-#+begin_src emacs-lisp
-  (with-eval-after-load 'org
-    (defun idiig/org-insert-structure-template-src-advice (orig-fun type)
-      "Advice for org-insert-structure-template to handle src blocks."
-      (if (string= type "src")  ; 判断条件为 "src"
-  	(let ((selected-type (ido-completing-read "Source code type: " idiig/language-list)))
-  	  (funcall orig-fun (format "src %s" selected-type)))
-        (funcall orig-fun type)))
-
-    (advice-add 'org-insert-structure-template :around #'idiig/org-insert-structure-template-src-advice))
-#+end_src
-
 **** 代码块支持语言
 ***** 依赖
 由于 =ob-nix=, =ob-go= 还没有默认。我们需要添加这些依赖
@@ -2210,7 +2201,6 @@ LSP:
   ob-nix
     ob-go
 #+end_src
-
 ***** 配置
 #+begin_src emacs-lisp
   (defun idiig/load-org-babel-languages ()
@@ -2233,10 +2223,42 @@ LSP:
   ;; 特殊
   (setq org-babel-shell-command (executable-find "bash"))
 #+end_src
+**** 结构化插入Babel模板
+=org-insert-structure-template= 后选择 =s= (src block) 时自动提示插入代码
+块的语言。
 
+更改这个函数：
+- 新增一个功能，如果输入的语言不在列表里，则把语言加入列表。但仅限于当
+  前org文档
+- 新增一个功能，根据输入的语言更新推荐语言的排序。
 #+begin_src emacs-lisp
+  (with-eval-after-load 'org
+    (defun idiig/org-insert-structure-template-src-advice (orig-fun type)
+      "Advice for org-insert-structure-template to handle src blocks."
+      (if (string= type "src")  ; 判断条件为 "src"
+  	(let ((selected-type (ido-completing-read "Source code type: " idiig/language-list)))
+  	  (funcall orig-fun (format "src %s" selected-type)))
+        (funcall orig-fun type)))
+
+    (advice-add 'org-insert-structure-template :around #'idiig/org-insert-structure-template-src-advice))
 #+end_src
-**** TODO 基础设定
+**** 基础设定
+***** 默认进入 org-mode 时的设定
+- 显示图片
+- 显示 LaTeX 公式
+- 折叠显示所有顶层节点
+- 展开显示当前节点内容
+- 展开显示所有子节点但不展开下一级
+#+begin_src emacs-lisp
+  (with-eval-after-load 'org
+    (setq org-startup-with-inline-images t) ; 启动时显示图片
+    (setq org-startup-with-latex-preview t) ; 启动时显示 LaTeX 公式
+    (add-hook 'org-mode-hook
+              (lambda ()
+                (org-overview)		; 显示所有顶层节点
+  	      (org-show-entry)		; 显示当前节点内容
+                (org-show-children))))	; 显示所有子节点但不展开
+#+end_src
 ***** 允许shift用于选择
 #+begin_src emacs-lisp 
   (with-eval-after-load 'org
@@ -2260,23 +2282,15 @@ LSP:
 #+begin_src emacs-lisp
   (with-eval-after-load 'org
    ;; Edit settings
-   org-auto-align-tags nil                    ; 禁用标签自动对齐功能
-   org-tags-column 0                          ; 标签紧贴标题文本，不右对齐
-   org-catch-invisible-edits 'show-and-error  ; 编辑折叠内容时显示并报错提醒
-   org-special-ctrl-a/e t                     ; 增强 C-a/C-e，先跳到内容开始/结束，再跳到行首/尾
-   org-insert-heading-respect-content t       ; 插入标题时考虑内容结构，在内容后插入
+   (setq org-auto-align-tags nil		; 禁用标签自动对齐功能
+         org-tags-column 0		; 标签紧贴标题文本，不右对齐
+         org-catch-invisible-edits 'show-and-error  ; 编辑折叠内容时显示并报错提醒
+         org-special-ctrl-a/e t ; 增强 C-a/C-e，先跳到内容开始/结束，再跳到行首/尾
+         org-insert-heading-respect-content t ; 插入标题时考虑内容结构，在内容后插入
 
-   ;; Org styling, hide markup etc.
-   org-hide-emphasis-markers t                ; 隐藏强调标记符号 (*粗体* 显示为 粗体)
-   org-pretty-entities t)                     ; 美化显示实体字符 (\alpha 显示为 α)
-#+end_src
-***** COMMENT 更现代的UI（手动开启）
-****** 依赖
-:PROPERTIES:
-:header-args: :noweb-ref epkgs
-:END:
-#+begin_src nix
-  org-modern
+         ;; Org styling, hide markup etc.
+         org-hide-emphasis-markers t ; 隐藏强调标记符号 (*粗体* 显示为 粗体)
+         org-pretty-entities t))	  ; 美化显示实体字符 (\alpha 显示为 α)
 #+end_src
 ***** 字体，缩进，换行设定
 :PROPERTIES:
@@ -2286,19 +2300,36 @@ LSP:
   (defun idiig/org-mode-face-settings ()
     "Set custom face attributes for Org mode headings in current buffer only."
 
-    (auto-fill-mode 0)
-    (require 'org-indent)
-    (org-indent-mode)
-    (variable-pitch-mode 1)
-    (visual-line-mode 1)
+    (auto-fill-mode 0)			; Disable auto-fill mode
+    (require 'org-indent)			; Ensure org-indent is loaded
+    (org-indent-mode)			; Enable org-indent mode
+    (variable-pitch-mode 1)		; Enable variable-pitch mode
+    (visual-line-mode 1)			; Enable visual-line mode for soft wrapping
     
-    (set-face-attribute 'variable-pitch nil :family "Sarasa Gothic J" :height 150)
-    (set-face-attribute 'fixed-pitch nil    :family "Sarasa Mono J"   :height 120)
-    (buffer-face-set '(:family "Sarasa Gothic J" :height 1.1))
-    (setq-local line-spacing 0.3)
+    (defvar idiig/fixed-width-font "Sarasa Mono J"
+      "The font to use for monospaced (fixed width) text.")
     
-    (let ((my-font "Sarasa Mono J")
-  	(faces '((org-level-1 . 1.2)
+    (defvar idiig/variable-width-font "Sarasa Gothic J"
+      "The font to use for variable-pitch (document) text.")
+    
+    (set-face-attribute 'default nil
+  		      :font idiig/fixed-width-font
+  		      :weight 'regular
+  		      :height 160)
+    (set-face-attribute 'fixed-pitch nil
+  		      :font idiig/fixed-width-font
+  		      :weight 'regular
+  		      :height 170)
+    (set-face-attribute 'variable-pitch nil
+  		      :font idiig/variable-width-font
+  		      :weight 'regular
+  		      :height 1.3)
+    (buffer-face-set `(:family ,idiig/fixed-width-font
+  			     :height 1.1)) ; Set buffer face
+    
+    (setq-local line-spacing 0.3)		; Set line spacing
+    
+    (let ((faces '((org-level-1 . 1.2)
                    (org-level-2 . 1.1)
                    (org-level-3 . 1.05)
                    (org-level-4 . 1.0)
@@ -2307,15 +2338,23 @@ LSP:
                    (org-level-7 . 1.1)
                    (org-level-8 . 1.1))))
       (dolist (face faces)
-        (face-remap-add-relative (car face) :family my-font :weight 'regular :height (cdr face))))
-    
+        `(face-remap-add-relative (car face)
+  			       :family ,idiig/variable-width-font
+  			       :weight 'regular
+  			       :height (cdr face))))
+
+    ;; Make sure certain org faces use the fixed-pitch face when variable-pitch-mode is on
     (set-face-attribute 'org-block nil :foreground nil :inherit 'fixed-pitch)
-    (set-face-attribute 'org-code nil   :inherit '(shadow fixed-pitch))
-    (set-face-attribute 'org-indent nil :inherit '(org-hide fixed-pitch))
+    (set-face-attribute 'org-table nil :inherit 'fixed-pitch)
+    (set-face-attribute 'org-formula nil :inherit 'fixed-pitch)
+    (set-face-attribute 'org-code nil :inherit '(shadow fixed-pitch))
     (set-face-attribute 'org-verbatim nil :inherit '(shadow fixed-pitch))
     (set-face-attribute 'org-special-keyword nil :inherit '(font-lock-comment-face fixed-pitch))
     (set-face-attribute 'org-meta-line nil :inherit '(font-lock-comment-face fixed-pitch))
     (set-face-attribute 'org-checkbox nil :inherit 'fixed-pitch)
+
+    ;; Make the document title a bit bigger
+    (set-face-attribute 'org-document-title nil :font idiig/variable-width-font :weight 'bold :height 1.3)
 
     (with-eval-after-load 'diminish
       (diminish 'org-indent-mode)
@@ -2515,14 +2554,14 @@ LSP:
     ;; 挂载 advice
     (advice-add 'org-cite-insert :around #'my/oc-insert-then-ask))
 #+end_src
-*** 幻灯片 (=org-tree-slide=)
-用 =org-tree-slide= 作幻灯片发表。手动开启。
+*** 幻灯片 (=org-present=)
+用 =org-present= 作幻灯片发表。手动开启。
 **** 依赖
 :PROPERTIES:
 :header-args: :noweb-ref epkgs
 :END:
 #+begin_src nix
-  org-tree-slide
+  org-present
 #+end_src
 
 ** AI辅助功能
