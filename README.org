@@ -2255,9 +2255,12 @@ LSP:
     (setq org-startup-with-latex-preview t) ; 启动时显示 LaTeX 公式
     (add-hook 'org-mode-hook
               (lambda ()
-                (org-overview)		; 显示所有顶层节点
-  	      (org-show-entry)		; 显示当前节点内容
-                (org-show-children))))	; 显示所有子节点但不展开
+                (org-overview)		 ; 显示所有顶层节点
+  	      (org-show-entry)		 ; 显示当前节点内容
+                (org-show-children)	 ; 显示所有子节点但不展开
+  	      (org-fold-hide-block-all)	 ; 隐藏所有代码块
+  	      (org-fold-hide-drawer-all) ; 隐藏所有抽屉
+  	      
 #+end_src
 ***** 允许shift用于选择
 #+begin_src emacs-lisp 
@@ -2344,17 +2347,28 @@ LSP:
   			       :height (cdr face))))
 
     ;; Make sure certain org faces use the fixed-pitch face when variable-pitch-mode is on
-    (set-face-attribute 'org-block nil :foreground nil :inherit 'fixed-pitch)
-    (set-face-attribute 'org-table nil :inherit 'fixed-pitch)
-    (set-face-attribute 'org-formula nil :inherit 'fixed-pitch)
-    (set-face-attribute 'org-code nil :inherit '(shadow fixed-pitch))
-    (set-face-attribute 'org-verbatim nil :inherit '(shadow fixed-pitch))
-    (set-face-attribute 'org-special-keyword nil :inherit '(font-lock-comment-face fixed-pitch))
-    (set-face-attribute 'org-meta-line nil :inherit '(font-lock-comment-face fixed-pitch))
-    (set-face-attribute 'org-checkbox nil :inherit 'fixed-pitch)
+    (set-face-attribute 'org-block nil
+  		      :inherit 'fixed-pitch)
+    (set-face-attribute 'org-table nil
+  		      :inherit 'fixed-pitch)
+    (set-face-attribute 'org-formula nil
+  		      :inherit 'fixed-pitch)
+    (set-face-attribute 'org-code nil
+  		      :inherit '(shadow fixed-pitch))
+    (set-face-attribute 'org-verbatim nil
+  		      :inherit '(shadow fixed-pitch))
+    (set-face-attribute 'org-special-keyword nil
+  		      :inherit '(font-lock-comment-face fixed-pitch))
+    (set-face-attribute 'org-meta-line nil
+  		      :inherit '(font-lock-comment-face fixed-pitch))
+    (set-face-attribute 'org-checkbox nil
+  		      :inherit 'fixed-pitch)
 
     ;; Make the document title a bit bigger
-    (set-face-attribute 'org-document-title nil :font idiig/variable-width-font :weight 'bold :height 1.3)
+    (set-face-attribute 'org-document-title nil
+  		      :font idiig/variable-width-font
+  		      :weight 'bold
+  		      :height 1.3)
 
     (with-eval-after-load 'diminish
       (diminish 'org-indent-mode)
