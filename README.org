@@ -38,52 +38,50 @@
 :PROPERTIES:
 :header-args: :tangle no
 :END:
-下面以配置 =Magit= 为例说明这个配置的方法。这里和大多数的配置一样我们
-把整体目的一致的包放在一个集群实现。每个集群主要分成两个子节点，一个用
-于安装包和依赖项，一个用于配置。配置部分可以细分为键位绑定，custom，
-hook，config，自定义的函数。
+下面以配置 =Magit= 为例说明这个配置的方法。这里和大多数的配置一样我们把
+整体目的一致的包放在一个集群实现。每个集群主要分成两个子节点，一个用于
+安装包和依赖项，另一个用于配置包本身。
 
-依赖的部分可以从 =pkgs= [fn:pkgs: =nixpkgs.legacyPackages.${system}= ]
-同时安装emacs外部的依赖。然后从 =epkgs= [fn:epkgs:
-=pkgs.emacs.pkgs.withPackages= ]
+依赖的部分可以从 =pkgs= (=nixpkgs.legacyPackages.${system}=) 同时安装
+emacs 外部依赖（系统工具如 =git= ）。然后从 =epkgs=
+(=pkgs.emacs.pkgs.withPackages=) 中安装emacs 的包。
 
-这里稍微多做一些解释。在配置节里面，我们利用了org-babel的一些特性。首
-先我们在一个汇总代码块中使用了 =:noweb=yes= [fn:noweb: 关于文学编程中
-=noweb= 的解释可以参考 [[https://www.cs.tufts.edu/~nr/noweb/][这个链接]] 。本身我们还有一个 =:session= 的方式更
-适合一些数据科学的工作流。这里我们主要为了和 =:tangle= 引起使用。]，然
-后在后面的代码块中我们使用 =:noweb-ref= 参照汇总代码块，最后后续的这些
-代码块都会在tangle时合并到第一个代码块中。这个被tangle的代码块在后续过
-程中会被nix依赖代码读入作为配置。
+这里稍微多做一些解释。在配置节里面，我利用了org-babel的一些特性。首先
+我们在一个入口代码块中使用了 =:noweb=yes= 。然后在后面的代码块中我们使用
+=:noweb-ref= 参照入口代码块，最后后续的这些代码块都会在 =org-babel-tangle=
+(=C-c C-v C-t=) 时合并到这个入口代码块中输出为 flake.nix。
 * 如何使用
 :PROPERTIES:
 :header-args: :tangle no
 :END:
-用emacs打开本文档， =M-x org-babel-tangle= 或使用快捷键 =C-c C-v t= 生
-成flake.nix。接下去运行可以通过如下方式：
+用emacs打开本文档， =M-x org-babel-tangle= 或使用快捷键 =C-c C-v t= 生成
+flake.nix。接下去运行可以通过在终端运行下面进行调试和版本回滚：
 ** 调试
 #+begin_src sh
-  export NIXPKGS_ALLOW_UNFREE=1
-  nix run <path/to/this/config> --impure --extra-experimental-features nix-command --extra-experimental-features flakes
-  source ~/.bashrc
-  ne
+  export NIXPKGS_ALLOW_UNFREE=1	# allow unfree packages
+  nix run <path/to/this/config> \	# replace <path/to/this/config> with the actual path
+      --impure \			# use impure mode
+      --extra-experimental-features nix-command \ # enable nix-command feature
+      --extra-experimental-features flakes # enable flakes feature
+  source ~/.bashrc			 # source bash configuration
+  ne			     # starts emacs with the new configuration
 #+end_src
 ** 版本回滚
 *** 使用git
 #+begin_src sh
   git checkout <previous-commit>
-  nix run --impure
-  source ~/.bashrc
-  emacs
+  nix run <path/to/this/config> \	# replace <path/to/this/config> with the actual path
+      --impure \			# use impure mode
+      --extra-experimental-features nix-command \ # enable nix-command feature
+      --extra-experimental-features flakes # enable flakes feature
+  source ~/.bashrc			 # source bash configuration
+  ne			     # starts emacs with the new configuration
 #+end_src
 *** 备份lock文件
 #+begin_src sh
-  # 查看以前的版本
-  nix flake metadata
-
-  # 备份版本
-  cp flake.lock flake.lock.bachup
-  # 使用特定锁文件版本
-  nix run --recreate-lock-file --inputs-from ./flake.lock.backup
+  nix flake metadata		# check flake metadata
+  cp flake.lock flake.lock.bachup	# backup current lock file
+  nix run --recreate-lock-file --inputs-from ./flake.lock.backup # recreate lock file
 #+end_src
 
 * 配置本体
@@ -1352,8 +1350,8 @@ minibuffer的检索]]。
 #+end_src
 
 ***** buffer内检索 (=Ctrlf=) 交互
-这里我写了一个函数 =pyim-cregex-build-lazy= 。这个函数交互 =pyim= 。参见[[*输入法][输
-入法]]。这个函数的工作逻辑如下：
+这里我写了一个函数 =pyim-cregex-build-lazy= 。这个函数交互 =pyim= 。参见输
+入法。这个函数的工作逻辑如下：
 
 - 如果还没有初始化拼音数据，就先进行预热预热时会加载 "a"、"e"、"o" 这
   三个字符的拼音映射数据设置初始化标志，避免重复初始化
