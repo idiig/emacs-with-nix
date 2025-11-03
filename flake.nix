@@ -1125,15 +1125,6 @@
 	      (setq org-plantuml-exec-mode 'plantuml))
 	    (add-to-list 'exec-path "${pkgs.graphviz}/bin")
 	    (add-hook 'org-mode-hook 'idiig/run-prog-mode-hooks)
-	    (with-eval-after-load 'org
-	      (defun idiig/org-insert-structure-template-src-advice (orig-fun type)
-	        "Advice for org-insert-structure-template to handle src blocks."
-	        (if (string= type "src")  ; 判断条件为 "src"
-	    	(let ((selected-type (ido-completing-read "Source code type: " idiig/language-list)))
-	    	  (funcall orig-fun (format "src %s" selected-type)))
-	          (funcall orig-fun type)))
-	    
-	      (advice-add 'org-insert-structure-template :around #'idiig/org-insert-structure-template-src-advice))
 	    (defun idiig/load-org-babel-languages ()
 	      "根据 `idiig/language-list` 启用 `org-babel` 语言。"
 	      (let ((languages '()))
@@ -1153,7 +1144,26 @@
 	    
 	    ;; 特殊
 	    (setq org-babel-shell-command (executable-find "bash"))
+	    (with-eval-after-load 'org
+	      (defun idiig/org-insert-structure-template-src-advice (orig-fun type)
+	        "Advice for org-insert-structure-template to handle src blocks."
+	        (if (string= type "src")  ; 判断条件为 "src"
+	    	(let ((selected-type (ido-completing-read "Source code type: " idiig/language-list)))
+	    	  (funcall orig-fun (format "src %s" selected-type)))
+	          (funcall orig-fun type)))
 	    
+	      (advice-add 'org-insert-structure-template :around #'idiig/org-insert-structure-template-src-advice))
+	    (with-eval-after-load 'org
+	      (setq org-startup-with-inline-images t) ; 启动时显示图片
+	      (setq org-startup-with-latex-preview t) ; 启动时显示 LaTeX 公式
+	      (add-hook 'org-mode-hook
+	                (lambda ()
+	                  (org-overview)		 ; 显示所有顶层节点
+	    	      (org-show-entry)		 ; 显示当前节点内容
+	                  (org-show-children)	 ; 显示所有子节点但不展开
+	    	      (org-fold-hide-block-all)	 ; 隐藏所有代码块
+	    	      (org-fold-hide-drawer-all) ; 隐藏所有抽屉
+	    	      
 	    (with-eval-after-load 'org
 	      (setq org-support-shift-select 2))
 	    (with-eval-after-load 'org
@@ -1162,31 +1172,48 @@
 	      (setq org-export-allow-bind-keywords t))
 	    (with-eval-after-load 'org
 	     ;; Edit settings
-	     org-auto-align-tags nil                    ; 禁用标签自动对齐功能
-	     org-tags-column 0                          ; 标签紧贴标题文本，不右对齐
-	     org-catch-invisible-edits 'show-and-error  ; 编辑折叠内容时显示并报错提醒
-	     org-special-ctrl-a/e t                     ; 增强 C-a/C-e，先跳到内容开始/结束，再跳到行首/尾
-	     org-insert-heading-respect-content t       ; 插入标题时考虑内容结构，在内容后插入
+	     (setq org-auto-align-tags nil		; 禁用标签自动对齐功能
+	           org-tags-column 0		; 标签紧贴标题文本，不右对齐
+	           org-catch-invisible-edits 'show-and-error  ; 编辑折叠内容时显示并报错提醒
+	           org-special-ctrl-a/e t ; 增强 C-a/C-e，先跳到内容开始/结束，再跳到行首/尾
+	           org-insert-heading-respect-content t ; 插入标题时考虑内容结构，在内容后插入
 	    
-	     ;; Org styling, hide markup etc.
-	     org-hide-emphasis-markers t                ; 隐藏强调标记符号 (*粗体* 显示为 粗体)
-	     org-pretty-entities t)                     ; 美化显示实体字符 (\alpha 显示为 α)
+	           ;; Org styling, hide markup etc.
+	           org-hide-emphasis-markers t ; 隐藏强调标记符号 (*粗体* 显示为 粗体)
+	           org-pretty-entities t))	  ; 美化显示实体字符 (\alpha 显示为 α)
 	    (defun idiig/org-mode-face-settings ()
 	      "Set custom face attributes for Org mode headings in current buffer only."
 	    
-	      (auto-fill-mode 0)
-	      (require 'org-indent)
-	      (org-indent-mode)
-	      (variable-pitch-mode 1)
-	      (visual-line-mode 1)
+	      (auto-fill-mode 0)			; Disable auto-fill mode
+	      (require 'org-indent)			; Ensure org-indent is loaded
+	      (org-indent-mode)			; Enable org-indent mode
+	      (variable-pitch-mode 1)		; Enable variable-pitch mode
+	      (visual-line-mode 1)			; Enable visual-line mode for soft wrapping
 	      
-	      (set-face-attribute 'variable-pitch nil :family "Sarasa Gothic J" :height 150)
-	      (set-face-attribute 'fixed-pitch nil    :family "Sarasa Mono J"   :height 120)
-	      (buffer-face-set '(:family "Sarasa Gothic J" :height 1.1))
-	      (setq-local line-spacing 0.3)
+	      (defvar idiig/fixed-width-font "Sarasa Mono J"
+	        "The font to use for monospaced (fixed width) text.")
 	      
-	      (let ((my-font "Sarasa Mono J")
-	    	(faces '((org-level-1 . 1.2)
+	      (defvar idiig/variable-width-font "Sarasa Gothic J"
+	        "The font to use for variable-pitch (document) text.")
+	      
+	      (set-face-attribute 'default nil
+	    		      :font idiig/fixed-width-font
+	    		      :weight 'regular
+	    		      :height 160)
+	      (set-face-attribute 'fixed-pitch nil
+	    		      :font idiig/fixed-width-font
+	    		      :weight 'regular
+	    		      :height 170)
+	      (set-face-attribute 'variable-pitch nil
+	    		      :font idiig/variable-width-font
+	    		      :weight 'regular
+	    		      :height 1.3)
+	      (buffer-face-set `(:family ,idiig/fixed-width-font
+	    			     :height 1.1)) ; Set buffer face
+	      
+	      (setq-local line-spacing 0.3)		; Set line spacing
+	      
+	      (let ((faces '((org-level-1 . 1.2)
 	                     (org-level-2 . 1.1)
 	                     (org-level-3 . 1.05)
 	                     (org-level-4 . 1.0)
@@ -1195,15 +1222,34 @@
 	                     (org-level-7 . 1.1)
 	                     (org-level-8 . 1.1))))
 	        (dolist (face faces)
-	          (face-remap-add-relative (car face) :family my-font :weight 'regular :height (cdr face))))
-	      
-	      (set-face-attribute 'org-block nil :foreground nil :inherit 'fixed-pitch)
-	      (set-face-attribute 'org-code nil   :inherit '(shadow fixed-pitch))
-	      (set-face-attribute 'org-indent nil :inherit '(org-hide fixed-pitch))
-	      (set-face-attribute 'org-verbatim nil :inherit '(shadow fixed-pitch))
-	      (set-face-attribute 'org-special-keyword nil :inherit '(font-lock-comment-face fixed-pitch))
-	      (set-face-attribute 'org-meta-line nil :inherit '(font-lock-comment-face fixed-pitch))
-	      (set-face-attribute 'org-checkbox nil :inherit 'fixed-pitch)
+	          `(face-remap-add-relative (car face)
+	    			       :family ,idiig/variable-width-font
+	    			       :weight 'regular
+	    			       :height (cdr face))))
+	    
+	      ;; Make sure certain org faces use the fixed-pitch face when variable-pitch-mode is on
+	      (set-face-attribute 'org-block nil
+	    		      :inherit 'fixed-pitch)
+	      (set-face-attribute 'org-table nil
+	    		      :inherit 'fixed-pitch)
+	      (set-face-attribute 'org-formula nil
+	    		      :inherit 'fixed-pitch)
+	      (set-face-attribute 'org-code nil
+	    		      :inherit '(shadow fixed-pitch))
+	      (set-face-attribute 'org-verbatim nil
+	    		      :inherit '(shadow fixed-pitch))
+	      (set-face-attribute 'org-special-keyword nil
+	    		      :inherit '(font-lock-comment-face fixed-pitch))
+	      (set-face-attribute 'org-meta-line nil
+	    		      :inherit '(font-lock-comment-face fixed-pitch))
+	      (set-face-attribute 'org-checkbox nil
+	    		      :inherit 'fixed-pitch)
+	    
+	      ;; Make the document title a bit bigger
+	      (set-face-attribute 'org-document-title nil
+	    		      :font idiig/variable-width-font
+	    		      :weight 'bold
+	    		      :height 1.3)
 	    
 	      (with-eval-after-load 'diminish
 	        (diminish 'org-indent-mode)
@@ -1663,7 +1709,7 @@
               ob-go
             org-bullets
             citeproc
-            org-tree-slide
+            org-present
             copilot
             gptel
             aidermacs
