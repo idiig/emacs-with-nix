@@ -1,5 +1,5 @@
 #+title: 基于 Nix Flakes 的 Emacs 配置
-#+author: Xudong
+#+author: idiig
 
 * 本配置的用法
 :PROPERTIES:
