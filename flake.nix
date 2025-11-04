@@ -646,7 +646,7 @@
 	      "Font height based on screen size.")
 	    
 	    (defvar idiig/lower-font-height 
-	      (idiig/set-fonts-based-on-screen-size 0.08)
+	      (idiig/set-fonts-based-on-screen-size 0.10)
 	      "Lower font height based on screen size.")
 	    
 	    (add-hook 'after-init-hook
@@ -668,6 +668,7 @@
 	    	    
 	    	    (set-face-attribute 'default nil
 	    				:font idiig/fixed-width-font
+	    				:background "#fbf7f0"
 	    				:weight 'regular
 	    				:height idiig/font-height)
 	    	    (set-face-attribute 'fixed-pitch nil
@@ -1219,13 +1220,13 @@
 	    	org-export-allow-bind-keywords t     ; 允许 =#+bind= 关键词
 	    	org-display-remote-inline-images t)) ; 远程图片文件可以通过 =C-u C-c C-x C-v= 被看到
 	    (with-eval-after-load 'org
-	     ;; Edit settings
-	     (setq org-auto-align-tags nil		; 禁用标签自动对齐功能
-	           org-tags-column 0		; 标签紧贴标题文本，不右对齐
-	           
-	           ;; Org styling, hide markup etc.
-	           org-hide-emphasis-markers t ; 隐藏强调标记符号 (*粗体* 显示为 粗体)
-	           org-pretty-entities t))	  ; 美化显示实体字符 (\alpha 显示为 α)
+	      ;; Edit settings
+	      (setq org-auto-align-tags nil		; 禁用标签自动对齐功能
+	    	org-tags-column 0		; 标签紧贴标题文本，不右对齐
+	    	
+	    	;; Org styling, hide markup etc.
+	    	org-hide-emphasis-markers t ; 隐藏强调标记符号 (*粗体* 显示为 粗体)
+	    	org-pretty-entities t))	  ; 美化显示实体字符 (\alpha 显示为 α)
 	    (defun idiig/org-mode-face-settings ()
 	      "Set custom face attributes for Org mode headings in current buffer only."
 	    
@@ -1256,8 +1257,9 @@
 	      			       :height (cdr face))))
 	      
 	      (set-face-attribute 'org-block nil
-	      		      :inherit '(mode-line-inactive)
-	      		      :height idiig/lower-font-height)
+	      		      :inherit 'fixed-pitch
+	      		      :height idiig/lower-font-height
+	    		      :box nil)
 	      (set-face-attribute 'org-table nil
 	      		      :inherit 'fixed-pitch
 	    		      :height idiig/lower-font-height)
@@ -1274,23 +1276,25 @@
 	      (set-face-attribute 'org-meta-line nil
 	      		      :inherit '(mode-line-active fixed-pitch)
 	    		      :height idiig/lower-font-height)
+	      (set-face-attribute 'org-property-value nil
+	      		      :inherit '(shadow fixed-pitch)
+	    		      :height idiig/lower-font-height)
 	      (set-face-attribute 'org-checkbox nil
 	      		      :inherit 'fixed-pitch
 	    		      :height idiig/lower-font-height)
 	      (set-face-attribute 'org-drawer nil
 	      		      :inherit '(mode-line-active fixed-pitch)
 	      		      :height idiig/lower-font-height
-	      		      :underline t
 	      		      :extend nil)
 	      (set-face-attribute 'org-block-begin-line nil
 	      		      :inherit '(mode-line-active fixed-pitch)
 	      		      :height idiig/lower-font-height
-	      		      :underline t
-	      		      :extend nil)
+	      		      :underline nil
+	    		      :extend nil)
 	      (set-face-attribute 'org-block-end-line nil
 	      		      :inherit 'org-hide
 	      		      :height idiig/lower-font-height
-	      		      :overline t
+	      		      :overline nil
 	      		      :extend nil)
 	    
 	      ;; Make the document title a bit bigger
@@ -1299,7 +1303,7 @@
 	      		      :weight 'bold
 	      		      :height 1.3)
 	    
-	      ;; (setq-local line-spacing 0.3)
+	      (setq-local line-spacing 0.3)
 	      
 	      (with-eval-after-load 'diminish
 	        (diminish 'org-indent-mode)
