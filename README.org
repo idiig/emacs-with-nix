@@ -2333,7 +2333,7 @@ LSP:
 #+begin_src emacs-lisp
   (with-eval-after-load 'org
     ;; Edit settings
-    (setq org-auto-align-tags nil		; 禁用标签自动对齐功能
+    (setq org-auto-align-tags nilq		; 禁用标签自动对齐功能
   	org-tags-column 0		; 标签紧贴标题文本，不右对齐
   	
   	;; Org styling, hide markup etc.
@@ -2472,6 +2472,19 @@ LSP:
   (with-eval-after-load 'org
     (setq org-ellipsis " ▾"
           org-hide-emphasis-markers t))
+#+end_src
+***** 表格
+****** 依赖
+:PROPERTIES:
+:header-args: :noweb-ref epkgs
+:END:
+#+begin_src nix
+  valign
+#+end_src
+****** 配置
+#+begin_src emacs-lisp
+  (use-package valign
+    :hook (org-mode . valign-mode))
 #+end_src
 *** 文献引用处理器 (=citeproc-el=)
 **** 依赖

@@ -1221,7 +1221,7 @@
 	    	org-display-remote-inline-images t)) ; 远程图片文件可以通过 =C-u C-c C-x C-v= 被看到
 	    (with-eval-after-load 'org
 	      ;; Edit settings
-	      (setq org-auto-align-tags nil		; 禁用标签自动对齐功能
+	      (setq org-auto-align-tags nilq		; 禁用标签自动对齐功能
 	    	org-tags-column 0		; 标签紧贴标题文本，不右对齐
 	    	
 	    	;; Org styling, hide markup etc.
@@ -1337,6 +1337,8 @@
 	    (with-eval-after-load 'org
 	      (setq org-ellipsis " ▾"
 	            org-hide-emphasis-markers t))
+	    (use-package valign
+	      :hook (org-mode . valign-mode))
 	    (with-eval-after-load 'org
 	      (setq org-cite-export-processors
 	          '((latex biblatex)
@@ -1762,6 +1764,7 @@
             ob-nix
               ob-go
             org-bullets
+            valign
             citeproc
             org-present
             copilot
