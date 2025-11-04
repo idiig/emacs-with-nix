@@ -622,22 +622,70 @@
 	    
 	    ;; 在 emacs 启动时应用这个 advice
 	    (add-hook 'emacs-startup-hook #'idiig/apply-backward-kill-word-or-region-advice)
+	    (defvar idiig/fixed-width-font "Sarasa Mono J"
+	      "The font to use for monospaced (fixed width) text.")
+	    
+	    (defvar idiig/variable-width-font "Sarasa Gothic J"
+	      "The font to use for variable-pitch (document) text.")
+	    
+	    (defun idiig/scale-to-nearest-ten (value scale)
+	      "Scale VALUE by SCALE and round to nearest multiple of 10.
+	    For example: (idiig/scale-to-nearest-ten 1080 0.15) => 160"
+	      (* 10 (round (/ (* value scale) 10.0))))
+	    
+	    (defun idiig/set-fonts-based-on-screen-size (scale)
+	      "Set fonts based on the screen size.
+	    SCALE is the ratio of font height to screen height (e.g., 0.15)."
+	      (when (display-graphic-p)
+	        (let* ((screen-height (display-pixel-height))
+	    	   (my-font-height (idiig/scale-to-nearest-ten screen-height scale)))
+	          my-font-height)))
+	    
+	    (defvar idiig/font-height
+	      (idiig/set-fonts-based-on-screen-size 0.15)
+	      "Font height based on screen size.")
+	    
+	    (defvar idiig/lower-font-height 
+	      (idiig/set-fonts-based-on-screen-size 0.08)
+	      "Lower font height based on screen size.")
+	    
 	    (add-hook 'after-init-hook
 	    	  (lambda ()
-	    	    (let* ((screen-height (display-pixel-height))
-	    		   (font-height (if (> screen-height 1200) 230 130))  ;; 根据屏幕高度调整
-	    		   (minibuffer-font-height (- font-height 0))
-	    		   (my-font "Sarasa Mono SC"))
-	    	      (set-face-attribute 'default nil :family my-font :height font-height)
-	    	      ;; 设置 mode-line 字体
-	    	      (set-face-attribute 'mode-line nil :family my-font :height font-height)
-	    	      (set-face-attribute 'mode-line-inactive nil :family my-font :height font-height)
-	    	      ;; 设置 minibuffer 字体
-	    	      (set-face-attribute 'minibuffer-prompt nil :family my-font :height minibuffer-font-height))))
 	    
-	    ;; 工具栏，菜单保持默认字体
-	    (set-face-attribute 'menu nil :inherit 'unspecified)
-	    (set-face-attribute 'tool-bar nil :inherit 'unspecified)
+	    	    ;; 工具栏，菜单保持默认字体
+	    	    (set-face-attribute 'menu nil
+	    				:inherit 'unspecified)
+	    	    (set-face-attribute 'tool-bar nil
+	    				:inherit 'unspecified)
+	    
+	    	    ;; 设置 mode-line 字体
+	    	    (set-face-attribute 'mode-line nil
+	    				:inherit 'unspecified
+	    				:height idiig/lower-font-height)
+	    	    (set-face-attribute 'mode-line-inactive nil
+	    				:inherit 'unspecified
+	    				:height idiig/lower-font-height)
+	    	    
+	    	    (set-face-attribute 'default nil
+	    				:font idiig/fixed-width-font
+	    				:weight 'regular
+	    				:height idiig/font-height)
+	    	    (set-face-attribute 'fixed-pitch nil
+	    				:font idiig/fixed-width-font
+	    				:weight 'regular
+	    				:height idiig/font-height)
+	    	    (set-face-attribute 'variable-pitch nil
+	    				:font idiig/variable-width-font
+	    				:weight 'regular
+	    				:height idiig/font-height)
+	    	    ;; 设置 comint 提示符字体
+	    	    (set-face-attribute 'comint-highlight-prompt nil
+	    				:inherit 'fixed-pitch)
+	    	    ;; 设置 minibuffer prompt 字体
+	    	    (set-face-attribute 'minibuffer-prompt nil
+	    				:inherit 'fixed-pitch)
+	    	    (set-face-attribute 'header-line nil
+	    				:inherit 'fixed-pitch)))
 	    (use-package ddskk
 	      :defer t
 	      :bind (("C-x j" . skk-mode))
@@ -1163,20 +1211,18 @@
 	                  (org-show-children)	  ; 显示所有子节点但不展开
 	    	      (org-fold-hide-block-all)	  ; 隐藏所有代码块
 	    	      (org-fold-hide-drawer-all)))) ; 隐藏所有抽屉
-	    (with-eval-after-load 'org
-	      (setq org-support-shift-select 2))
-	    (with-eval-after-load 'org
-	      (setq org-display-remote-inline-images t))
-	    (with-eval-after-load 'org
-	      (setq org-export-allow-bind-keywords t))
+	    (with-eval-after-load 'org		
+	      (setq org-support-shift-select 2
+	    	org-catch-invisible-edits 'show-and-error ; 编辑折叠内容时显示并报错提醒
+	    	org-special-ctrl-a/e t ; 增强 C-a/C-e，先跳到内容开始/结束，再跳到行首/尾
+	    	org-insert-heading-respect-content t ; 插入标题时考虑内容结构，在内容后插入
+	    	org-export-allow-bind-keywords t     ; 允许 =#+bind= 关键词
+	    	org-display-remote-inline-images t)) ; 远程图片文件可以通过 =C-u C-c C-x C-v= 被看到
 	    (with-eval-after-load 'org
 	     ;; Edit settings
 	     (setq org-auto-align-tags nil		; 禁用标签自动对齐功能
 	           org-tags-column 0		; 标签紧贴标题文本，不右对齐
-	           org-catch-invisible-edits 'show-and-error  ; 编辑折叠内容时显示并报错提醒
-	           org-special-ctrl-a/e t ; 增强 C-a/C-e，先跳到内容开始/结束，再跳到行首/尾
-	           org-insert-heading-respect-content t ; 插入标题时考虑内容结构，在内容后插入
-	    
+	           
 	           ;; Org styling, hide markup etc.
 	           org-hide-emphasis-markers t ; 隐藏强调标记符号 (*粗体* 显示为 粗体)
 	           org-pretty-entities t))	  ; 美化显示实体字符 (\alpha 显示为 α)
@@ -1189,28 +1235,11 @@
 	      (variable-pitch-mode 1)		; Enable variable-pitch mode
 	      (visual-line-mode 1)			; Enable visual-line mode for soft wrapping
 	      
-	      (defvar idiig/fixed-width-font "Sarasa Mono J"
-	        "The font to use for monospaced (fixed width) text.")
-	      
-	      (defvar idiig/variable-width-font "Sarasa Gothic J"
-	        "The font to use for variable-pitch (document) text.")
-	      
-	      (set-face-attribute 'default nil
-	    		      :font idiig/fixed-width-font
-	    		      :weight 'regular
-	    		      :height 160)
-	      (set-face-attribute 'fixed-pitch nil
-	    		      :font idiig/fixed-width-font
-	    		      :weight 'regular
-	    		      :height 170)
-	      (set-face-attribute 'variable-pitch nil
-	    		      :font idiig/variable-width-font
-	    		      :weight 'regular
-	    		      :height 1.3)
-	      (buffer-face-set `(:family ,idiig/fixed-width-font
-	    			     :height 1.1)) ; Set buffer face
-	      
-	      (setq-local line-spacing 0.3)		; Set line spacing
+	      ;; org headings 设置行间距
+	      (defface idiig-base-line
+	        '((t (:inherit 'variable-pitch
+	      		   :height 1.0)))
+	        "Used in text-mode and friends for exactly one space after a period.")
 	      
 	      (let ((faces '((org-level-1 . 1.2)
 	                     (org-level-2 . 1.1)
@@ -1221,35 +1250,57 @@
 	                     (org-level-7 . 1.1)
 	                     (org-level-8 . 1.1))))
 	        (dolist (face faces)
-	          `(face-remap-add-relative (car face)
-	    			       :family ,idiig/variable-width-font
-	    			       :weight 'regular
-	    			       :height (cdr face))))
-	    
-	      ;; Make sure certain org faces use the fixed-pitch face when variable-pitch-mode is on
+	          (face-remap-add-relative (car face)
+	      			       :inherit 'idiig-base-line
+	      			       :weight 'regular
+	      			       :height (cdr face))))
+	      
 	      (set-face-attribute 'org-block nil
-	    		      :inherit 'fixed-pitch)
+	      		      :inherit '(mode-line-inactive)
+	      		      :height idiig/lower-font-height)
 	      (set-face-attribute 'org-table nil
-	    		      :inherit 'fixed-pitch)
+	      		      :inherit 'fixed-pitch
+	    		      :height idiig/lower-font-height)
 	      (set-face-attribute 'org-formula nil
-	    		      :inherit 'fixed-pitch)
+	      		      :inherit 'fixed-pitch)
 	      (set-face-attribute 'org-code nil
-	    		      :inherit '(shadow fixed-pitch))
+	      		      :inherit '(shadow fixed-pitch)
+	    		      :height idiig/lower-font-height)
 	      (set-face-attribute 'org-verbatim nil
-	    		      :inherit '(shadow fixed-pitch))
+	      		      :inherit '(shadow fixed-pitch))
 	      (set-face-attribute 'org-special-keyword nil
-	    		      :inherit '(font-lock-comment-face fixed-pitch))
+	      		      :inherit '(mode-line-inactive fixed-pitch)
+	    		      :height idiig/lower-font-height)
 	      (set-face-attribute 'org-meta-line nil
-	    		      :inherit '(font-lock-comment-face fixed-pitch))
+	      		      :inherit '(mode-line-active fixed-pitch)
+	    		      :height idiig/lower-font-height)
 	      (set-face-attribute 'org-checkbox nil
-	    		      :inherit 'fixed-pitch)
+	      		      :inherit 'fixed-pitch
+	    		      :height idiig/lower-font-height)
+	      (set-face-attribute 'org-drawer nil
+	      		      :inherit '(mode-line-active fixed-pitch)
+	      		      :height idiig/lower-font-height
+	      		      :underline t
+	      		      :extend nil)
+	      (set-face-attribute 'org-block-begin-line nil
+	      		      :inherit '(mode-line-active fixed-pitch)
+	      		      :height idiig/lower-font-height
+	      		      :underline t
+	      		      :extend nil)
+	      (set-face-attribute 'org-block-end-line nil
+	      		      :inherit 'org-hide
+	      		      :height idiig/lower-font-height
+	      		      :overline t
+	      		      :extend nil)
 	    
 	      ;; Make the document title a bit bigger
 	      (set-face-attribute 'org-document-title nil
-	    		      :font idiig/variable-width-font
-	    		      :weight 'bold
-	    		      :height 1.3)
+	      		      :inherit 'variable-pitch
+	      		      :weight 'bold
+	      		      :height 1.3)
 	    
+	      ;; (setq-local line-spacing 0.3)
+	      
 	      (with-eval-after-load 'diminish
 	        (diminish 'org-indent-mode)
 	        (diminish 'buffer-face-mode)))
