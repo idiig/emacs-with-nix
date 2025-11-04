@@ -1163,7 +1163,6 @@
 	                  (org-show-children)	 ; 显示所有子节点但不展开
 	    	      (org-fold-hide-block-all)	 ; 隐藏所有代码块
 	    	      (org-fold-hide-drawer-all) ; 隐藏所有抽屉
-	    	      
 	    (with-eval-after-load 'org
 	      (setq org-support-shift-select 2))
 	    (with-eval-after-load 'org
