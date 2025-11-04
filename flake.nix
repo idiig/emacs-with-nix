@@ -1158,11 +1158,11 @@
 	      (setq org-startup-with-latex-preview t) ; 启动时显示 LaTeX 公式
 	      (add-hook 'org-mode-hook
 	                (lambda ()
-	                  (org-overview)		 ; 显示所有顶层节点
-	    	      (org-show-entry)		 ; 显示当前节点内容
-	                  (org-show-children)	 ; 显示所有子节点但不展开
-	    	      (org-fold-hide-block-all)	 ; 隐藏所有代码块
-	    	      (org-fold-hide-drawer-all) ; 隐藏所有抽屉
+	                  (org-overview)		  ; 显示所有顶层节点
+	    	      (org-show-entry)		  ; 显示当前节点内容
+	                  (org-show-children)	  ; 显示所有子节点但不展开
+	    	      (org-fold-hide-block-all)	  ; 隐藏所有代码块
+	    	      (org-fold-hide-drawer-all)))) ; 隐藏所有抽屉
 	    (with-eval-after-load 'org
 	      (setq org-support-shift-select 2))
 	    (with-eval-after-load 'org
