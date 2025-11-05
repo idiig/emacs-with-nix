@@ -2350,8 +2350,6 @@ LSP:
     		      :background "#fbf7f0"
   		      :height idiig/lower-font-height
   		      :box nil)
-    (set-face-attribute 'font-lock-comment-face nil
-    		      :height idiig/lower-font-height)
     (set-face-attribute 'org-table nil
     		      :height idiig/lower-font-height)
     (set-face-attribute 'org-target nil
