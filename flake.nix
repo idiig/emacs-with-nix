@@ -1221,25 +1221,74 @@
 	    	org-display-remote-inline-images t)) ; 远程图片文件可以通过 =C-u C-c C-x C-v= 被看到
 	    (with-eval-after-load 'org
 	      ;; Edit settings
-	      (setq org-auto-align-tags nilq		; 禁用标签自动对齐功能
+	      (setq org-auto-align-tags nil		; 禁用标签自动对齐功能
 	    	org-tags-column 0		; 标签紧贴标题文本，不右对齐
 	    	
 	    	;; Org styling, hide markup etc.
 	    	org-hide-emphasis-markers t ; 隐藏强调标记符号 (*粗体* 显示为 粗体)
-	    	org-pretty-entities t))	  ; 美化显示实体字符 (\alpha 显示为 α)
+	    	org-pretty-entities t)	  ; 美化显示实体字符 (\alpha 显示为 α)
+	    
+	      ;; Modes
+	      (auto-fill-mode 0)			; Disable auto-fill mode
+	      (visual-line-mode 1)			; Enable visual-line mode for soft wrapping
+	    
+	      ;; faces
+	      (set-face-attribute 'org-block nil
+	      		      :background "#fbf7f0"
+	    		      :height idiig/lower-font-height
+	    		      :box nil)
+	      (set-face-attribute 'font-lock-comment-face nil
+	      		      :height idiig/lower-font-height)
+	      (set-face-attribute 'org-table nil
+	      		      :height idiig/lower-font-height)
+	      (set-face-attribute 'org-target nil
+	      		      :height idiig/lower-font-height)
+	      (set-face-attribute 'org-meta-line nil
+	    		      :height idiig/lower-font-height)
+	      (set-face-attribute 'org-special-keyword nil
+	    		      :height idiig/lower-font-height)
+	      (set-face-attribute 'org-property-value nil
+	    		      :height idiig/lower-font-height)
+	      (set-face-attribute 'org-drawer nil
+	    		      :height idiig/lower-font-height)
+	      (set-face-attribute 'org-document-info nil
+	    		      :height idiig/lower-font-height)
+	      (set-face-attribute 'org-document-info-keyword nil
+	      		      :height idiig/lower-font-height)
+	      (set-face-attribute 'org-block-begin-line nil
+	      		      :inherit '(org-block)
+	    		      :background "#efe9dd"
+	      		      :underline nil
+	    		      :overline "gray40"
+	    		      :height idiig/lower-font-height
+	    		      :box nil
+	    		      :extend nil)
+	      (set-face-attribute 'org-block-end-line nil
+	      		      :inherit 'org-hide
+	      		      :height idiig/lower-font-height 
+	      		      :extend nil)
+	      (with-eval-after-load 'oc
+	        (set-face-attribute 'org-cite nil
+	      		      :slant 'italic))
+	    
+	      (setq-local line-spacing 0.3))
 	    (defun idiig/org-mode-face-settings ()
 	      "Set custom face attributes for Org mode headings in current buffer only."
-	    
+	      
+	      ;; Org styling, hide markup etc.
+	      org-hide-emphasis-markers t ; 隐藏强调标记符号 (*粗体* 显示为 粗体)
+	      org-pretty-entities t	      ; 美化显示实体字符 (\alpha 显示为 α)
 	      (auto-fill-mode 0)			; Disable auto-fill mode
 	      (require 'org-indent)			; Ensure org-indent is loaded
 	      (org-indent-mode)			; Enable org-indent mode
 	      (variable-pitch-mode 1)		; Enable variable-pitch mode
 	      (visual-line-mode 1)			; Enable visual-line mode for soft wrapping
+	      (setq header-line-format " ")
 	      
 	      ;; org headings 设置行间距
 	      (defface idiig-base-line
 	        '((t (:inherit 'variable-pitch
-	      		   :height 1.0)))
+	      		   :height 0.4)))
 	        "Used in text-mode and friends for exactly one space after a period.")
 	      
 	      (let ((faces '((org-level-1 . 1.2)
@@ -1251,51 +1300,63 @@
 	                     (org-level-7 . 1.1)
 	                     (org-level-8 . 1.1))))
 	        (dolist (face faces)
-	          (face-remap-add-relative (car face)
+	          (face-remap-add-relative (car face) nil
 	      			       :inherit 'idiig-base-line
-	      			       :weight 'regular
+	      			       :weight 'bold
 	      			       :height (cdr face))))
 	      
 	      (set-face-attribute 'org-block nil
-	      		      :inherit 'fixed-pitch
 	      		      :height idiig/lower-font-height
+	    		      :background "#efe9dd"
 	    		      :box nil)
 	      (set-face-attribute 'org-table nil
-	      		      :inherit 'fixed-pitch
-	    		      :height idiig/lower-font-height)
+	      		      :height idiig/lower-font-height)
 	      (set-face-attribute 'org-formula nil
 	      		      :inherit 'fixed-pitch)
 	      (set-face-attribute 'org-code nil
 	      		      :inherit '(shadow fixed-pitch)
-	    		      :height idiig/lower-font-height)
+	    		      :height idiig/font-height)
 	      (set-face-attribute 'org-verbatim nil
 	      		      :inherit '(shadow fixed-pitch))
 	      (set-face-attribute 'org-special-keyword nil
-	      		      :inherit '(mode-line-inactive fixed-pitch)
-	    		      :height idiig/lower-font-height)
+	      		      :height idiig/lower-font-height)
 	      (set-face-attribute 'org-meta-line nil
-	      		      :inherit '(mode-line-active fixed-pitch)
-	    		      :height idiig/lower-font-height)
+	      		      :height idiig/lower-font-height)
 	      (set-face-attribute 'org-property-value nil
 	      		      :inherit '(shadow fixed-pitch)
 	    		      :height idiig/lower-font-height)
+	      (set-face-attribute 'org-tag nil
+	    		      :inherit '(shadow fixed-pitch)
+	      		      :height idiig/lower-font-height)
 	      (set-face-attribute 'org-checkbox nil
-	      		      :inherit 'fixed-pitch
-	    		      :height idiig/lower-font-height)
+	      		      :height idiig/lower-font-height)
 	      (set-face-attribute 'org-drawer nil
-	      		      :inherit '(mode-line-active fixed-pitch)
 	      		      :height idiig/lower-font-height
 	      		      :extend nil)
 	      (set-face-attribute 'org-block-begin-line nil
-	      		      :inherit '(mode-line-active fixed-pitch)
-	      		      :height idiig/lower-font-height
-	      		      :underline nil
+	      		      :inherit '(org-block)
+	      		      :height idiig/font-height
+	      		      ;; :underline "gray40"
+	    		      :underline nil
+	    		      :overline "gray40"
+	    		      :box nil
 	    		      :extend nil)
 	      (set-face-attribute 'org-block-end-line nil
 	      		      :inherit 'org-hide
-	      		      :height idiig/lower-font-height
-	      		      :overline nil
-	      		      :extend nil)
+	      		      :height idiig/lower-font-height 
+	      		      :extend )
+	      (set-face-attribute 'org-link nil
+	      		      :inherit 'mode-line
+	    		      :height idiig/font-height)
+	      (set-face-attribute 'org-indent nil
+	      		      :inherit '(org-hide fixed-pitch)
+	    		      :height idiig/font-height)
+	      (set-face-attribute 'org-target nil
+	      		      :inherit '(shadow fixed-pitch)
+	      		      :height idiig/lower-font-height)
+	      (set-face-attribute 'org-cite nil
+	      		      :inherit 'variable-pitch
+	    		      :slant 'italic)
 	    
 	      ;; Make the document title a bit bigger
 	      (set-face-attribute 'org-document-title nil
@@ -1309,7 +1370,7 @@
 	        (diminish 'org-indent-mode)
 	        (diminish 'buffer-face-mode)))
 	    
-	    (add-hook 'org-mode-hook 'idiig/org-mode-face-settings)
+	    ;; (add-hook 'org-mode-hook 'idiig/org-mode-face-settings)
 	    (with-eval-after-load 'org
 	      (add-to-list
 	       'org-preview-latex-process-alist
@@ -1326,7 +1387,7 @@
 	      (setq org-latex-create-formula-image-program 'idiig-dvisvgm))
 	    (use-package org-bullets
 	      :after org
-	      :hook (org-mode . org-bullets-mode)
+	      ;; :hook (org-mode . org-bullets-mode)
 	      :custom
 	      (org-bullets-bullet-list '("◉" "○" "●" "○" "●" "○" "●")))
 	    
@@ -1334,10 +1395,11 @@
 	                            '(("^ *\\([-]\\) "
 	                               (0 (prog1 () (compose-region (match-beginning 1) (match-end 1) "•"))))))
 	    
-	    (with-eval-after-load 'org
-	      (setq org-ellipsis " ▾"
-	            org-hide-emphasis-markers t))
+	    ;; (with-eval-after-load 'org
+	    ;;   (setq org-ellipsis " ▾"
+	    ;;         org-hide-emphasis-markers t))
 	    (use-package valign
+	      :diminish valign-mode
 	      :hook (org-mode . valign-mode))
 	    (with-eval-after-load 'org
 	      (setq org-cite-export-processors
