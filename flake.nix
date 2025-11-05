@@ -1240,18 +1240,7 @@
 	      (set-face-attribute 'org-table nil
 	      		      :height idiig/lower-font-height)
 	      (set-face-attribute 'org-target nil
-	      		      :height idiig/lower-font-height)
-	      (set-face-attribute 'org-meta-line nil
-	    		      :height idiig/lower-font-height)
-	      (set-face-attribute 'org-special-keyword nil
-	    		      :height idiig/lower-font-height)
-	      (set-face-attribute 'org-property-value nil
-	    		      :height idiig/lower-font-height)
-	      (set-face-attribute 'org-drawer nil
-	    		      :height idiig/lower-font-height)
-	      (set-face-attribute 'org-document-info nil
-	    		      :height idiig/lower-font-height)
-	      (set-face-attribute 'org-document-info-keyword nil
+	    		      :inherit 'variable-pitch
 	      		      :height idiig/lower-font-height)
 	      (set-face-attribute 'org-block-begin-line nil
 	      		      :inherit '(org-block)
