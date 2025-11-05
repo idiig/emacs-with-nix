@@ -2720,7 +2720,6 @@ LSP:
 :END:
 #+begin_src emacs-lisp
   (use-package copilot
-    :hook (prog-mode . copilot-mode)
     :config
     (define-key copilot-completion-map (kbd "<tab>") 'copilot-accept-completion)
     (add-to-list 'copilot-indentation-alist '(prog-mode 2))

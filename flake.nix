@@ -1237,8 +1237,6 @@
 	      		      :background "#fbf7f0"
 	    		      :height idiig/lower-font-height
 	    		      :box nil)
-	      (set-face-attribute 'font-lock-comment-face nil
-	      		      :height idiig/lower-font-height)
 	      (set-face-attribute 'org-table nil
 	      		      :height idiig/lower-font-height)
 	      (set-face-attribute 'org-target nil
@@ -1528,7 +1526,6 @@
 	      ;; 挂载 advice
 	      (advice-add 'org-cite-insert :around #'my/oc-insert-then-ask))
 	    (use-package copilot
-	      :hook (prog-mode . copilot-mode)
 	      :config
 	      (define-key copilot-completion-map (kbd "<tab>") 'copilot-accept-completion)
 	      (add-to-list 'copilot-indentation-alist '(prog-mode 2))
