@@ -1332,7 +1332,7 @@
 	    
 	    ;; Hook 函數
 	    (defun idiig/org-line-height-hook (&optional _state)
-	      (run-with-idle-timer 0.0 nil
+	      (run-with-idle-timer 0.1 nil
 	                           (lambda (buf)
 	                             (when (buffer-live-p buf)
 	                               (with-current-buffer buf
