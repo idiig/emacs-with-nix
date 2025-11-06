@@ -1607,7 +1607,7 @@ minibuffer的检索]]。
 #+end_src
 
 *** =M--= 匹配到括号
-TODO: 把 evil-jump-item 换成别的函数。
+转跳匹配括号。
 #+begin_src emacs-lisp
   (defun idiig/goto-match-paren (arg)
     "跳轉到匹配的括號，類似 vi 的 %。"
