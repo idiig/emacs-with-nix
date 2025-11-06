@@ -1256,10 +1256,12 @@
 	    		      :extend nil)
 	      (set-face-attribute 'org-block-end-line nil
 	      		      :inherit 'org-hide
-	      		      :height idiig/lower-font-height 
-	      		      :extend nil)
+	      		      :height idiig/lower-font-height
+	    		      :overline "grey40"
+	      		      :extend t)
 	      (with-eval-after-load 'oc
 	        (set-face-attribute 'org-cite nil
+	    
 	      		      :slant 'italic)))
 	    (defun idiig/org-mode-face-settings ()
 	      "Set custom face attributes for Org mode headings in current buffer only."

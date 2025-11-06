@@ -2369,12 +2369,15 @@ LSP:
   		      :extend nil)
     (set-face-attribute 'org-block-end-line nil
     		      :inherit 'org-hide
-    		      :height idiig/lower-font-height 
-    		      :extend nil)
+    		      :height idiig/lower-font-height
+  		      :overline "grey40"
+    		      :extend t)
     (with-eval-after-load 'oc
       (set-face-attribute 'org-cite nil
+
     		      :slant 'italic)))
 #+end_src
+
 ***** 字体，缩进，换行设定
 :PROPERTIES:
 :header-args: :noweb-ref ecfg
