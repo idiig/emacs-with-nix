@@ -1263,6 +1263,61 @@
 	        (set-face-attribute 'org-cite nil
 	    
 	      		      :slant 'italic)))
+	    (defvar idiig/org-line-height 1.5) ; 設定行高倍率
+	    (defvar idiig/org-target-faces '(org-level-1
+	                                             org-level-2
+	                                             org-level-3
+	                                             org-level-4
+	                                             org-level-5
+	                                             org-level-6
+	                                             org-level-7
+	                                             nil)) ;; 目標標題樣式列表，nil 代表普通文字
+	    
+	    ;; 清除覆蓋層
+	    (defun idiig/org-line-height-clear ()
+	      (remove-overlays (point-min) (point-max) 'idiig/org-overlay t))
+	    
+	    ;; 檢查是否為空行
+	    (defun idiig/org-empty-line-p ()
+	      (save-excursion
+	        (beginning-of-line)
+	        (looking-at-p "^[[:space:]]*$")))
+	    
+	    ;; 應用行高
+	    (defun idiig/org-line-height-apply ()
+	      (idiig/org-line-height-clear)
+	      (save-excursion
+	        (goto-char (point-min))
+	        (while (not (eobp))
+	          (let* ((line-start (line-beginning-position))
+	                 (line-end (line-end-position))
+	                 (invisible (get-char-property line-start 'invisible))
+	                 (face (get-text-property line-start 'face))
+	                 (has-face (or (memq face idiig/org-target-faces)
+	                              (and (listp face)
+	                                   (cl-some (lambda (f) (memq f idiig/org-target-faces)) face))))
+	                 (is-empty (idiig/org-empty-line-p)))
+	            (when (and has-face (not invisible) (not is-empty))
+	              (let ((ov (make-overlay line-start (min (1+ line-end) (point-max)))))
+	                (overlay-put ov 'line-height idiig/org-line-height)
+	                (overlay-put ov 'priority 100)
+	                (overlay-put ov 'idiig/org-overlay t))))
+	          (forward-line 1))))
+	    
+	    ;; Hook 函數
+	    (defun idiig/org-line-height-hook (&optional _state)
+	      (run-with-idle-timer 0.05 nil
+	                           (lambda (buf)
+	                             (when (buffer-live-p buf)
+	                               (with-current-buffer buf
+	                                 (idiig/org-line-height-apply))))
+	                           (current-buffer)))
+	    
+	    ;; 使用方式
+	    (add-hook 'org-mode-hook
+	              (lambda ()
+	                (idiig/org-line-height-apply)
+	                (add-hook 'org-cycle-hook #'idiig/org-line-height-hook nil t)))
 	    (defun idiig/org-mode-face-settings ()
 	      "Set custom face attributes for Org mode headings in current buffer only."
 	      
