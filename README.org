@@ -1610,15 +1610,26 @@ minibuffer的检索]]。
 TODO: 把 evil-jump-item 换成别的函数。
 #+begin_src emacs-lisp
   (defun idiig/goto-match-paren (arg)
-    "Go to the matching if on (){}[], similar to vi style of % "
+    "跳轉到匹配的括號，類似 vi 的 %。"
     (interactive "p")
-    ;; first, check for "outside of bracket" positions expected by forward-sexp, etc
-    (cond ((looking-at "[\[\(\{]") (evil-jump-item))
-          ((looking-back "[\]\)\}]" 1) (evil-jump-item))
-          ;; now, try to succeed from inside of a bracket
-          ((looking-at "[\]\)\}]") (forward-char) (evil-jump-item))
-          ((looking-back "[\[\(\{]" 1) (backward-char) (evil-jump-item))
-          (t nil)))
+    (cond
+     ;; 光標在開括號上
+     ((looking-at "[[({]") 
+      (forward-sexp))
+     ;; 光標在閉括號上
+     ((looking-back "[])}]" 1) 
+      (backward-sexp))
+     ;; 光標在閉括號前（例如中間空格）
+     ((looking-at "[])}]") 
+      (forward-char)
+      (backward-sexp))
+     ;; 光標在開括號後
+     ((looking-back "[[({]" 1)
+      (backward-char)
+      (forward-sexp))
+     ;; 其他情況
+     (t
+      (message "未找到匹配的括號"))))
 
   (bind-key* "M--" 'idiig/goto-match-paren)
 #+end_src

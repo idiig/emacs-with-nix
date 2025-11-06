@@ -926,15 +926,26 @@
 	    (global-set-key (kbd "C-M-¥") 'idiig/indent-region-or-buffer)  ;; JIS keyboard
 	    (global-set-key [(shift return)] 'idiig/smart-open-line)
 	    (defun idiig/goto-match-paren (arg)
-	      "Go to the matching if on (){}[], similar to vi style of % "
+	      "跳轉到匹配的括號，類似 vi 的 %。"
 	      (interactive "p")
-	      ;; first, check for "outside of bracket" positions expected by forward-sexp, etc
-	      (cond ((looking-at "[\[\(\{]") (evil-jump-item))
-	            ((looking-back "[\]\)\}]" 1) (evil-jump-item))
-	            ;; now, try to succeed from inside of a bracket
-	            ((looking-at "[\]\)\}]") (forward-char) (evil-jump-item))
-	            ((looking-back "[\[\(\{]" 1) (backward-char) (evil-jump-item))
-	            (t nil)))
+	      (cond
+	       ;; 光標在開括號上
+	       ((looking-at "[[({]") 
+	        (forward-sexp))
+	       ;; 光標在閉括號上
+	       ((looking-back "[])}]" 1) 
+	        (backward-sexp))
+	       ;; 光標在閉括號前（例如中間空格）
+	       ((looking-at "[])}]") 
+	        (forward-char)
+	        (backward-sexp))
+	       ;; 光標在開括號後
+	       ((looking-back "[[({]" 1)
+	        (backward-char)
+	        (forward-sexp))
+	       ;; 其他情況
+	       (t
+	        (message "未找到匹配的括號"))))
 	    
 	    (bind-key* "M--" 'idiig/goto-match-paren)
 	    (defun idiig/insert-space-after-point ()
@@ -1219,6 +1230,24 @@
 	    	org-insert-heading-respect-content t ; 插入标题时考虑内容结构，在内容后插入
 	    	org-export-allow-bind-keywords t     ; 允许 =#+bind= 关键词
 	    	org-display-remote-inline-images t)) ; 远程图片文件可以通过 =C-u C-c C-x C-v= 被看到
+	    (defun idiig/org-show-current-only ()
+	      "收起全部，只展開當前 heading 的一層。"
+	      (when (org-at-heading-p)
+	        (save-excursion
+	          (org-overview)            ; 收起全部
+	          (org-show-entry)          ; 展開當前條目內容
+	          (org-show-children 1)     ; 展開當前層的子節點標題
+	          (while (org-up-heading-safe) ; 保證父鏈條也可見
+	            (org-show-entry)
+	            (org-show-children 1)))))
+	    
+	    (defun idiig/org-focus-after-cycle (&rest _args)
+	      "在 org-cycle 之後自動只展開當前 heading。"
+	      (when (and (org-at-heading-p)
+	                 (memq org-cycle-subtree-status '(children subtree)))
+	        (idiig/org-show-current-only)))
+	    
+	    (add-hook 'org-cycle-hook #'idiig/org-focus-after-cycle)
 	    (with-eval-after-load 'org
 	      ;; Edit settings
 	      (setq org-auto-align-tags nil		; 禁用标签自动对齐功能
