@@ -1290,8 +1290,7 @@
 	      		      :extend t)
 	      (with-eval-after-load 'oc
 	        (set-face-attribute 'org-cite nil
-	    
-	      		      :slant 'italic)))
+	      			:slant 'italic)))
 	    (defvar idiig/org-line-height 1.5) ; 設定行高倍率
 	    (defvar idiig/org-target-faces '(;; org-cite
 	                                     ;; org-cite-key

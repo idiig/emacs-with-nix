@@ -2410,8 +2410,7 @@ LSP:
     		      :extend t)
     (with-eval-after-load 'oc
       (set-face-attribute 'org-cite nil
-
-    		      :slant 'italic)))
+    			:slant 'italic)))
 #+end_src
 日常编辑的时候，CJK文字过于紧凑，因此在这里添加增加文本内容的行高。注
 意，由于我希望code block这些地方可以更小，因此一般的方法如 =(setq-local
