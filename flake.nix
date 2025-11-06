@@ -1264,14 +1264,12 @@
 	    
 	      		      :slant 'italic)))
 	    (defvar idiig/org-line-height 1.5) ; 設定行高倍率
-	    (defvar idiig/org-target-faces '(org-level-1
-	                                             org-level-2
-	                                             org-level-3
-	                                             org-level-4
-	                                             org-level-5
-	                                             org-level-6
-	                                             org-level-7
-	                                             nil)) ;; 目標標題樣式列表，nil 代表普通文字
+	    (defvar idiig/org-target-faces '(;; org-cite
+	                                     ;; org-cite-key
+	                                     ;; org-verbatim
+	                                     ;; org-footnote
+	                                     ;; org-latex-and-related
+	                                     nil)) ;; 目標標題樣式列表，nil 代表普通文字
 	    
 	    ;; 清除覆蓋層
 	    (defun idiig/org-line-height-clear ()
@@ -1306,7 +1304,7 @@
 	    
 	    ;; Hook 函數
 	    (defun idiig/org-line-height-hook (&optional _state)
-	      (run-with-idle-timer 0.05 nil
+	      (run-with-idle-timer 0.0 nil
 	                           (lambda (buf)
 	                             (when (buffer-live-p buf)
 	                               (with-current-buffer buf
