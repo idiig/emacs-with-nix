@@ -1237,6 +1237,10 @@
 	      		      :background "#fbf7f0"
 	    		      :height idiig/lower-font-height
 	    		      :box nil)
+	      (set-face-attribute 'org-code nil
+	    		      :height idiig/lower-font-height)
+	      (set-face-attribute 'org-tag nil
+	    		      :height idiig/lower-font-height)
 	      (set-face-attribute 'org-table nil
 	      		      :height idiig/lower-font-height)
 	      (set-face-attribute 'org-target nil
@@ -1256,9 +1260,7 @@
 	      		      :extend nil)
 	      (with-eval-after-load 'oc
 	        (set-face-attribute 'org-cite nil
-	      		      :slant 'italic))
-	    
-	      (setq-local line-spacing 0.3))
+	      		      :slant 'italic)))
 	    (defun idiig/org-mode-face-settings ()
 	      "Set custom face attributes for Org mode headings in current buffer only."
 	      

@@ -1,7 +1,6 @@
 #+title: 基于 Nix Flakes 的 Emacs 配置
 #+author: idiig
 #+setupfile: https://fniessen.github.io/org-html-themes/org/theme-bigblow.setup
-
 * 本配置
 :PROPERTIES:
 :header-args: :tangle no
@@ -2351,6 +2350,10 @@ LSP:
     		      :background "#fbf7f0"
   		      :height idiig/lower-font-height
   		      :box nil)
+    (set-face-attribute 'org-code nil
+  		      :height idiig/lower-font-height)
+    (set-face-attribute 'org-tag nil
+  		      :height idiig/lower-font-height)
     (set-face-attribute 'org-table nil
     		      :height idiig/lower-font-height)
     (set-face-attribute 'org-target nil
@@ -2370,9 +2373,7 @@ LSP:
     		      :extend nil)
     (with-eval-after-load 'oc
       (set-face-attribute 'org-cite nil
-    		      :slant 'italic))
-
-    (setq-local line-spacing 0.3))
+    		      :slant 'italic)))
 #+end_src
 ***** 字体，缩进，换行设定
 :PROPERTIES:
