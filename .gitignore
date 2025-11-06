@@ -11,3 +11,4 @@ result/*
 /api-keys/
 .aider*
 /.emacs-lsp-paths
+*.org#
