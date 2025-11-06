@@ -2234,7 +2234,6 @@ LSP:
   (add-to-list 'exec-path "${pkgs.graphviz}/bin")
 #+end_src
 ** Org相关配置
-
 *** Org本体
 :PROPERTIES:
 :header-args: :noweb-ref ecfg
@@ -2298,6 +2297,7 @@ LSP:
 - 折叠显示所有顶层节点
 - 展开显示当前节点内容
 - 展开显示所有子节点但不展开下一级
+  
 #+begin_src emacs-lisp
   (with-eval-after-load 'org
     (setq org-startup-with-inline-images t) ; 启动时显示图片
@@ -2317,6 +2317,7 @@ LSP:
 - 编辑折叠内容时显示并报错提醒
 - 允许 =#+bind= 关键词：用于导出时绑定变量
 - 远程图片文件可以通过 =C-u C-c C-x C-v= 被看到
+  
 #+begin_src emacs-lisp 
   (with-eval-after-load 'org		
     (setq org-support-shift-select 2
@@ -2326,6 +2327,30 @@ LSP:
   	org-export-allow-bind-keywords t     ; 允许 =#+bind= 关键词
   	org-display-remote-inline-images t)) ; 远程图片文件可以通过 =C-u C-c C-x C-v= 被看到
 #+end_src
+***** 展开标题时折叠其他的标题
+每次在 Org mode 中展开一个标题时，会自动折叠整个文档，只保留当前标题及
+其直接子节点展开，同时保持父级标题可见。
+#+begin_src emacs-lisp
+  (defun idiig/org-show-current-only ()
+    "收起全部，只展開當前 heading 的一層。"
+    (when (org-at-heading-p)
+      (save-excursion
+        (org-overview)            ; 收起全部
+        (org-show-entry)          ; 展開當前條目內容
+        (org-show-children 1)     ; 展開當前層的子節點標題
+        (while (org-up-heading-safe) ; 保證父鏈條也可見
+          (org-show-entry)
+          (org-show-children 1)))))
+
+  (defun idiig/org-focus-after-cycle (&rest _args)
+    "在 org-cycle 之後自動只展開當前 heading。"
+    (when (and (org-at-heading-p)
+               (memq org-cycle-subtree-status '(children subtree)))
+      (idiig/org-show-current-only)))
+
+  (add-hook 'org-cycle-hook #'idiig/org-focus-after-cycle)
+#+end_src
+
 **** 面貌
 ***** 基础美化
 :PROPERTIES:
