@@ -525,19 +525,37 @@ emacs在打开新的窗口时，默认光标维持在原来的窗口。比如当
 #+end_src
 
 **** 文件管理 (=Dired=)
+:PROPERTIES:
+:header-args: :noweb-ref ecfg
+:END:
 #+begin_src emacs-lisp
   (use-package dired
     :commands (dired dired-jump)
     :custom
-    (dired-listing-switches "-alh")	; Use human-readable sizes
-    (dired-dwim-target t)		    ; Try to be smart about guessing target directory
-    (dired-recursive-deletes 'always) ; Always delete and copy recursively
-    (dired-recursive-copies 'always)  ; Always delete and copy recursively
+    ;; Use human-readable file sizes and group directories first
+    (dired-listing-switches "-AGFhlv --group-directories-first --time-style=long-iso")
+    
+    ;; Intelligently guess target directory for operations (e.g., in split windows)
+    (dired-dwim-target t)
+    
+    ;; Always delete and copy directories recursively
+    (dired-recursive-deletes 'always)
+    (dired-recursive-copies 'always)
+    
+    ;; Move files to trash instead of permanent deletion
+    (delete-by-moving-to-trash t)
+    
+    ;; Auto-revert dired buffer when directory contents change
+    (dired-auto-revert-buffer t)
+    
     :hook
-    (dired-mode . auto-revert-mode)
+    ;; Enable auto-revert and highlight current line in dired buffers
+    (dired-mode . (lambda ()
+                    (auto-revert-mode 1)
+                    (hl-line-mode 1)))
+    
     :config
-    ;; Enable some commands by default
-    (put 'dired-find-alternate-file 'disabled nil)
+    ;; Enable 'a' key to open directories in same buffer instead of creating new ones
     (put 'dired-find-alternate-file 'disabled nil))
 #+end_src
 **** 便利的光标首尾移动
@@ -2338,9 +2356,11 @@ LSP:
   	org-export-allow-bind-keywords t     ; 允许 =#+bind= 关键词
   	org-display-remote-inline-images t)) ; 远程图片文件可以通过 =C-u C-c C-x C-v= 被看到
 #+end_src
+
 ***** 展开标题时折叠其他的标题
 每次在 Org mode 中展开一个标题时，会自动折叠整个文档，只保留当前标题及
 其直接子节点展开，同时保持父级标题可见。
+
 #+begin_src emacs-lisp
   (defun idiig/org-show-current-only ()
     "收起全部，只展開當前 heading 的一層。"
@@ -2417,12 +2437,14 @@ LSP:
 line-spacing 0.3)= 这类做法会导致这些字体设置的更小的地方也发生行距的增
 加，所以我的做法是使用 overlay 管理目标行的高度。未来可以改成不同的要
 素不同的行高。
+
 #+begin_src emacs-lisp
-  (defvar idiig/org-line-height 1.5) ; 設定行高倍率
-  (defvar idiig/org-target-faces '(;; org-cite
-                                   ;; org-cite-key
-                                   ;; org-verbatim
-                                   ;; org-footnote
+  (defvar idiig/org-line-height 1.8) ; 設定行高倍率
+  (defvar idiig/org-target-faces '(org-cite
+                                   org-cite-key
+                                   org-verbatim
+                                   org-footnote
+  				 org-code
                                    ;; org-latex-and-related
                                    nil)) ;; 目標標題樣式列表，nil 代表普通文字
 
@@ -2459,7 +2481,7 @@ line-spacing 0.3)= 这类做法会导致这些字体设置的更小的地方也�
 
   ;; Hook 函數
   (defun idiig/org-line-height-hook (&optional _state)
-    (run-with-idle-timer 0.1 nil
+    (run-with-idle-timer 0.07 nil
                          (lambda (buf)
                            (when (buffer-live-p buf)
                              (with-current-buffer buf
@@ -2472,6 +2494,7 @@ line-spacing 0.3)= 这类做法会导致这些字体设置的更小的地方也�
               (idiig/org-line-height-apply)
               (add-hook 'org-cycle-hook #'idiig/org-line-height-hook nil t)))
 #+end_src
+
 ***** 字体，缩进，换行设定
 :PROPERTIES:
 :header-args: :noweb-ref ecfg

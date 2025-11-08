@@ -215,6 +215,34 @@
 	      :init
 	      (setq save-place-file (expand-file-name "place" user-emacs-directory))
 	      (save-place-mode 1))
+	    (use-package dired
+	      :commands (dired dired-jump)
+	      :custom
+	      ;; Use human-readable file sizes and group directories first
+	      (dired-listing-switches "-AGFhlv --group-directories-first --time-style=long-iso")
+	      
+	      ;; Intelligently guess target directory for operations (e.g., in split windows)
+	      (dired-dwim-target t)
+	      
+	      ;; Always delete and copy directories recursively
+	      (dired-recursive-deletes 'always)
+	      (dired-recursive-copies 'always)
+	      
+	      ;; Move files to trash instead of permanent deletion
+	      (delete-by-moving-to-trash t)
+	      
+	      ;; Auto-revert dired buffer when directory contents change
+	      (dired-auto-revert-buffer t)
+	      
+	      :hook
+	      ;; Enable auto-revert and highlight current line in dired buffers
+	      (dired-mode . (lambda ()
+	                      (auto-revert-mode 1)
+	                      (hl-line-mode 1)))
+	      
+	      :config
+	      ;; Enable 'a' key to open directories in same buffer instead of creating new ones
+	      (put 'dired-find-alternate-file 'disabled nil))
 	    (use-package mwim
 	      :bind
 	      ("C-a" . mwim-beginning-of-code-or-line-or-comment)
@@ -1291,11 +1319,12 @@
 	      (with-eval-after-load 'oc
 	        (set-face-attribute 'org-cite nil
 	      			:slant 'italic)))
-	    (defvar idiig/org-line-height 1.5) ; 設定行高倍率
-	    (defvar idiig/org-target-faces '(;; org-cite
-	                                     ;; org-cite-key
-	                                     ;; org-verbatim
-	                                     ;; org-footnote
+	    (defvar idiig/org-line-height 1.8) ; 設定行高倍率
+	    (defvar idiig/org-target-faces '(org-cite
+	                                     org-cite-key
+	                                     org-verbatim
+	                                     org-footnote
+	    				 org-code
 	                                     ;; org-latex-and-related
 	                                     nil)) ;; 目標標題樣式列表，nil 代表普通文字
 	    
@@ -1332,7 +1361,7 @@
 	    
 	    ;; Hook 函數
 	    (defun idiig/org-line-height-hook (&optional _state)
-	      (run-with-idle-timer 0.1 nil
+	      (run-with-idle-timer 0.07 nil
 	                           (lambda (buf)
 	                             (when (buffer-live-p buf)
 	                               (with-current-buffer buf
