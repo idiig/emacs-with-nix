@@ -284,7 +284,7 @@ flake.nix。接下去运行可以通过在终端运行下面进行调试和版�
 :PROPERTIES:
 :header-args: :noweb-ref ecfg
 :END:
-***** 基础
+***** 基础 (built-in)
 #+begin_src emacs-lisp
   ;; 基础设置
   (tool-bar-mode -1) ;; 关闭工具栏
@@ -338,7 +338,6 @@ flake.nix。接下去运行可以通过在终端运行下面进行调试和版�
 :PROPERTIES:
 :header-args: :noweb-ref ecfg
 :END:
-
 emacs在打开新的窗口时，默认光标维持在原来的窗口。比如当你使用
 =describe-function= 时，光标不会跳到函数的简介窗口。在这类窗口我们本身
 可以按 =q= 来退出和关闭窗口。所以跳转到新窗口非常便利。
@@ -491,37 +490,51 @@ emacs在打开新的窗口时，默认光标维持在原来的窗口。比如当
   (add-hook 'kill-emacs-hook #'idiig/cleanup-recentf)
 #+end_src
 
-- 自动保存文件设置
-  
-#+begin_src emacs-lisp
-  (use-package savehist
-    :init
-    (setq savehist-additional-variables
-          ;; search entries
-          '(search-ring regexp-search-ring)
-          ;; 每一分钟保存一次
-          savehist-autosave-interval 60
-          ;; keep the home clean
-          savehist-file (expand-file-name "savehist" user-emacs-directory))
-    (savehist-mode t))
-#+end_src
-
-- 书签功能，打开时自动到原先编辑的位置
-
+**** 书签功能 (=bookmark=, built-in)
+:PROPERTIES:
+:header-args: :noweb-ref ecfg
+:END:
 #+begin_src emacs-lisp
   (use-package bookmark
     :init
     (setq bookmark-default-file (expand-file-name "bookmarks" user-emacs-directory)
           bookmark-save-flag 1))
 #+end_src
+**** Mark 命令重复优化 (=simple=, built-in)
+:PROPERTIES:
+:header-args: :noweb-ref ecfg
+:END:
+使 =C-u C-SPC= 命令后可以直接用 =C-SPC= 继续弹出 mark，无需重复输入 =C-u= 。
+更快的输入方式: =C-u C-SPC, C-SPC, C-SPC= 而非 =C-u C-SPC, C-u C-SPC, C-u
+C-SPC= 。
 
-- 保存文件的编辑位置
-
+#+begin_src emacs-lisp
+  (setq set-mark-command-repeat-pop t)
+#+end_src
+**** 打开时自动到原先编辑的位置 (=saveplace=, built-in)
+保存文件的编辑位置
 #+begin_src emacs-lisp
   (use-package saveplace
     :init
     (setq save-place-file (expand-file-name "place" user-emacs-directory))
     (save-place-mode 1))
+#+end_src
+
+**** 保留历史记录 (=savehist-mode=)
+默认 =savehist-mode= 只保存 minibuffer 历史,通过
+=savehist-additional-variables= 可以保存更多变量(如 =kill-ring= 和
+=register-alist=),使其在 Emacs 会话间持久化
+
+#+begin_src emacs-lisp
+  (use-package savehist
+    :init
+    (setq savehist-additional-variables '(search-ring ; 扩展历史记录保存：搜索历史
+  					regexp-search-ring ; 正则搜索历史
+  					register-alist	   ; 寄存器
+  					kill-ring)	   ; 剪切板历史
+          savehist-autosave-interval 60	; 每一分钟保存一次
+          savehist-file (expand-file-name "savehist" user-emacs-directory)) ; 保存文件位置
+    (savehist-mode t))			; 启用 savehist 模式
 #+end_src
 
 **** 文件管理 (=Dired=)
@@ -561,7 +574,7 @@ emacs在打开新的窗口时，默认光标维持在原来的窗口。比如当
     ;; Enable 'a' key to open directories in same buffer instead of creating new ones
     (put 'dired-find-alternate-file 'disabled nil))
 #+end_src
-**** 便利的光标首尾移动
+**** 便利的光标首尾移动 (=mwim=)
 ***** 依赖
 :PROPERTIES:
 :header-args: :noweb-ref epkgs
@@ -584,7 +597,7 @@ emacs在打开新的窗口时，默认光标维持在原来的窗口。比如当
      mwim-end-of-code-or-line))
 #+end_src
 
-**** 折行与复原
+**** 折行与复原 (=unfill=)
 ***** 依赖
 :PROPERTIES:
 :header-args: :noweb-ref epkgs

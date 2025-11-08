@@ -197,24 +197,11 @@
 	        (and (fboundp 'recentf-cleanup)
 	             (recentf-cleanup))))
 	    (add-hook 'kill-emacs-hook #'idiig/cleanup-recentf)
-	    (use-package savehist
-	      :init
-	      (setq savehist-additional-variables
-	            ;; search entries
-	            '(search-ring regexp-search-ring)
-	            ;; 每一分钟保存一次
-	            savehist-autosave-interval 60
-	            ;; keep the home clean
-	            savehist-file (expand-file-name "savehist" user-emacs-directory))
-	      (savehist-mode t))
 	    (use-package bookmark
 	      :init
 	      (setq bookmark-default-file (expand-file-name "bookmarks" user-emacs-directory)
 	            bookmark-save-flag 1))
-	    (use-package saveplace
-	      :init
-	      (setq save-place-file (expand-file-name "place" user-emacs-directory))
-	      (save-place-mode 1))
+	    (setq set-mark-command-repeat-pop t)
 	    (use-package dired
 	      :commands (dired dired-jump)
 	      :custom
