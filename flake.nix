@@ -57,6 +57,7 @@
 	      (global-so-long-mode +1))
 	    ;; 基础设置
 	    (tool-bar-mode -1) ;; 关闭工具栏
+	    (menu-bar-mode -1) ;; 关闭工具栏
 	    (scroll-bar-mode -1) ;; 关闭文件滑动控件
 	    (setq inhibit-splash-screen 1) ;; 关闭启动帮助画面
 	    (setq initial-frame-alist (quote ((fullscreen . maximized)))) ;; 全屏
