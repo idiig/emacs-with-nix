@@ -41,7 +41,6 @@
 	    (scroll-bar-mode -1)			; 关闭文件滑动控件
 	    (setq ring-bell-function 'ignore)
 	    (setq use-short-answers t)
-	    ;; startup.el
 	    (setq inhibit-splash-screen 1)     ; 关闭启动帮助画面
 	    (setq initial-scratch-message nil) ; 关闭scratch message
 	    (setq inhibit-startup-message t)   ; 关闭启动信息
@@ -216,6 +215,19 @@
 	      (setq bookmark-default-file (expand-file-name "bookmarks" user-emacs-directory)
 	            bookmark-save-flag 1))
 	    (setq set-mark-command-repeat-pop t)
+	    (use-package saveplace
+	      :init
+	      (setq save-place-file (expand-file-name "place" user-emacs-directory))
+	      (save-place-mode 1))
+	    (use-package savehist
+	      :init
+	      (setq savehist-additional-variables '(search-ring ; 扩展历史记录保存：搜索历史
+	    					regexp-search-ring ; 正则搜索历史
+	    					register-alist	   ; 寄存器
+	    					kill-ring)	   ; 剪切板历史
+	            savehist-autosave-interval 60	; 每一分钟保存一次
+	            savehist-file (expand-file-name "savehist" user-emacs-directory)) ; 保存文件位置
+	      (savehist-mode t))			; 启用 savehist 模式
 	    (use-package dired
 	      :commands (dired dired-jump)
 	      :custom

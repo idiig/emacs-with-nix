@@ -574,6 +574,9 @@ C-SPC= 。
   (setq set-mark-command-repeat-pop t)
 #+end_src
 **** 打开时自动到原先编辑的位置 (=saveplace=, built-in)
+:PROPERTIES:
+:header-args: :noweb-ref ecfg
+:END:
 保存文件的编辑位置
 #+begin_src emacs-lisp
   (use-package saveplace
@@ -582,7 +585,10 @@ C-SPC= 。
     (save-place-mode 1))
 #+end_src
 
-**** 保留历史记录 (=savehist-mode=)
+**** 保留历史记录 (=savehist-mode=, built-in)
+:PROPERTIES:
+:header-args: :noweb-ref ecfg
+:END:
 默认 =savehist-mode= 只保存 minibuffer 历史，通过
 =savehist-additional-variables= 可以保存更多变量(如 =kill-ring= 和
 =register-alist=)，使其在 Emacs 会话间持久化。
@@ -598,7 +604,7 @@ C-SPC= 。
     (savehist-mode t))			; 启用 savehist 模式
 #+end_src
 
-**** 文件管理 (=Dired=)
+**** 文件管理 (=Dired=, built-in)
 :PROPERTIES:
 :header-args: :noweb-ref ecfg
 :END:
