@@ -35,60 +35,34 @@
 	    (global-set-key (kbd "C-¥") 'toggle-input-method)
 	    (require 'use-package)
 	    (require 'diminish)
-	    ;; 关闭警告声
+	    ;; Useful decorations nil
+	    (tool-bar-mode -1)			; 关闭工具栏
+	    (menu-bar-mode -1)			; 关闭工具栏
+	    (scroll-bar-mode -1)			; 关闭文件滑动控件
 	    (setq ring-bell-function 'ignore)
-	    
-	    ;; 确认使用y或n，而不是yes或no。
-	    (defalias 'yes-or-no-p 'y-or-n-p)
-	    
-	    ;; 不自动生成备份文件
-	    (setq make-backup-files nil)
-	    
-	    ;; 选中文字能被整体替换（与其他文本编辑器相同）
-	    (delete-selection-mode 1)
-	    
-	    ;; 文件最后添加新行
-	    (setq require-final-newline t)
-	    
-	    ;; 文件在外部更新时buffer更新
-	    (global-auto-revert-mode 1)
+	    (setq use-short-answers t)
+	    ;; startup.el
+	    (setq inhibit-splash-screen 1)     ; 关闭启动帮助画面
+	    (setq initial-scratch-message nil) ; 关闭scratch message
+	    (setq inhibit-startup-message t)   ; 关闭启动信息
 	    (use-package so-long
 	      :init
 	      (global-so-long-mode +1))
-	    ;; 基础设置
-	    (tool-bar-mode -1) ;; 关闭工具栏
-	    (menu-bar-mode -1) ;; 关闭工具栏
-	    (scroll-bar-mode -1) ;; 关闭文件滑动控件
-	    (setq inhibit-splash-screen 1) ;; 关闭启动帮助画面
-	    (setq initial-frame-alist (quote ((fullscreen . maximized)))) ;; 全屏
-	    (setq initial-scratch-message nil) ;; 关闭scratch message
-	    (setq inhibit-startup-message t) ;; 关闭启动信息
-	    (setq frame-title-format
-	          ;; 窗口显示文件路径/buffer名
+	    (use-package delsel
+	      :custom
+	      (delete-selection-mode t))
+	    (use-package autorevert
+	      :custom
+	      (global-auto-revert-mode t))
+	    ;; frame.el
+	    (use-package frame
+	      :init
+	      (setq initial-frame-alist '((fullscreen . maximized)))	; 全屏
+	      (setq frame-title-format ; 窗口显示文件路径/buffer名
 	          '("" " idiig - "
 	            (:eval (if (buffer-file-name)
-	                       (abbreviate-file-name (buffer-file-name)) "%b"))))
-	    (setq ns-use-proxy-icon nil)  ;; 删除frame icon
-	    (use-package spacious-padding
-	      :config
-	      (setq spacious-padding-widths
-	            '( :internal-border-width 15
-	               :header-line-width 4
-	               :mode-line-width 6
-	               :tab-width 4
-	               :right-divider-width 30
-	               :scroll-bar-width 8))
+	                       (abbreviate-file-name (buffer-file-name)) "%b")))))
 	    
-	      ;; Read the doc string of `spacious-padding-subtle-mode-line' as it
-	      ;; is very flexible and provides several examples.
-	      (setq spacious-padding-subtle-mode-line
-	            `( :mode-line-active 'default
-	               :mode-line-inactive vertical-border)))
-	    (setq switch-to-buffer-obey-display-actions t)
-	    (setq switch-to-buffer-in-dedicated-window 'pop)
-	    (customize-set-variable 'display-buffer-base-action
-	    			'((display-buffer-reuse-window display-buffer-same-window)
-	    			  (reusable-frames . t)))
 	    (defadvice split-window-below (after split-window-below-and-switch activate)
 	      "切换到新分割的窗口"
 	      (when (called-interactively-p 'any)
@@ -98,6 +72,21 @@
 	      "切换到新分割的窗口"
 	      (when (called-interactively-p 'any)
 	        (other-window 1)))
+	    (use-package window
+	      :custom
+	      ;; 缓冲区显示优先级:
+	      ;; 1. 复用已显示该缓冲区的窗口(避免重复显示)
+	      ;; 2. 在当前窗口显示
+	      ;; 3. 可跨不同 frame 查找可复用的窗口
+	      (display-buffer-base-action
+	       '((display-buffer-reuse-window display-buffer-same-window)
+	         (reusable-frames . t)))
+	      
+	      ;; 让缓冲区切换遵循智能显示规则
+	      (switch-to-buffer-obey-display-actions t)
+	      
+	      ;; 在专用窗口中切换缓冲区时弹出新窗口，保护原窗口内容
+	      (switch-to-buffer-in-dedicated-window 'pop))
 	    (global-set-key (kbd "C-x V") 'shrink-window)
 	    
 	    (defun idiig/window-adjust-advice (orig-fun &rest args)
@@ -143,6 +132,29 @@
 	    (advice-add 'shrink-window-horizontally :around #'idiig/window-adjust-advice)
 	    (advice-add 'maximize-window :around #'idiig/window-adjust-advice)
 	    (advice-add 'minimize-window :around #'idiig/window-adjust-advice)
+	    (use-package files
+	      :init
+	      (setq make-backup-files nil)		; 不自动生成备份文件
+	      (setq require-final-newline t)	; 文件最后添加新行
+	      :config
+	      ;; 不存在文档时询问是否新建
+	      (add-hook 'before-save-hook
+	                (lambda ()
+	                  (when buffer-file-name
+	    		(let ((dir (file-name-directory buffer-file-name)))
+	                      (when (and (not (file-exists-p dir))
+	                                 (y-or-n-p (format "Directory %s does not exist. Create it?" dir)))
+	                        (make-directory dir t))))))
+	    
+	      ;; 找文件时若无母文档则新建 
+	      (defadvice find-file (before make-directory-maybe
+	                                   (filename &optional wildcards) activate)
+	        "Create parent directory if not exists while visiting file."
+	        (unless (file-exists-p filename)
+	          (let ((dir (file-name-directory filename)))
+	    	(when dir
+	              (unless (file-exists-p dir)
+	                (make-directory dir t)))))))
 	    ;; 不存在文档时询问是否新建
 	    (add-hook 'before-save-hook
 	              (lambda ()
@@ -163,40 +175,42 @@
 	              (make-directory dir t))))))
 	    (use-package recentf
 	      :defer t
-	      :commands
-	      (consult-recent-file)
-	      :init
-	      (setq recentf-save-file (expand-file-name "recentf" user-emacs-directory)
-	            recentf-max-saved-items 500
-	            recentf-max-menu-items 10)
-	      (setq recentf-exclude
-	            '("COMMIT_MSG"
-	              "COMMIT_EDITMSG"
-	              "github.*txt$"
-	              "/tmp/"
-	              "/sudo:"
-	              "/TAGS$"
-	              "/GTAGS$"
-	              "/GRAGS$"
-	              "/GPATH$"
-	              "\\.mkv$"
-	              "\\.mp[34]$"
-	              "\\.avi$"
-	              "\\.sub$"
-	              "\\.srt$"
-	              "\\.ass$"
-	              ".*png$"
-	              "Nutstore/org-files/"
-	              "bookmarks"))
-	      (setq recentf-max-saved-items 2048)
-	      (recentf-mode 1))
-	    
-	    ;; cleanup recent files
-	    (defun idiig/cleanup-recentf ()
-	      (progn
-	        (and (fboundp 'recentf-cleanup)
-	             (recentf-cleanup))))
-	    (add-hook 'kill-emacs-hook #'idiig/cleanup-recentf)
+	      :commands (consult-recent-file)
+	      
+	      :custom
+	      ;; Save location and limits
+	      (recentf-save-file (expand-file-name "recentf" user-emacs-directory))
+	      (recentf-max-saved-items 2048)    ; Maximum number of recent files to save
+	      (recentf-max-menu-items 10)       ; Number of items to show in menu
+	      
+	      ;; Exclude files that shouldn't be tracked
+	      (recentf-exclude
+	       '(;; Version control
+	         "COMMIT_MSG" "COMMIT_EDITMSG" "github.*txt$"
+	         ;; System files
+	         "/tmp/" "/sudo:"
+	         ;; Tag files
+	         "/TAGS$" "/GTAGS$" "/GRAGS$" "/GPATH$"
+	         ;; Media files
+	         "\\.mkv$" "\\.mp[34]$" "\\.avi$"
+	         "\\.sub$" "\\.srt$" "\\.ass$"
+	         ;; Images
+	         ".*png$"
+	         ;; Other
+	         "bookmarks"))
+	      
+	      :hook
+	      ;; Clean up non-existent files when exiting Emacs
+	      (kill-emacs . idiig/cleanup-recentf)
+	      
+	      :config
+	      ;; Enable recentf mode
+	      (recentf-mode 1)
+	      
+	      (defun idiig/cleanup-recentf ()
+	        "Remove non-existent files from recent files list."
+	        (when (fboundp 'recentf-cleanup)
+	          (recentf-cleanup))))
 	    (use-package bookmark
 	      :init
 	      (setq bookmark-default-file (expand-file-name "bookmarks" user-emacs-directory)
@@ -245,6 +259,21 @@
 	      ("M-q" . unfill-toggle)
 	      :commands
 	      (unfill-toggle))
+	    (use-package spacious-padding
+	      :config
+	      (setq spacious-padding-widths
+	            '( :internal-border-width 15
+	               :header-line-width 4
+	               :mode-line-width 6
+	               :tab-width 4
+	               :right-divider-width 30
+	               :scroll-bar-width 8))
+	    
+	      ;; Read the doc string of `spacious-padding-subtle-mode-line' as it
+	      ;; is very flexible and provides several examples.
+	      (setq spacious-padding-subtle-mode-line
+	            `( :mode-line-active 'default
+	               :mode-line-inactive vertical-border)))
 	    (use-package emacs
 	      :init
 	      ;; Add prompt indicator for `completing-read-multiple'
@@ -1876,11 +1905,10 @@
           emacsWithPackages = ((pkgs.emacsPackagesFor emacs).overrideScope overrides).withPackages (epkgs: with epkgs; [
             use-package
               diminish
-            so-long
-            spacious-padding
-              writeroom-mode
             mwim
             unfill
+            spacious-padding
+              writeroom-mode
             vertico
               orderless
               marginalia

@@ -215,11 +215,11 @@ flake.nix。接下去运行可以通过在终端运行下面进行调试和版�
   (global-set-key (kbd "C-¥") 'toggle-input-method)
 #+end_src
 *** 包管理和其他基础
-这里我考虑了到底是否要使用 =use-package= 。因为我现在在使用 org mode
-写配置文件的目的是希望可以穿插自然语言的代码描述，所以需要拆分代码。
-=use-package= 这种一体成型的写法不是很适合这种风格。但考虑了实际写的过
-程，我觉得大多数情况可以在配置代码前面作完整的整理，而不需要过于细粒度
-的代码表述，然后在迁移的过程可能也比较简单。所以我最后还是决定改成使用
+这里我考虑了到底是否要使用 =use-package= 。因为我现在在使用 org mode写配
+置文件的目的是希望可以穿插自然语言的代码描述，所以需要拆分代码。
+=use-package= 这种一体成型的写法不是很适合这种风格。但考虑了实际写的过程，
+我觉得大多数情况可以在配置代码前面作完整的整理，而不需要过于细粒度的代
+码表述，然后在迁移的过程可能也比较简单。所以我最后还是决定改成使用
 =use-package= 了。
 **** 依赖
 :PROPERTIES:
@@ -240,119 +240,99 @@ flake.nix。接下去运行可以通过在终端运行下面进行调试和版�
   (require 'diminish)
 #+end_src
 *** 更好的默认设置
-**** 本体的设定
+**** 取消装饰物 (=tool-bar-mode=, =menu-bar-mode=, =scroll-bar-mode=, built-in)
+:PROPERTIES:
+:header-args: :noweb-ref ecfg
+:END:
+关闭工具栏，菜单，滑动控件。必要时可手动开启。
+#+begin_src emacs-lisp
+  ;; Useful decorations nil
+  (tool-bar-mode -1)			; 关闭工具栏
+  (menu-bar-mode -1)			; 关闭工具栏
+  (scroll-bar-mode -1)			; 关闭文件滑动控件
+#+end_src
+**** 关闭提示音 (=C source code=)
 :PROPERTIES:
 :header-args: :noweb-ref ecfg
 :END:
 #+begin_src emacs-lisp
-  ;; 关闭警告声
   (setq ring-bell-function 'ignore)
-
-  ;; 确认使用y或n，而不是yes或no。
-  (defalias 'yes-or-no-p 'y-or-n-p)
-
-  ;; 不自动生成备份文件
-  (setq make-backup-files nil)
-
-  ;; 选中文字能被整体替换（与其他文本编辑器相同）
-  (delete-selection-mode 1)
-
-  ;; 文件最后添加新行
-  (setq require-final-newline t)
-
-  ;; 文件在外部更新时buffer更新
-  (global-auto-revert-mode 1)
 #+end_src
-**** 优化长文档 (=so-long=)
-***** 依赖
-:PROPERTIES:
-:header-args: :noweb-ref epkgs
-:END:
-#+begin_src nix
-  so-long
-#+end_src
-***** 配置
+**** 简短回答是否选项 (=C source code=)
 :PROPERTIES:
 :header-args: :noweb-ref ecfg
 :END:
+#+begin_src emacs-lisp
+  (setq use-short-answers t)
+#+end_src
+**** 干净的启动画面 (=startup=, built-in)
+:PROPERTIES:
+:header-args: :noweb-ref ecfg
+:END:
+启动后只留下纯净的 =*Scratch*= 页面。
+#+begin_src emacs-lisp
+  (setq inhibit-splash-screen 1)     ; 关闭启动帮助画面
+  (setq initial-scratch-message nil) ; 关闭scratch message
+  (setq inhibit-startup-message t)   ; 关闭启动信息
+#+end_src
+**** 优化长文档卡顿 (=so-long=, built-in)
+:PROPERTIES:
+:header-args: :noweb-ref ecfg
+:END:
+启用 =so-long-mode= 自动检测包含超长行的文件(如压缩后的 JavaScript、JSON
+等),并自动禁用可能导致性能问题的功能(如语法高亮、行号显示等),避免
+Emacs 在处理这类文件时出现卡顿或假死现象。
 #+begin_src emacs-lisp
   (use-package so-long
     :init
     (global-so-long-mode +1))
 #+end_src
-**** UI
+**** 更符合直觉的删除选中内容 (=delsel=, built-in)
 :PROPERTIES:
 :header-args: :noweb-ref ecfg
 :END:
-***** 基础 (built-in)
+选中文字能在粘贴时被整体替换（与其他文本编辑器相同）。
 #+begin_src emacs-lisp
-  ;; 基础设置
-  (tool-bar-mode -1) ;; 关闭工具栏
-  (menu-bar-mode -1) ;; 关闭工具栏
-  (scroll-bar-mode -1) ;; 关闭文件滑动控件
-  (setq inhibit-splash-screen 1) ;; 关闭启动帮助画面
-  (setq initial-frame-alist (quote ((fullscreen . maximized)))) ;; 全屏
-  (setq initial-scratch-message nil) ;; 关闭scratch message
-  (setq inhibit-startup-message t) ;; 关闭启动信息
-  (setq frame-title-format
-        ;; 窗口显示文件路径/buffer名
-        '("" " idiig - "
-          (:eval (if (buffer-file-name)
-                     (abbreviate-file-name (buffer-file-name)) "%b"))))
-  (setq ns-use-proxy-icon nil)  ;; 删除frame icon
+  (use-package delsel
+    :custom
+    (delete-selection-mode t))
 #+end_src
-***** 写作和展示UI（手动开启）  
-****** 依赖
-:PROPERTIES:
-:header-args: :noweb-ref epkgs
-:END:
-#+begin_src nix
-  spacious-padding
-    writeroom-mode
-#+end_src
-****** 配置
+**** 外部变更时自动在编辑器内反映变更 (=autorevert=, built-in)
 :PROPERTIES:
 :header-args: :noweb-ref ecfg
 :END:
+文件在外部更新时buffer更新。
 #+begin_src emacs-lisp
-  (use-package spacious-padding
-    :config
-    (setq spacious-padding-widths
-          '( :internal-border-width 15
-             :header-line-width 4
-             :mode-line-width 6
-             :tab-width 4
-             :right-divider-width 30
-             :scroll-bar-width 8))
-
-    ;; Read the doc string of `spacious-padding-subtle-mode-line' as it
-    ;; is very flexible and provides several examples.
-    (setq spacious-padding-subtle-mode-line
-          `( :mode-line-active 'default
-             :mode-line-inactive vertical-border)))
+  (use-package autorevert
+    :custom
+    (global-auto-revert-mode t))
 #+end_src
-**** 光标跳到新窗口
+**** 框架最大化与框架显示信息 (=frame=, built-in)
 :PROPERTIES:
 :header-args: :noweb-ref ecfg
 :END:
-emacs在打开新的窗口时，默认光标维持在原来的窗口。比如当你使用
-=describe-function= 时，光标不会跳到函数的简介窗口。在这类窗口我们本身
-可以按 =q= 来退出和关闭窗口。所以跳转到新窗口非常便利。
-
-- 专用buffer（display-buffer行为；主要影响 Emacs 自动创建的窗口（如
-  help、compilation 等）。注意这里也会影响到 =magit= 这类 transient 窗
-  口
-  
+- *初始框架最大化* ::
+  设置 Emacs 启动时自动以最大化状态显示窗口（而非全屏模式）
+- *框架标题显示优化* ::
+  自定义框架标题格式,显示 "idiig - " 前缀,后接当前文件的完整路径(如果
+  是文件)或缓冲区名称(如果不是文件)。文件路径会使用缩写形式(如 =~/= 代替
+  家目录),便于快速识别当前编辑的文件位置
 #+begin_src emacs-lisp
-  (setq switch-to-buffer-obey-display-actions t)
-  (setq switch-to-buffer-in-dedicated-window 'pop)
-  (customize-set-variable 'display-buffer-base-action
-  			'((display-buffer-reuse-window display-buffer-same-window)
-  			  (reusable-frames . t)))
-#+end_src
+;; frame.el
+(use-package frame
+  :init
+  (setq initial-frame-alist '((fullscreen . maximized)))	; 全屏
+  (setq frame-title-format ; 窗口显示文件路径/buffer名
+      '("" " idiig - "
+        (:eval (if (buffer-file-name)
+                   (abbreviate-file-name (buffer-file-name)) "%b")))))
 
-- split-window时转跳到新窗口
-  
+#+end_src
+**** 新窗口弹出和移动行为 (=window=, built-in)
+:PROPERTIES:
+:header-args: :noweb-ref ecfg
+:END:
+***** 分割新窗口时转跳到新窗口
 #+begin_src emacs-lisp
   (defadvice split-window-below (after split-window-below-and-switch activate)
     "切换到新分割的窗口"
@@ -365,7 +345,39 @@ emacs在打开新的窗口时，默认光标维持在原来的窗口。比如当
       (other-window 1)))
 #+end_src
 
-**** 窗口的放大缩小转变为持续的行为
+***** =display-buffer= 行为
+- *智能缓冲区切换* ::
+  默认情况下 =switch-to-buffer= (C-x b) 总是在当前窗口替换显示新缓冲区。
+  启用 =switch-to-buffer-obey-display-actions= 后，切换行为会遵循更智能的
+  显示规则，例如某些特殊缓冲区会自动在侧边栏或底部显示
+- *保护专用窗口* ::
+  某些窗口被标记为"专用"(dedicated)，用于显示特定内容(如终端、REPL 等)。
+  设置为 =pop= 后，在这些窗口中尝试切换缓冲区时会弹出新窗口，而非覆盖原内
+  容，保持工作区布局稳定。专用 buffer（ =display-buffer= 行为；主要影响
+  Emacs自动创建的窗口，如 =*help*= 等）。注意这里也会影响到 =magit= 这类
+  transient 窗口
+- *避免重复显示* ::
+  当打开一个已在其他窗口显示的缓冲区时，优先跳转到该窗口而非创建新窗口。
+  这样可以避免同一文件在多个窗口中重复出现，保持界面整洁
+
+#+begin_src emacs-lisp
+  (use-package window
+    :custom
+    ;; 缓冲区显示优先级:
+    ;; 1. 复用已显示该缓冲区的窗口(避免重复显示)
+    ;; 2. 在当前窗口显示
+    ;; 3. 可跨不同 frame 查找可复用的窗口
+    (display-buffer-base-action
+     '((display-buffer-reuse-window display-buffer-same-window)
+       (reusable-frames . t)))
+    
+    ;; 让缓冲区切换遵循智能显示规则
+    (switch-to-buffer-obey-display-actions t)
+    
+    ;; 在专用窗口中切换缓冲区时弹出新窗口，保护原窗口内容
+    (switch-to-buffer-in-dedicated-window 'pop))
+#+end_src
+***** 窗口的放大缩小转变为持续的行为
 :PROPERTIES:
 :header-args: :noweb-ref ecfg
 :END:
@@ -419,10 +431,47 @@ emacs在打开新的窗口时，默认光标维持在原来的窗口。比如当
   (advice-add 'minimize-window :around #'idiig/window-adjust-advice)
 #+end_src
 
-**** 文件的保存与新建
+**** 更好的文档相关行为 (=file=, built-in)
 :PROPERTIES:
 :header-args: :noweb-ref ecfg
 :END:
+- *禁用自动备份* ::
+  关闭 Emacs 默认的备份文件生成功能,不会在编辑文件时创建 =filename~= 格
+  式的备份文件,保持目录整洁。如果需要版本控制,建议使用 Git 等专业工具
+- *文件末尾强制换行* ::
+  保存文件时自动在文件末尾添加换行符,符合 POSIX 标准和大多数编程规范。
+  避免某些工具(如 Git)显示"文件末尾缺少换行符"的警告
+- *保存时智能创建目录* ::
+  保存文件时,如果父目录不存在会弹出询问是否创建。确认后自动创建所需的
+  目录层级,避免因目录不存在导致保存失败
+- *打开文件时自动创建目录* ::
+  使用 =C-x C-f= 打开不存在的文件时,如果其父目录也不存在,会自动创建所需
+  的目录结构,无需手动创建目录后再打开文件
+#+begin_src emacs-lisp
+  (use-package files
+    :init
+    (setq make-backup-files nil)		; 不自动生成备份文件
+    (setq require-final-newline t)	; 文件最后添加新行
+    :config
+    ;; 不存在文档时询问是否新建
+    (add-hook 'before-save-hook
+              (lambda ()
+                (when buffer-file-name
+  		(let ((dir (file-name-directory buffer-file-name)))
+                    (when (and (not (file-exists-p dir))
+                               (y-or-n-p (format "Directory %s does not exist. Create it?" dir)))
+                      (make-directory dir t))))))
+
+    ;; 找文件时若无母文档则新建 
+    (defadvice find-file (before make-directory-maybe
+                                 (filename &optional wildcards) activate)
+      "Create parent directory if not exists while visiting file."
+      (unless (file-exists-p filename)
+        (let ((dir (file-name-directory filename)))
+  	(when dir
+            (unless (file-exists-p dir)
+              (make-directory dir t)))))))
+#+end_src
 #+begin_src emacs-lisp
   ;; 不存在文档时询问是否新建
   (add-hook 'before-save-hook
@@ -443,51 +492,67 @@ emacs在打开新的窗口时，默认光标维持在原来的窗口。比如当
           (unless (file-exists-p dir)
             (make-directory dir t))))))
 #+end_src
-
-**** 最近文件
+**** 记录和读取最近打开的文档 (=recentf=, built-in)
 :PROPERTIES:
 :header-args: :noweb-ref ecfg
 :END:
+- *最近文件记录* ::
+  启用 =recentf-mode= 记录最近打开的文件,保存最多 500 个文件历史(显示前 10 个),
+  方便快速重新打开常用文件。可配合 =consult-recent-file= 等命令快速访问
+- *排除特定文件类型* ::
+  自动过滤不需要记录的文件,包括:
+  - Git 提交信息文件(=COMMIT_MSG= 等)
+  - 临时文件(/tmp/ 目录)
+  - sudo 编辑的文件
+  - 标签文件(TAGS、GTAGS 等)
+  - 媒体文件(视频、音频、字幕)
+  - 图片文件(PNG 等)
+  - 书签文件
+- *退出时清理文件列表* ::
+  关闭 Emacs 时自动清理已不存在的文件，保持最近文件列表的准确性，避免
+  列表中出现已删除的文件路径
 #+begin_src emacs-lisp
   (use-package recentf
     :defer t
-    :commands
-    (consult-recent-file)
-    :init
-    (setq recentf-save-file (expand-file-name "recentf" user-emacs-directory)
-          recentf-max-saved-items 500
-          recentf-max-menu-items 10)
-    (setq recentf-exclude
-          '("COMMIT_MSG"
-            "COMMIT_EDITMSG"
-            "github.*txt$"
-            "/tmp/"
-            "/sudo:"
-            "/TAGS$"
-            "/GTAGS$"
-            "/GRAGS$"
-            "/GPATH$"
-            "\\.mkv$"
-            "\\.mp[34]$"
-            "\\.avi$"
-            "\\.sub$"
-            "\\.srt$"
-            "\\.ass$"
-            ".*png$"
-            "Nutstore/org-files/"
-            "bookmarks"))
-    (setq recentf-max-saved-items 2048)
-    (recentf-mode 1))
-
-  ;; cleanup recent files
-  (defun idiig/cleanup-recentf ()
-    (progn
-      (and (fboundp 'recentf-cleanup)
-           (recentf-cleanup))))
-  (add-hook 'kill-emacs-hook #'idiig/cleanup-recentf)
+    :commands (consult-recent-file)
+    
+    :custom
+    ;; Save location and limits
+    (recentf-save-file (expand-file-name "recentf" user-emacs-directory))
+    (recentf-max-saved-items 2048)    ; Maximum number of recent files to save
+    (recentf-max-menu-items 10)       ; Number of items to show in menu
+    
+    ;; Exclude files that shouldn't be tracked
+    (recentf-exclude
+     '(;; Version control
+       "COMMIT_MSG" "COMMIT_EDITMSG" "github.*txt$"
+       ;; System files
+       "/tmp/" "/sudo:"
+       ;; Tag files
+       "/TAGS$" "/GTAGS$" "/GRAGS$" "/GPATH$"
+       ;; Media files
+       "\\.mkv$" "\\.mp[34]$" "\\.avi$"
+       "\\.sub$" "\\.srt$" "\\.ass$"
+       ;; Images
+       ".*png$"
+       ;; Other
+       "bookmarks"))
+    
+    :hook
+    ;; Clean up non-existent files when exiting Emacs
+    (kill-emacs . idiig/cleanup-recentf)
+    
+    :config
+    ;; Enable recentf mode
+    (recentf-mode 1)
+    
+    (defun idiig/cleanup-recentf ()
+      "Remove non-existent files from recent files list."
+      (when (fboundp 'recentf-cleanup)
+        (recentf-cleanup))))
 #+end_src
 
-**** 书签功能 (=bookmark=, built-in)
+**** 保存书签到配置独立目录 (=bookmark=, built-in)
 :PROPERTIES:
 :header-args: :noweb-ref ecfg
 :END:
@@ -518,10 +583,9 @@ C-SPC= 。
 #+end_src
 
 **** 保留历史记录 (=savehist-mode=)
-默认 =savehist-mode= 只保存 minibuffer 历史,通过
+默认 =savehist-mode= 只保存 minibuffer 历史，通过
 =savehist-additional-variables= 可以保存更多变量(如 =kill-ring= 和
-=register-alist=),使其在 Emacs 会话间持久化
-
+=register-alist=)，使其在 Emacs 会话间持久化。
 #+begin_src emacs-lisp
   (use-package savehist
     :init
@@ -613,6 +677,36 @@ C-SPC= 。
     ("M-q" . unfill-toggle)
     :commands
     (unfill-toggle))
+#+end_src
+**** 写作和展示UI（手动开启）  
+***** 依赖
+:PROPERTIES:
+:header-args: :noweb-ref epkgs
+:END:
+#+begin_src nix
+  spacious-padding
+    writeroom-mode
+#+end_src
+***** 配置
+:PROPERTIES:
+:header-args: :noweb-ref ecfg
+:END:
+#+begin_src emacs-lisp
+  (use-package spacious-padding
+    :config
+    (setq spacious-padding-widths
+          '( :internal-border-width 15
+             :header-line-width 4
+             :mode-line-width 6
+             :tab-width 4
+             :right-divider-width 30
+             :scroll-bar-width 8))
+
+    ;; Read the doc string of `spacious-padding-subtle-mode-line' as it
+    ;; is very flexible and provides several examples.
+    (setq spacious-padding-subtle-mode-line
+          `( :mode-line-active 'default
+             :mode-line-inactive vertical-border)))
 #+end_src
 **** 更好的minibuffer
 :PROPERTIES:
