@@ -62,6 +62,107 @@
 	            (:eval (if (buffer-file-name)
 	                       (abbreviate-file-name (buffer-file-name)) "%b")))))
 	    
+	    (use-package window
+	      :bind
+	      (("C-x ^" . idiig/smart-adjust-window-size-up)
+	       ("C-x {" . idiig/smart-adjust-window-size-left)
+	       ("C-x }" . idiig/smart-adjust-window-size-right))
+	      :config
+	      ;; Apply advice
+	      (advice-add 'idiig/smart-adjust-window-size :around #'idiig/smart-adjust-window-size-advice))
+	    (defun idiig/smart-adjust-window-size (direction &optional delta)
+	      "Intelligently adjust window size based on window position.
+	    DIRECTION: 'up, 'down, 'left, 'right indicates border movement direction
+	    DELTA: adjustment size, default is 5"
+	      (let ((delta (or delta 5)))
+	        (pcase direction
+	          ;; Vertical adjustment
+	          ('up
+	           (cond
+	            ((window-in-direction 'below)
+	             (shrink-window delta nil))
+	            ((window-in-direction 'above)
+	             (enlarge-window delta nil))
+	            (t (message "Cannot adjust window upward"))))
+	          
+	          ('down
+	           (cond
+	            ((window-in-direction 'below)
+	             (enlarge-window delta nil))
+	            ((window-in-direction 'above)
+	             (shrink-window delta nil))
+	            (t (message "Cannot adjust window downward"))))
+	          
+	          ;; Horizontal adjustment
+	          ('left
+	           (cond
+	            ((window-in-direction 'right)
+	             (shrink-window delta t))
+	            ((window-in-direction 'left)
+	             (enlarge-window delta t))
+	            (t (message "Cannot adjust window leftward"))))
+	          
+	          ('right
+	           (cond
+	            ((window-in-direction 'right)
+	             (enlarge-window delta t))
+	            ((window-in-direction 'left)
+	             (shrink-window delta t))
+	            (t (message "Cannot adjust window rightward")))))))
+	    
+	    (defun idiig/smart-adjust-window-size-up (&optional delta)
+	      "Move border upward"
+	      (interactive "p")
+	      (idiig/smart-adjust-window-size 'up delta))
+	    
+	    (defun idiig/smart-adjust-window-size-down (&optional delta)
+	      "Move border downward"
+	      (interactive "p")
+	      (idiig/smart-adjust-window-size 'down delta))
+	    
+	    (defun idiig/smart-adjust-window-size-left (&optional delta)
+	      "Move border leftward"
+	      (interactive "p")
+	      (idiig/smart-adjust-window-size 'left delta))
+	    
+	    (defun idiig/smart-adjust-window-size-right (&optional delta)
+	      "Move border rightward"
+	      (interactive "p")
+	      (idiig/smart-adjust-window-size 'right delta))
+	    (defun idiig/smart-adjust-window-size-advice (orig-fun direction &rest args)
+	      "Add continuous adjustment support for idiig/smart-adjust-window-size"
+	      (let ((delta (or (car args) 5)))
+	        ;; Execute initial adjustment
+	        (apply orig-fun direction args)
+	        
+	        ;; Set transient map
+	        (set-transient-map
+	         (let ((map (make-sparse-keymap)))
+	           ;; ^ = border moves up
+	           (define-key map (kbd "^")
+	    		   `(lambda () (interactive) (idiig/smart-adjust-window-size 'up ,delta)))
+	           ;; V = border moves down
+	           (define-key map (kbd "V")
+	    		   `(lambda () (interactive) (idiig/smart-adjust-window-size 'down ,delta)))
+	           ;; { = border moves left
+	           (define-key map (kbd "{")
+	    		   `(lambda () (interactive) (idiig/smart-adjust-window-size 'left ,delta)))
+	           ;; } = border moves right
+	           (define-key map (kbd "}")
+	    		   `(lambda () (interactive) (idiig/smart-adjust-window-size 'right ,delta)))
+	           ;; + = balance windows
+	           (define-key map (kbd "+")
+	    		   (lambda () (interactive) (balance-windows)))
+	           ;; M = maximize
+	           (define-key map (kbd "M")
+	    		   (lambda () (interactive) (maximize-window)))
+	           ;; m = minimize
+	           (define-key map (kbd "m")
+	    		   (lambda () (interactive) (minimize-window)))
+	           map)
+	         nil nil
+	         "Use %k for further adjustment")))
+	    
 	    (defadvice split-window-below (after split-window-below-and-switch activate)
 	      "切换到新分割的窗口"
 	      (when (called-interactively-p 'any)
@@ -86,51 +187,6 @@
 	      
 	      ;; 在专用窗口中切换缓冲区时弹出新窗口，保护原窗口内容
 	      (switch-to-buffer-in-dedicated-window 'pop))
-	    (global-set-key (kbd "C-x V") 'shrink-window)
-	    
-	    (defun idiig/window-adjust-advice (orig-fun &rest args)
-	      "使用 Emacs 风格按键 (^, V, {, }, +) 持续调整窗口大小。"
-	      (let* ((ev last-command-event)
-	    	 (echo-keystrokes nil))
-	        ;; 执行初始调整
-	        (apply orig-fun args)
-	    
-	        ;; 设置 transient map
-	        (let ((delta (car args))) 
-	          (set-transient-map
-	           (let ((map (make-sparse-keymap)))
-	    	 ;; 垂直调整
-	    	 (define-key map (kbd "^")
-	    		     `(lambda () (interactive) (enlarge-window ,delta nil)))
-	    	 (define-key map (kbd "V")
-	    		     `(lambda () (interactive) (shrink-window ,delta nil)))
-	    
-	    	 ;; 水平调整
-	    	 (define-key map (kbd "{")
-	    		     `(lambda () (interactive) (shrink-window ,delta t)))
-	    	 (define-key map (kbd "}")
-	    		     `(lambda () (interactive) (enlarge-window ,delta t)))
-	    
-	    	 ;; 平衡窗口
-	    	 (define-key map (kbd "+")
-	    		     (lambda () (interactive) (balance-windows)))
-	    	 ;; 最大化窗口
-	    	 (define-key map (kbd "M")
-	    		     (lambda () (interactive) (maximize-window)))
-	    	 ;; 最小化窗口
-	    	 (define-key map (kbd "m")
-	    		     (lambda () (interactive) (minimize-window)))
-	    	 map)
-	           nil nil
-	           "Use %k for further adjustment"))))
-	    
-	    ;; 添加 advice
-	    (advice-add 'enlarge-window :around #'idiig/window-adjust-advice)
-	    (advice-add 'shrink-window :around #'idiig/window-adjust-advice)
-	    (advice-add 'enlarge-window-horizontally :around #'idiig/window-adjust-advice)
-	    (advice-add 'shrink-window-horizontally :around #'idiig/window-adjust-advice)
-	    (advice-add 'maximize-window :around #'idiig/window-adjust-advice)
-	    (advice-add 'minimize-window :around #'idiig/window-adjust-advice)
 	    (use-package files
 	      :init
 	      (setq make-backup-files nil)		; 不自动生成备份文件
