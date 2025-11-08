@@ -68,7 +68,6 @@
 	            (:eval (if (buffer-file-name)
 	                       (abbreviate-file-name (buffer-file-name)) "%b"))))
 	    (setq ns-use-proxy-icon nil)  ;; 删除frame icon
-	    (require-theme 'modus-themes)
 	    (use-package spacious-padding
 	      :config
 	      (setq spacious-padding-widths

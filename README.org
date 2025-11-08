@@ -300,10 +300,6 @@ flake.nix。接下去运行可以通过在终端运行下面进行调试和版�
                      (abbreviate-file-name (buffer-file-name)) "%b"))))
   (setq ns-use-proxy-icon nil)  ;; 删除frame icon
 #+end_src
-***** 主题
-#+begin_src emacs-lisp
-  (require-theme 'modus-themes)
-#+end_src
 ***** 写作和展示UI（手动开启）  
 ****** 依赖
 :PROPERTIES:
