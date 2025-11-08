@@ -64,71 +64,121 @@
 	    
 	    (use-package window
 	      :bind
-	      (("C-x ^" . idiig/smart-adjust-window-size-up)
-	       ("C-x {" . idiig/smart-adjust-window-size-left)
-	       ("C-x }" . idiig/smart-adjust-window-size-right))
+	      (([remap enlarge-window] . idiig/smart-adjust-window-size-up)
+	       ([remap shrink-window] . idiig/smart-adjust-window-size-down)
+	       ([remap shrink-window-horizontally] . idiig/smart-adjust-window-size-left)
+	       ([remap enlarge-window-horizontally] . idiig/smart-adjust-window-size-right))
+	      
+	      :init
+	      (defun idiig/smart-adjust-window-size (direction &optional delta horizontal)
+	        "Intelligently adjust window size based on window position.
+	    DIRECTION: 'up, 'down, 'left, 'right indicates border movement direction
+	    DELTA: adjustment size, default is 5
+	    HORIZONTAL: whether to adjust horizontally"
+	        (let ((delta (or delta 5)))
+	          (pcase direction
+	    	;; Vertical adjustment
+	    	('up
+	    	 (cond
+	              ;; If there's a window below, shrink current window (border moves up)
+	              ((window-in-direction 'below)
+	               (shrink-window delta nil))
+	              ;; If there's a window above, enlarge current window (border moves up)
+	              ((window-in-direction 'above)
+	               (enlarge-window delta nil))
+	              (t (message "Cannot adjust window upward"))))
+	    	
+	    	('down
+	    	 (cond
+	              ;; If there's a window below, enlarge current window (border moves down)
+	              ((window-in-direction 'below)
+	               (enlarge-window delta nil))
+	              ;; If there's a window above, shrink current window (border moves down)
+	              ((window-in-direction 'above)
+	               (shrink-window delta nil))
+	              (t (message "Cannot adjust window downward"))))
+	    	
+	    	;; Horizontal adjustment
+	    	('left
+	    	 (cond
+	              ;; If there's a window on the right, shrink current window (border moves left)
+	              ((window-in-direction 'right)
+	               (shrink-window delta t))
+	              ;; If there's a window on the left, enlarge current window (border moves left)
+	              ((window-in-direction 'left)
+	               (enlarge-window delta t))
+	              (t (message "Cannot adjust window leftward"))))
+	    	
+	    	('right
+	    	 (cond
+	              ;; If there's a window on the right, enlarge current window (border moves right)
+	              ((window-in-direction 'right)
+	               (enlarge-window delta t))
+	              ;; If there's a window on the left, shrink current window (border moves right)
+	              ((window-in-direction 'left)
+	               (shrink-window delta t))
+	              (t (message "Cannot adjust window rightward")))))))
+	      
+	      ;; Define convenience commands
+	      (defun idiig/smart-adjust-window-size-up (&optional delta)
+	        "Move border upward"
+	        (interactive "P")
+	        (idiig/smart-adjust-window-size 'up (or delta 5)))
+	    
+	      (defun idiig/smart-adjust-window-size-down (&optional delta)
+	        "Move border downward"
+	        (interactive "P")
+	        (idiig/smart-adjust-window-size 'down (or delta 5)))
+	    
+	      (defun idiig/smart-adjust-window-size-left (&optional delta)
+	        "Move border leftward"
+	        (interactive "P")
+	        (idiig/smart-adjust-window-size 'left (or delta 5)))
+	    
+	      (defun idiig/smart-adjust-window-size-right (&optional delta)
+	        "Move border rightward"
+	        (interactive "P")
+	        (idiig/smart-adjust-window-size 'right (or delta 5))))
+	    (use-package window
+	      :init
+	      ;; Add transient map support
+	      (defun idiig/smart-adjust-window-size-advice (orig-fun direction &rest args)
+	        "Add continuous adjustment support for idiig/smart-adjust-window-size"
+	        (let ((delta (or (car args) 5)))
+	          ;; Execute initial adjustment
+	          (apply orig-fun direction args)
+	          
+	          ;; Set transient map
+	          (set-transient-map
+	           (let ((map (make-sparse-keymap)))
+	    	 ;; ^ = border moves up
+	    	 (define-key map (kbd "^")
+	    		     `(lambda () (interactive) (idiig/smart-adjust-window-size 'up ,delta)))
+	    	 ;; V = border moves down
+	    	 (define-key map (kbd "V")
+	    		     `(lambda () (interactive) (idiig/smart-adjust-window-size 'down ,delta)))
+	    	 ;; { = border moves left
+	    	 (define-key map (kbd "{")
+	    		     `(lambda () (interactive) (idiig/smart-adjust-window-size 'left ,delta)))
+	    	 ;; } = border moves right
+	    	 (define-key map (kbd "}")
+	    		     `(lambda () (interactive) (idiig/smart-adjust-window-size 'right ,delta)))
+	    	 ;; + = balance windows
+	    	 (define-key map (kbd "+")
+	    		     (lambda () (interactive) (balance-windows)))
+	    	 ;; M = maximize
+	    	 (define-key map (kbd "M")
+	    		     (lambda () (interactive) (maximize-window)))
+	    	 ;; m = minimize
+	    	 (define-key map (kbd "m")
+	    		     (lambda () (interactive) (minimize-window)))
+	    	 map)
+	           nil nil
+	           "Use %k for further adjustment")))
+	    
 	      :config
 	      ;; Apply advice
 	      (advice-add 'idiig/smart-adjust-window-size :around #'idiig/smart-adjust-window-size-advice))
-	    (defun idiig/smart-adjust-window-size (direction &optional delta)
-	      "Intelligently adjust window size based on window position.
-	    DIRECTION: 'up, 'down, 'left, 'right indicates border movement direction
-	    DELTA: adjustment size, default is 5"
-	      (let ((delta (or delta 5)))
-	        (pcase direction
-	          ;; Vertical adjustment
-	          ('up
-	           (cond
-	            ((window-in-direction 'below)
-	             (shrink-window delta nil))
-	            ((window-in-direction 'above)
-	             (enlarge-window delta nil))
-	            (t (message "Cannot adjust window upward"))))
-	          
-	          ('down
-	           (cond
-	            ((window-in-direction 'below)
-	             (enlarge-window delta nil))
-	            ((window-in-direction 'above)
-	             (shrink-window delta nil))
-	            (t (message "Cannot adjust window downward"))))
-	          
-	          ;; Horizontal adjustment
-	          ('left
-	           (cond
-	            ((window-in-direction 'right)
-	             (shrink-window delta t))
-	            ((window-in-direction 'left)
-	             (enlarge-window delta t))
-	            (t (message "Cannot adjust window leftward"))))
-	          
-	          ('right
-	           (cond
-	            ((window-in-direction 'right)
-	             (enlarge-window delta t))
-	            ((window-in-direction 'left)
-	             (shrink-window delta t))
-	            (t (message "Cannot adjust window rightward")))))))
-	    
-	    (defun idiig/smart-adjust-window-size-up (&optional delta)
-	      "Move border upward"
-	      (interactive "p")
-	      (idiig/smart-adjust-window-size 'up delta))
-	    
-	    (defun idiig/smart-adjust-window-size-down (&optional delta)
-	      "Move border downward"
-	      (interactive "p")
-	      (idiig/smart-adjust-window-size 'down delta))
-	    
-	    (defun idiig/smart-adjust-window-size-left (&optional delta)
-	      "Move border leftward"
-	      (interactive "p")
-	      (idiig/smart-adjust-window-size 'left delta))
-	    
-	    (defun idiig/smart-adjust-window-size-right (&optional delta)
-	      "Move border rightward"
-	      (interactive "p")
-	      (idiig/smart-adjust-window-size 'right delta))
 	    (defun idiig/smart-adjust-window-size-advice (orig-fun direction &rest args)
 	      "Add continuous adjustment support for idiig/smart-adjust-window-size"
 	      (let ((delta (or (car args) 5)))
@@ -161,8 +211,11 @@
 	    		   (lambda () (interactive) (minimize-window)))
 	           map)
 	         nil nil
-	         "Use %k for further adjustment")))
-	    
+	         "Use %k for further adjustment"))
+	      
+	      :config
+	      ;; Apply advice
+	      (advice-add 'idiig/smart-adjust-window-size :around #'idiig/smart-adjust-window-size-advice))
 	    (defadvice split-window-below (after split-window-below-and-switch activate)
 	      "切换到新分割的窗口"
 	      (when (called-interactively-p 'any)
