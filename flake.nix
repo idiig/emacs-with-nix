@@ -259,6 +259,51 @@
 	      :config
 	      ;; Enable 'a' key to open directories in same buffer instead of creating new ones
 	      (put 'dired-find-alternate-file 'disabled nil))
+	    (use-package elec-pair
+	      :custom
+	      ;; Disable balance checking - allow pairing even when unbalanced
+	      (electric-pair-preserve-balance nil)
+	      
+	      ;; Use conservative inhibit strategy for smart context detection
+	      (electric-pair-inhibit-predicate 'electric-pair-conservative-inhibit)
+	      
+	      :config
+	      ;; Enable automatic bracket pairing
+	      (electric-pair-mode 1)
+	      
+	      ;; Save default pairs for creating mode-specific local settings
+	      (defconst idiig/default-electric-pairs electric-pair-pairs
+	        "Default electric pair settings to use as base for local pairs.")
+	      
+	      (defun idiig/add-local-electric-pairs (pairs)
+	        "Add local electric pairs for the current buffer.
+	           
+	    Arguments:
+	      PAIRS: List of character pairs to add
+	           
+	    Example usage:
+	      (add-hook 'jupyter-org-interaction-mode-hook
+	                (lambda () (idiig/add-local-electric-pairs '((?$ . ?$)))))"
+	        (setq-local electric-pair-pairs (append idiig/default-electric-pairs pairs)
+	                    electric-pair-text-pairs electric-pair-pairs))
+	      
+	      ;; Disable auto-pairing for angle brackets <>
+	      (add-function :before-until electric-pair-inhibit-predicate
+	                    (lambda (c) (eq c ?<))))
+	    (use-package paren
+	      :config
+	      ;; Enable bracket matching highlight
+	      (show-paren-mode 1)
+	      
+	      ;; Enhanced bracket matching - highlight even when cursor is inside brackets
+	      (define-advice show-paren-function (:around (fn) fix-show-paren-function)
+	        "Highlight matching brackets even when cursor is not directly on a bracket.
+	    When cursor is inside a bracketed expression, highlight the innermost
+	    enclosing bracket pair."
+	        (cond ((looking-at-p "\\s(") (funcall fn))
+	              (t (save-excursion
+	                   (ignore-errors (backward-up-list))
+	                   (funcall fn))))))
 	    (use-package mwim
 	      :bind
 	      ("C-a" . mwim-beginning-of-code-or-line-or-comment)
@@ -515,48 +560,6 @@
 	      :config
 	      (setq wgrep-auto-save-buffer t)
 	      (setq wgrep-enable-key "e"))
-	    (use-package emacs
-	      :init
-	      ;; 启用自动括号配对
-	      (electric-pair-mode t)
-	      
-	      :config
-	      ;; 配置 electric-pair-mode 行为
-	      (setq electric-pair-preserve-balance nil)
-	      ;; 使用保守的抑制策略
-	      ;; https://www.reddit.com/r/emacs/comments/4xhxfw/how_to_tune_the_behavior_of_eletricpairmode/
-	      (setq electric-pair-inhibit-predicate 'electric-pair-conservative-inhibit)
-	      
-	      ;; 保存默认的配对括号设置，以便创建模式特定的本地设置
-	      (defconst idiig/default-electric-pairs electric-pair-pairs)
-	      
-	      ;; 为特定模式添加本地电子配对
-	      (defun idiig/add-local-electric-pairs (pairs)
-	        "为当前缓冲区添加本地电子配对括号。
-	         
-	         参数:
-	           PAIRS: 要添加的括号对列表
-	         
-	         示例用法:
-	           (add-hook 'jupyter-org-interaction-mode-hook
-	                     (lambda () (idiig/add-local-electric-pairs '((?$ . ?$)))))"
-	        (setq-local electric-pair-pairs (append idiig/default-electric-pairs pairs))
-	        (setq-local electric-pair-text-pairs electric-pair-pairs))
-	      
-	      ;; 禁止自动配对尖括号 <>
-	      (add-function :before-until electric-pair-inhibit-predicate
-	                    (lambda (c) (eq c ?<)))
-	      
-	      ;; 增强的括号匹配高亮——即使光标在括号内也能高亮匹配的括号
-	      (define-advice show-paren-function (:around (fn) fix-show-paren-function)
-	        "即使光标不直接位于括号上，也能高亮匹配的括号。"
-	        (cond ((looking-at-p "\\s(") (funcall fn))
-	              (t (save-excursion
-	                   (ignore-errors (backward-up-list))
-	                   (funcall fn)))))
-	      
-	      ;; 启用括号匹配高亮
-	      (show-paren-mode t))
 	    (use-package puni
 	      :defer t
 	      :bind

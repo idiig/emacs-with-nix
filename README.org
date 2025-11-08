@@ -604,7 +604,7 @@ C-SPC= 。
     (savehist-mode t))			; 启用 savehist 模式
 #+end_src
 
-**** 文件管理 (=Dired=, built-in)
+**** 更好的文件管理器 (=Dired=, built-in)
 :PROPERTIES:
 :header-args: :noweb-ref ecfg
 :END:
@@ -641,6 +641,81 @@ C-SPC= 。
     ;; Enable 'a' key to open directories in same buffer instead of creating new ones
     (put 'dired-find-alternate-file 'disabled nil))
 #+end_src
+**** 更合理的括号行为 (=elec-pair=, =paren=, built-in)
+:PROPERTIES:
+:header-args: :noweb-ref ecfg
+:END:
+***** 括号自动匹配 (=elec-pair=)
+- *自动括号配对* ::
+  启用 =electric-pair-mode= 自动补全成对的括号、引号等符号。输入左括号时
+  自动插入右括号，并将光标置于中间，提高编码效率
+- *配对行为设置* ::
+  - 禁用括号平衡检查(=electric-pair-preserve-balance=)，允许在不平衡的情
+    况下也能插入配对符号
+  - 使用保守的抑制策略，在某些上下文(如字符串、注释内)中智能判断是否需
+    要配对
+- *模式特定配对* ::
+  定义 =idiig/add-local-electric-pairs= 函数，可为特定模式添加自定义的配
+  对符号。例如在 org 模式中为数学公式添加 =$= 符号的配对
+- *禁用尖括号配对* ::
+  特别禁用 =<>= 的自动配对，避免在编写 HTML、XML 或比较运算符时产生干扰
+#+begin_src emacs-lisp
+  (use-package elec-pair
+    :custom
+    ;; Disable balance checking - allow pairing even when unbalanced
+    (electric-pair-preserve-balance nil)
+    
+    ;; Use conservative inhibit strategy for smart context detection
+    (electric-pair-inhibit-predicate 'electric-pair-conservative-inhibit)
+    
+    :config
+    ;; Enable automatic bracket pairing
+    (electric-pair-mode 1)
+    
+    ;; Save default pairs for creating mode-specific local settings
+    (defconst idiig/default-electric-pairs electric-pair-pairs
+      "Default electric pair settings to use as base for local pairs.")
+    
+    (defun idiig/add-local-electric-pairs (pairs)
+      "Add local electric pairs for the current buffer.
+         
+  Arguments:
+    PAIRS: List of character pairs to add
+         
+  Example usage:
+    (add-hook 'jupyter-org-interaction-mode-hook
+              (lambda () (idiig/add-local-electric-pairs '((?$ . ?$)))))"
+      (setq-local electric-pair-pairs (append idiig/default-electric-pairs pairs)
+                  electric-pair-text-pairs electric-pair-pairs))
+    
+    ;; Disable auto-pairing for angle brackets <>
+    (add-function :before-until electric-pair-inhibit-predicate
+                  (lambda (c) (eq c ?<))))
+#+end_src
+***** 括号高亮 (=paren=)
+- *括号匹配高亮* ::
+  启用 =show-paren-mode= 自动高亮匹配的括号对，帮助快速识别代码块的范围和
+  嵌套关系
+- *增强的括号高亮* ::
+  默认情况下，只有当光标直接位于括号上时才会高亮匹配的括号对。通过增强
+  函数，即使光标位于括号内部(如括号包围的代码中间)，也能高亮显示当前所在
+  的最内层括号对，更容易理解代码结构
+#+BEGIN_SRC elisp
+(use-package paren
+  :config
+  ;; Enable bracket matching highlight
+  (show-paren-mode 1)
+  
+  ;; Enhanced bracket matching - highlight even when cursor is inside brackets
+  (define-advice show-paren-function (:around (fn) fix-show-paren-function)
+    "Highlight matching brackets even when cursor is not directly on a bracket.
+When cursor is inside a bracketed expression, highlight the innermost
+enclosing bracket pair."
+    (cond ((looking-at-p "\\s(") (funcall fn))
+          (t (save-excursion
+               (ignore-errors (backward-up-list))
+               (funcall fn))))))
+#+END_SRC
 **** 便利的光标首尾移动 (=mwim=)
 ***** 依赖
 :PROPERTIES:
@@ -1063,55 +1138,6 @@ minibuffer的检索]]。
     (setq wgrep-auto-save-buffer t)
     (setq wgrep-enable-key "e"))
 #+end_src
-**** 括号匹配
-:PROPERTIES:
-:header-args: :noweb-ref ecfg
-:END:
-#+begin_src emacs-lisp
-  (use-package emacs
-    :init
-    ;; 启用自动括号配对
-    (electric-pair-mode t)
-    
-    :config
-    ;; 配置 electric-pair-mode 行为
-    (setq electric-pair-preserve-balance nil)
-    ;; 使用保守的抑制策略
-    ;; https://www.reddit.com/r/emacs/comments/4xhxfw/how_to_tune_the_behavior_of_eletricpairmode/
-    (setq electric-pair-inhibit-predicate 'electric-pair-conservative-inhibit)
-    
-    ;; 保存默认的配对括号设置，以便创建模式特定的本地设置
-    (defconst idiig/default-electric-pairs electric-pair-pairs)
-    
-    ;; 为特定模式添加本地电子配对
-    (defun idiig/add-local-electric-pairs (pairs)
-      "为当前缓冲区添加本地电子配对括号。
-       
-       参数:
-         PAIRS: 要添加的括号对列表
-       
-       示例用法:
-         (add-hook 'jupyter-org-interaction-mode-hook
-                   (lambda () (idiig/add-local-electric-pairs '((?$ . ?$)))))"
-      (setq-local electric-pair-pairs (append idiig/default-electric-pairs pairs))
-      (setq-local electric-pair-text-pairs electric-pair-pairs))
-    
-    ;; 禁止自动配对尖括号 <>
-    (add-function :before-until electric-pair-inhibit-predicate
-                  (lambda (c) (eq c ?<)))
-    
-    ;; 增强的括号匹配高亮——即使光标在括号内也能高亮匹配的括号
-    (define-advice show-paren-function (:around (fn) fix-show-paren-function)
-      "即使光标不直接位于括号上，也能高亮匹配的括号。"
-      (cond ((looking-at-p "\\s(") (funcall fn))
-            (t (save-excursion
-                 (ignore-errors (backward-up-list))
-                 (funcall fn)))))
-    
-    ;; 启用括号匹配高亮
-    (show-paren-mode t))
-#+end_src
-
 **** 语言无关的结构化编程 (=puni=)
 ***** 依赖
 :PROPERTIES:
@@ -2803,6 +2829,19 @@ line-spacing 0.3)= 这类做法会导致这些字体设置的更小的地方也�
   (use-package valign
     :diminish valign-mode
     :hook (org-mode . valign-mode))
+#+end_src
+*** 括号匹配 
+#+begin_src emacs-lisp
+  ;; Org mode: pair $ for inline math, * for bold, / for italic, = for code
+  (with-eval-after-load elec-pair
+    (add-hook 'org-mode-hook
+              (lambda ()
+                (idiig/add-local-electric-pairs
+                 '((?$ . ?$)		; Inline math $...$
+  		 (?* . ?*)		; Bold *...*
+  		 (?/ . ?/)		; Italic /.../
+  		 (?= . ?=)		; Verbatim =...=
+  		 (?~ . ?~))))))		; Code ~...~
 #+end_src
 *** 文献引用处理器 (=citeproc-el=)
 **** 依赖
