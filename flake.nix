@@ -233,6 +233,9 @@
 	      
 	      ;; Auto-revert dired buffer when directory contents change
 	      (dired-auto-revert-buffer t)
+	    
+	      ;; i-search should search file names only
+	      (dired-isearch-filenames t)
 	      
 	      :hook
 	      ;; Enable auto-revert and highlight current line in dired buffers
