@@ -316,21 +316,6 @@
 	      ("M-q" . unfill-toggle)
 	      :commands
 	      (unfill-toggle))
-	    (use-package spacious-padding
-	      :config
-	      (setq spacious-padding-widths
-	            '( :internal-border-width 15
-	               :header-line-width 4
-	               :mode-line-width 6
-	               :tab-width 4
-	               :right-divider-width 30
-	               :scroll-bar-width 8))
-	    
-	      ;; Read the doc string of `spacious-padding-subtle-mode-line' as it
-	      ;; is very flexible and provides several examples.
-	      (setq spacious-padding-subtle-mode-line
-	            `( :mode-line-active 'default
-	               :mode-line-inactive vertical-border)))
 	    (use-package emacs
 	      :init
 	      ;; Add prompt indicator for `completing-read-multiple'
@@ -1922,8 +1907,6 @@
               diminish
             mwim
             unfill
-            spacious-padding
-              writeroom-mode
             vertico
               orderless
               marginalia

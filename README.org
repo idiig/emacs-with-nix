@@ -641,7 +641,7 @@ C-SPC= 。
     ;; Enable 'a' key to open directories in same buffer instead of creating new ones
     (put 'dired-find-alternate-file 'disabled nil))
 #+end_src
-**** 更合理的括号行为 (=elec-pair=, =paren=, built-in)
+**** 更合理的括号与配对行为 (=elec-pair=, =paren=, built-in)
 :PROPERTIES:
 :header-args: :noweb-ref ecfg
 :END:
@@ -760,35 +760,6 @@ enclosing bracket pair."
     (unfill-toggle))
 #+end_src
 **** 写作和展示UI（手动开启）  
-***** 依赖
-:PROPERTIES:
-:header-args: :noweb-ref epkgs
-:END:
-#+begin_src nix
-  spacious-padding
-    writeroom-mode
-#+end_src
-***** 配置
-:PROPERTIES:
-:header-args: :noweb-ref ecfg
-:END:
-#+begin_src emacs-lisp
-  (use-package spacious-padding
-    :config
-    (setq spacious-padding-widths
-          '( :internal-border-width 15
-             :header-line-width 4
-             :mode-line-width 6
-             :tab-width 4
-             :right-divider-width 30
-             :scroll-bar-width 8))
-
-    ;; Read the doc string of `spacious-padding-subtle-mode-line' as it
-    ;; is very flexible and provides several examples.
-    (setq spacious-padding-subtle-mode-line
-          `( :mode-line-active 'default
-             :mode-line-inactive vertical-border)))
-#+end_src
 **** 更好的minibuffer
 :PROPERTIES:
 :header-args: :noweb-ref ecfg
