@@ -287,7 +287,7 @@ Emacs 在处理这类文件时出现卡顿或假死现象。
     :init
     (global-so-long-mode +1))
 #+end_src
-**** 更符合直觉的删除选中内容 (=delsel=, built-in)
+**** 更符合直觉地删除选中内容 (=delsel=, built-in)
 :PROPERTIES:
 :header-args: :noweb-ref ecfg
 :END:
