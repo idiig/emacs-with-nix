@@ -609,42 +609,66 @@ emacs在打开新的窗口时，默认光标维持在原来的窗口。比如当
 :header-args: :noweb-ref ecfg
 :END:
 ***** 原生设定
+- *completing-read-multiple 提示增强* ::
+  为多选补全命令添加视觉提示符,在 minibuffer 中显示分隔符信息(例如
+  =[CRM,]=),让使用者知道可以输入多个选项
+- *Minibuffer 提示区保护* ::
+  使 minibuffer 的提示文字变为只读,防止光标进入提示区域,避免误编辑提示
+  文字
+- *递归 Minibuffer* ::
+  允许在 minibuffer 中再次调用需要 minibuffer 的命令,适合复杂的工作流
+  程(例如在搜索文件时可以再次调用 M-x)
+- *命令过滤(Emacs 28+)* ::
+  在 =M-x= 界面中仅显示与当前 mode 相关的命令,保持补全界面的简洁性和情境
+  相关性
+- *鼠标离开时关闭 Minibuffer* ::
+  当使用鼠标切换到其他缓冲区时自动关闭 minibuffer,避免 minibuffer 卡住
+  的状态,适合经常使用鼠标操作的工作流程
+  
 #+begin_src emacs-lisp
   (use-package emacs
     :init
-    (progn
-      ;; 为`completing-read-multiple'添加提示，比如[CRM<separator>]
-      (defun crm-indicator (args)
-        (cons (format "[CRM%s] %s"
-                      (replace-regexp-in-string
-                       "\\`\\[.*?]\\*\\|\\[.*?]\\*\\'" ""
-                       crm-separator)
-                      (car args))
-              (cdr args)))
-      (advice-add #'completing-read-multiple :filter-args #'crm-indicator)
+    ;; Add prompt indicator for `completing-read-multiple'
+    ;; e.g., [CRM<separator>] in the minibuffer
+    (defun crm-indicator (args)
+      "Add a visual indicator showing the separator for `completing-read-multiple'."
+      (cons (format "[CRM%s] %s"
+                    (replace-regexp-in-string
+                     "\\`\\[.*?]\\*\\|\\[.*?]\\*\\'" ""
+                     crm-separator)
+                    (car args))
+            (cdr args)))
+    (advice-add #'completing-read-multiple :filter-args #'crm-indicator)
 
-      ;; 不允许鼠标出现在minibuffer的提示中
-      (setq minibuffer-prompt-properties
-            '(read-only t cursor-intangible t face minibuffer-prompt))
-      (add-hook 'minibuffer-setup-hook #'cursor-intangible-mode)
+    :hook
+    ;; Prevent cursor from entering minibuffer prompt area
+    (minibuffer-setup . cursor-intangible-mode)
+    
+    ;; Close minibuffer when mouse leaves buffer (useful for mouse-heavy workflows)
+    ;; Source: http://trey-jackson.blogspot.com/2010/04/emacs-tip-36-abort-minibuffer-when.html
+    (mouse-leave-buffer . idiig/stop-using-minibuffer)
 
-      ;; 在emacs 28以后，非当前mode的指令都会被隐藏，vertico的指令也会隐藏
-      (setq read-extended-command-predicate
-            #'command-completion-default-include-p)
+    :custom
+    ;; Make minibuffer prompt read-only and prevent cursor from entering it
+    (minibuffer-prompt-properties
+     '(read-only t cursor-intangible t face minibuffer-prompt))
+    
+    ;; Enable recursive minibuffers (useful for complex workflows)
+    (enable-recursive-minibuffers t)
+    
+    ;; In Emacs 28+, hide commands not relevant to current mode
+    ;; This keeps the M-x interface clean and contextual
+    (read-extended-command-predicate #'command-completion-default-include-p)
 
-      ;; minibuffer可循环
-      (setq enable-recursive-minibuffers t)))
-
-  ;; http://trey-jackson.blogspot.com/2010/04/emacs-tip-36-abort-minibuffer-when.html
-  ;; 使用鼠标时关闭minibuffer
-  (defun idiig/stop-using-minibuffer ()
-    "kill the minibuffer"
-    (when (and (>= (recursion-depth) 1) (active-minibuffer-window))
-      (abort-recursive-edit)))
-  (add-hook 'mouse-leave-buffer-hook 'idiig/stop-using-minibuffer)
-
+    :config
+    (defun idiig/stop-using-minibuffer ()
+      "Abort minibuffer when switching to another buffer with mouse.
+  Useful for preventing stuck minibuffer states during mouse operations."
+      (when (and (>= (recursion-depth) 1) 
+                 (active-minibuffer-window))
+        (abort-recursive-edit))))
 #+end_src
-
+***** 
 ***** 基础五件套
 ****** 依赖
 :PROPERTIES:
@@ -865,7 +889,7 @@ emacs在打开新的窗口时，默认光标维持在原来的窗口。比如当
     ("C-x u" . vundo))
 #+end_src
 **** 检索
-***** =I-search=
+***** =I-search= (built-in)
 #+begin_src emacs-lisp
   (use-package isearch
     :custom

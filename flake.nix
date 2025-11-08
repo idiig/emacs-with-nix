@@ -260,37 +260,45 @@
 	      (unfill-toggle))
 	    (use-package emacs
 	      :init
-	      (progn
-	        ;; 为`completing-read-multiple'添加提示，比如[CRM<separator>]
-	        (defun crm-indicator (args)
-	          (cons (format "[CRM%s] %s"
-	                        (replace-regexp-in-string
-	                         "\\`\\[.*?]\\*\\|\\[.*?]\\*\\'" ""
-	                         crm-separator)
-	                        (car args))
-	                (cdr args)))
-	        (advice-add #'completing-read-multiple :filter-args #'crm-indicator)
+	      ;; Add prompt indicator for `completing-read-multiple'
+	      ;; e.g., [CRM<separator>] in the minibuffer
+	      (defun crm-indicator (args)
+	        "Add a visual indicator showing the separator for `completing-read-multiple'."
+	        (cons (format "[CRM%s] %s"
+	                      (replace-regexp-in-string
+	                       "\\`\\[.*?]\\*\\|\\[.*?]\\*\\'" ""
+	                       crm-separator)
+	                      (car args))
+	              (cdr args)))
+	      (advice-add #'completing-read-multiple :filter-args #'crm-indicator)
 	    
-	        ;; 不允许鼠标出现在minibuffer的提示中
-	        (setq minibuffer-prompt-properties
-	              '(read-only t cursor-intangible t face minibuffer-prompt))
-	        (add-hook 'minibuffer-setup-hook #'cursor-intangible-mode)
+	      :hook
+	      ;; Prevent cursor from entering minibuffer prompt area
+	      (minibuffer-setup . cursor-intangible-mode)
+	      
+	      ;; Close minibuffer when mouse leaves buffer (useful for mouse-heavy workflows)
+	      ;; Source: http://trey-jackson.blogspot.com/2010/04/emacs-tip-36-abort-minibuffer-when.html
+	      (mouse-leave-buffer . idiig/stop-using-minibuffer)
 	    
-	        ;; 在emacs 28以后，非当前mode的指令都会被隐藏，vertico的指令也会隐藏
-	        (setq read-extended-command-predicate
-	              #'command-completion-default-include-p)
+	      :custom
+	      ;; Make minibuffer prompt read-only and prevent cursor from entering it
+	      (minibuffer-prompt-properties
+	       '(read-only t cursor-intangible t face minibuffer-prompt))
+	      
+	      ;; Enable recursive minibuffers (useful for complex workflows)
+	      (enable-recursive-minibuffers t)
+	      
+	      ;; In Emacs 28+, hide commands not relevant to current mode
+	      ;; This keeps the M-x interface clean and contextual
+	      (read-extended-command-predicate #'command-completion-default-include-p)
 	    
-	        ;; minibuffer可循环
-	        (setq enable-recursive-minibuffers t)))
-	    
-	    ;; http://trey-jackson.blogspot.com/2010/04/emacs-tip-36-abort-minibuffer-when.html
-	    ;; 使用鼠标时关闭minibuffer
-	    (defun idiig/stop-using-minibuffer ()
-	      "kill the minibuffer"
-	      (when (and (>= (recursion-depth) 1) (active-minibuffer-window))
-	        (abort-recursive-edit)))
-	    (add-hook 'mouse-leave-buffer-hook 'idiig/stop-using-minibuffer)
-	    
+	      :config
+	      (defun idiig/stop-using-minibuffer ()
+	        "Abort minibuffer when switching to another buffer with mouse.
+	    Useful for preventing stuck minibuffer states during mouse operations."
+	        (when (and (>= (recursion-depth) 1) 
+	                   (active-minibuffer-window))
+	          (abort-recursive-edit))))
 	    (use-package vertico
 	      :after consult
 	      :custom
