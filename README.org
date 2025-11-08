@@ -759,7 +759,6 @@ enclosing bracket pair."
     :commands
     (unfill-toggle))
 #+end_src
-**** 写作和展示UI（手动开启）  
 **** 更好的minibuffer
 :PROPERTIES:
 :header-args: :noweb-ref ecfg
@@ -1089,8 +1088,8 @@ minibuffer的检索]]。
     ;; 添加 advice
     (advice-add 'ctrlf-change-search-style :after #'ctrlf-set-default-style-advice))
 #+end_src
-**** 重构 (=wgrep=)
-在 =grep= , =ag=, =ripgrep= 等检索的结果中按下 =e= 进入编辑模式，按下 =C-c C-c=
+**** 直接在grep检索页面编辑 (=wgrep=)
+在 =grep=, =ag=, =ripgrep= 等检索的结果中按下 =e= 进入编辑模式，按下 =C-c C-c=
 完成修改。
 ***** 依赖
 :PROPERTIES:
@@ -1105,6 +1104,7 @@ minibuffer的检索]]。
 :END:
 #+begin_src emacs-lisp
   (use-package wgrep
+    :commands occur-mode
     :config
     (setq wgrep-auto-save-buffer t)
     (setq wgrep-enable-key "e"))

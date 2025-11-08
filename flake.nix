@@ -542,6 +542,7 @@
 	      ;; 添加 advice
 	      (advice-add 'ctrlf-change-search-style :after #'ctrlf-set-default-style-advice))
 	    (use-package wgrep
+	      :commands occur-mode
 	      :config
 	      (setq wgrep-auto-save-buffer t)
 	      (setq wgrep-enable-key "e"))
