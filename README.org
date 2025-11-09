@@ -465,43 +465,6 @@ Emacs 在处理这类文件时出现卡顿或假死现象。
     :config
     ;; Apply advice
     (advice-add 'idiig/smart-adjust-window-size :around #'idiig/smart-adjust-window-size-advice))
-  (defun idiig/smart-adjust-window-size-advice (orig-fun direction &rest args)
-    "Add continuous adjustment support for idiig/smart-adjust-window-size"
-    (let ((delta (or (car args) 5)))
-      ;; Execute initial adjustment
-      (apply orig-fun direction args)
-      
-      ;; Set transient map
-      (set-transient-map
-       (let ((map (make-sparse-keymap)))
-         ;; ^ = border moves up
-         (define-key map (kbd "^")
-  		   `(lambda () (interactive) (idiig/smart-adjust-window-size 'up ,delta)))
-         ;; V = border moves down
-         (define-key map (kbd "V")
-  		   `(lambda () (interactive) (idiig/smart-adjust-window-size 'down ,delta)))
-         ;; { = border moves left
-         (define-key map (kbd "{")
-  		   `(lambda () (interactive) (idiig/smart-adjust-window-size 'left ,delta)))
-         ;; } = border moves right
-         (define-key map (kbd "}")
-  		   `(lambda () (interactive) (idiig/smart-adjust-window-size 'right ,delta)))
-         ;; + = balance windows
-         (define-key map (kbd "+")
-  		   (lambda () (interactive) (balance-windows)))
-         ;; M = maximize
-         (define-key map (kbd "M")
-  		   (lambda () (interactive) (maximize-window)))
-         ;; m = minimize
-         (define-key map (kbd "m")
-  		   (lambda () (interactive) (minimize-window)))
-         map)
-       nil nil
-       "Use %k for further adjustment"))
-    
-    :config
-    ;; Apply advice
-    (advice-add 'idiig/smart-adjust-window-size :around #'idiig/smart-adjust-window-size-advice))
 #+end_src
 ***** 分割新窗口时转跳到新窗口
 :PROPERTIES:
@@ -691,9 +654,10 @@ Emacs 在处理这类文件时出现卡顿或假死现象。
 使 =C-u C-SPC= 命令后可以直接用 =C-SPC= 继续弹出 mark，无需重复输入 =C-u= 。
 更快的输入方式: =C-u C-SPC, C-SPC, C-SPC= 而非 =C-u C-SPC, C-u C-SPC, C-u
 C-SPC= 。
-
 #+begin_src emacs-lisp
-  (setq set-mark-command-repeat-pop t)
+  (use-package simple
+    :custom
+    (set-mark-command-repeat-pop t))
 #+end_src
 **** 打开时自动到原先编辑的位置 (=saveplace=, built-in)
 :PROPERTIES:
@@ -945,7 +909,6 @@ enclosing bracket pair."
                  (active-minibuffer-window))
         (abort-recursive-edit))))
 #+end_src
-***** 
 ***** 基础五件套
 ****** 依赖
 :PROPERTIES:

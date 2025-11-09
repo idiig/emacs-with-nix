@@ -179,43 +179,6 @@
 	      :config
 	      ;; Apply advice
 	      (advice-add 'idiig/smart-adjust-window-size :around #'idiig/smart-adjust-window-size-advice))
-	    (defun idiig/smart-adjust-window-size-advice (orig-fun direction &rest args)
-	      "Add continuous adjustment support for idiig/smart-adjust-window-size"
-	      (let ((delta (or (car args) 5)))
-	        ;; Execute initial adjustment
-	        (apply orig-fun direction args)
-	        
-	        ;; Set transient map
-	        (set-transient-map
-	         (let ((map (make-sparse-keymap)))
-	           ;; ^ = border moves up
-	           (define-key map (kbd "^")
-	    		   `(lambda () (interactive) (idiig/smart-adjust-window-size 'up ,delta)))
-	           ;; V = border moves down
-	           (define-key map (kbd "V")
-	    		   `(lambda () (interactive) (idiig/smart-adjust-window-size 'down ,delta)))
-	           ;; { = border moves left
-	           (define-key map (kbd "{")
-	    		   `(lambda () (interactive) (idiig/smart-adjust-window-size 'left ,delta)))
-	           ;; } = border moves right
-	           (define-key map (kbd "}")
-	    		   `(lambda () (interactive) (idiig/smart-adjust-window-size 'right ,delta)))
-	           ;; + = balance windows
-	           (define-key map (kbd "+")
-	    		   (lambda () (interactive) (balance-windows)))
-	           ;; M = maximize
-	           (define-key map (kbd "M")
-	    		   (lambda () (interactive) (maximize-window)))
-	           ;; m = minimize
-	           (define-key map (kbd "m")
-	    		   (lambda () (interactive) (minimize-window)))
-	           map)
-	         nil nil
-	         "Use %k for further adjustment"))
-	      
-	      :config
-	      ;; Apply advice
-	      (advice-add 'idiig/smart-adjust-window-size :around #'idiig/smart-adjust-window-size-advice))
 	    (defadvice split-window-below (after split-window-below-and-switch activate)
 	      "切换到新分割的窗口"
 	      (when (called-interactively-p 'any)
@@ -323,7 +286,9 @@
 	      :init
 	      (setq bookmark-default-file (expand-file-name "bookmarks" user-emacs-directory)
 	            bookmark-save-flag 1))
-	    (setq set-mark-command-repeat-pop t)
+	    (use-package simple
+	      :custom
+	      (set-mark-command-repeat-pop t))
 	    (use-package saveplace
 	      :init
 	      (setq save-place-file (expand-file-name "place" user-emacs-directory))
