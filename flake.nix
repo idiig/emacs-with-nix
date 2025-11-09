@@ -226,24 +226,6 @@
 	    	(when dir
 	              (unless (file-exists-p dir)
 	                (make-directory dir t)))))))
-	    ;; 不存在文档时询问是否新建
-	    (add-hook 'before-save-hook
-	              (lambda ()
-	                (when buffer-file-name
-	                  (let ((dir (file-name-directory buffer-file-name)))
-	                    (when (and (not (file-exists-p dir))
-	                               (y-or-n-p (format "Directory %s does not exist. Create it?" dir)))
-	                      (make-directory dir t))))))
-	    
-	    ;; 找文件时若无母文档则新建 
-	    (defadvice find-file (before make-directory-maybe
-	                                 (filename &optional wildcards) activate)
-	      "Create parent directory if not exists while visiting file."
-	      (unless (file-exists-p filename)
-	        (let ((dir (file-name-directory filename)))
-	          (when dir
-	            (unless (file-exists-p dir)
-	              (make-directory dir t))))))
 	    (use-package recentf
 	      :defer t
 	      :commands (consult-recent-file)

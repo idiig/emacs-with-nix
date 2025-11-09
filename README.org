@@ -557,26 +557,6 @@ Emacs 在处理这类文件时出现卡顿或假死现象。
             (unless (file-exists-p dir)
               (make-directory dir t)))))))
 #+end_src
-#+begin_src emacs-lisp
-  ;; 不存在文档时询问是否新建
-  (add-hook 'before-save-hook
-            (lambda ()
-              (when buffer-file-name
-                (let ((dir (file-name-directory buffer-file-name)))
-                  (when (and (not (file-exists-p dir))
-                             (y-or-n-p (format "Directory %s does not exist. Create it?" dir)))
-                    (make-directory dir t))))))
-
-  ;; 找文件时若无母文档则新建 
-  (defadvice find-file (before make-directory-maybe
-                               (filename &optional wildcards) activate)
-    "Create parent directory if not exists while visiting file."
-    (unless (file-exists-p filename)
-      (let ((dir (file-name-directory filename)))
-        (when dir
-          (unless (file-exists-p dir)
-            (make-directory dir t))))))
-#+end_src
 **** 记录和读取最近打开的文档 (=recentf=, built-in)
 :PROPERTIES:
 :header-args: :noweb-ref ecfg
