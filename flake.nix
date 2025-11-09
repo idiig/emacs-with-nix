@@ -229,7 +229,8 @@
 	    (use-package recentf
 	      :defer t
 	      :commands (consult-recent-file)
-	      
+	      :init
+	      (recentf-mode 1)
 	      :custom
 	      ;; Save location and limits
 	      (recentf-save-file (expand-file-name "recentf" user-emacs-directory))
@@ -257,9 +258,6 @@
 	      (kill-emacs . idiig/cleanup-recentf)
 	      
 	      :config
-	      ;; Enable recentf mode
-	      (recentf-mode 1)
-	      
 	      (defun idiig/cleanup-recentf ()
 	        "Remove non-existent files from recent files list."
 	        (when (fboundp 'recentf-cleanup)
