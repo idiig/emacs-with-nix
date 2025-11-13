@@ -2016,6 +2016,7 @@
             org-present
             ox-reveal
             copilot
+            copilot-chat
             gptel
             aidermacs
             claude-code

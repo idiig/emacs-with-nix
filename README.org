@@ -3085,7 +3085,14 @@ line-spacing 0.3)= 这类做法会导致这些字体设置的更小的地方也�
 
     (setq copilot-max-char 99999999))
 #+end_src
-
+*** Copilot Chat
+**** 依赖
+:PROPERTIES:
+:header-args: :noweb-ref epkgs
+:END:
+#+begin_src nix
+  copilot-chat
+#+end_src
 *** Chatbot (=gptel)=
 **** 依赖
 :PROPERTIES:
