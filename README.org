@@ -3055,6 +3055,11 @@ line-spacing 0.3)= 这类做法会导致这些字体设置的更小的地方也�
     (setq org-reveal-root "http://cdn.jsdelivr.net/reveal.js/3.0.0/")
     (setq org-reveal-mathjax t))
 #+end_src
+**** =dslide=
+***** 依赖
+#+begin_src nix
+  dslide
+#+end_src
 ** AI辅助功能
 *** Copilot
 **** 依赖
