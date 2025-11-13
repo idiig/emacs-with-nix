@@ -2015,6 +2015,7 @@
             citeproc
             org-present
             ox-reveal
+            dslide
             copilot
             copilot-chat
             gptel
