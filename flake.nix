@@ -1983,6 +1983,22 @@
             pyim
               pyim-basedict
             magit
+            (melpaBuild {
+              ename = "reader";
+              pname = "emacs-reader";
+              version = "20250630";
+              src = fetchFromGitea {
+                domain = "codeberg.org";
+                owner = "divyaranjan";
+                repo = "emacs-reader";
+                rev = "9d62d26fe4ae63e5cecf57bc399b20f7feefb620"; # replace with 'tag' for stable
+                hash = "sha256-hkRa52PYfBG090jior3GPOeZyftwmpr2Q7jPKFHsR88=";
+              };
+              files = ''(:defaults "render-core.so")'';
+              nativeBuildInputs = [ pkg-config ];
+              buildInputs = [ gcc mupdf gnumake pkg-config ];
+              preBuild = "make clean all";
+            })
             (lsp-bridge.override {
               # 指定使用 Python 3.11 而不是 3.12
               python3 = pkgs.python311;

@@ -1867,8 +1867,33 @@ minibuffer的检索]]。
   (bind-key* "C-." 'idiig/insert-space-after-point)
 #+end_src
 
-** TODO 文档阅览 (=emacs-reader=)
-
+** 文档阅览 (=emacs-reader=)
+*** 依赖
+:PROPERTIES:
+:header-args: :noweb-ref epkgs
+:END:
+#+begin_src nix
+  (melpaBuild {
+    ename = "reader";
+    pname = "emacs-reader";
+    version = "20250630";
+    src = fetchFromGitea {
+      domain = "codeberg.org";
+      owner = "divyaranjan";
+      repo = "emacs-reader";
+      rev = "9d62d26fe4ae63e5cecf57bc399b20f7feefb620"; # replace with 'tag' for stable
+      hash = "sha256-hkRa52PYfBG090jior3GPOeZyftwmpr2Q7jPKFHsR88=";
+    };
+    files = ''(:defaults "render-core.so")'';
+    nativeBuildInputs = [ pkg-config ];
+    buildInputs = [ gcc mupdf gnumake pkg-config ];
+    preBuild = "make clean all";
+  })
+#+end_src
+*** TODO 配置
+:PROPERTIES:
+:header-args: :noweb-ref ecfg
+:END:
 ** 编程工具
 *** 我有可能使用的语言
 :PROPERTIES:
