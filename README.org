@@ -1867,6 +1867,8 @@ minibuffer的检索]]。
   (bind-key* "C-." 'idiig/insert-space-after-point)
 #+end_src
 
+** TODO 文档阅览 (=emacs-reader=)
+
 ** 编程工具
 *** 我有可能使用的语言
 :PROPERTIES:
