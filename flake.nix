@@ -1987,7 +1987,7 @@
               ename = "reader";
               pname = "emacs-reader";
               version = "20250630";
-              src = fetchFromGitea {
+              src = pkgs.fetchFromGitea {
                 domain = "codeberg.org";
                 owner = "divyaranjan";
                 repo = "emacs-reader";
@@ -1995,8 +1995,8 @@
                 hash = "sha256-hkRa52PYfBG090jior3GPOeZyftwmpr2Q7jPKFHsR88=";
               };
               files = ''(:defaults "render-core.so")'';
-              nativeBuildInputs = [ pkg-config ];
-              buildInputs = [ gcc mupdf gnumake pkg-config ];
+              nativeBuildInputs = [ pkgs.pkg-config ];
+              buildInputs = with pkgs; [ gcc mupdf gnumake pkg-config ];
               preBuild = "make clean all";
             })
             (lsp-bridge.override {
