@@ -3025,16 +3025,36 @@ line-spacing 0.3)= 这类做法会导致这些字体设置的更小的地方也�
     ;; 挂载 advice
     (advice-add 'org-cite-insert :around #'my/oc-insert-then-ask))
 #+end_src
-*** 幻灯片 (=org-present=)
+*** 幻灯片 ()
+**** =org-present=
 用 =org-present= 作幻灯片发表。手动开启。
-**** 依赖
+***** 依赖
 :PROPERTIES:
 :header-args: :noweb-ref epkgs
 :END:
 #+begin_src nix
   org-present
 #+end_src
-
+**** =ox-reveal=
+***** 依赖
+:PROPERTIES:
+:header-args: :noweb-ref epkgs
+:END:
+#+begin_src nix
+  ox-reveal
+#+end_src
+***** 配置
+:PROPERTIES:
+:header-args: :noweb-ref ecfg
+:END:
+#+begin_src emacs-lisp
+  (use-package ox-reveal
+    :commands (org-export-dispatch)
+    :after org
+    :init
+    (setq org-reveal-root "http://cdn.jsdelivr.net/reveal.js/3.0.0/")
+    (setq org-reveal-mathjax t))
+#+end_src
 ** AI辅助功能
 *** Copilot
 **** 依赖

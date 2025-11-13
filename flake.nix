@@ -1710,6 +1710,11 @@
 	    
 	      ;; 挂载 advice
 	      (advice-add 'org-cite-insert :around #'my/oc-insert-then-ask))
+	    (use-package ox-reveal
+	      :commands (org-export-dispatch)
+	      :init
+	      (setq org-reveal-root "http://cdn.jsdelivr.net/reveal.js/3.0.0/")
+	      (setq org-reveal-mathjax t))
 	    (use-package copilot
 	      :config
 	      (define-key copilot-completion-map (kbd "<tab>") 'copilot-accept-completion)
@@ -2008,6 +2013,7 @@
             valign
             citeproc
             org-present
+            ox-reveal
             copilot
             gptel
             aidermacs
