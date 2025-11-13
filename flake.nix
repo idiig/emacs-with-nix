@@ -2016,6 +2016,7 @@
             org-present
             ox-reveal
             dslide
+            org-modern
             copilot
             copilot-chat
             gptel
