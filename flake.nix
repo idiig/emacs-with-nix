@@ -2036,6 +2036,7 @@
             org-modern
             copilot
             copilot-chat
+            mcp
             gptel
             aidermacs
             claude-code
