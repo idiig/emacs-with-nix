@@ -1983,6 +1983,7 @@
             pyim
               pyim-basedict
             magit
+            wanderlust
             (melpaBuild {
               ename = "reader";
               pname = "emacs-reader";
