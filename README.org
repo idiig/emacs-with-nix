@@ -1758,7 +1758,15 @@ minibuffer的检索]]。
     ;; 使用nix路径中的git
     (add-to-list 'exec-path "${pkgs.git}/bin"))
 #+END_SRC
-
+** 邮件
+*** 依赖
+:PROPERTIES:
+:header-args: :noweb-ref epkgs
+:END:
+#+begin_src nix
+  wanderlust
+#+end_src
+*** TODO 配置
 ** 文档写作
 :PROPERTIES:
 :header-args: :noweb-ref ecfg
