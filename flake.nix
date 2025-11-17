@@ -1846,13 +1846,14 @@
 	      (setq gptel-backend 
 	            (gptel-make-gh-copilot "Copilot"
 	                                   :stream t
-	                                   :models 'idiig/copilot-model-list))
+	                                   :models idiig/copilot-model-list))
 	      :hook (org-mode . (lambda ()
 	                          (when (and buffer-file-name
 	                                     (string-match-p "\\.ai\\.org\\'" buffer-file-name))
 	                            (gptel-mode 1)))))
 	    (use-package gptel-fn-complete
 	      :after gptel
+	      :commands (gptel-fn-complete)
 	      :init
 	      (defvar idiig/xref-map
 	        (let ((map (make-sparse-keymap)))
@@ -1861,9 +1862,10 @@
 	          (define-key map (kbd ",") #'xref-go-back)
 	          (define-key map (kbd "/") #'xref-find-references)
 	          map)
-	        "My key customizations for AI and xref.")
-	      :config
-	      (global-set-key (kbd "C-c .") idiig/xref-map))
+	        "Key customizations for AI and xref.")
+	      :bind
+	      ("C-c ." . idiig/xref-map))
+	    
 	    (use-package gptel-magit
 	      :after gptel
 	      :commands (gptel-magit-install)

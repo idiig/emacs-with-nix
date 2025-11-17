@@ -3284,7 +3284,6 @@ MCP error -32001: Request timed out)
     gptel-fn-complete
     gptel-magit
 #+END_SRC
-
 **** 配置
 :PROPERTIES:
 :header-args: :noweb-ref ecfg
@@ -3330,6 +3329,7 @@ MCP error -32001: Request timed out)
 #+begin_src emacs-lisp
   (use-package gptel-fn-complete
     :after gptel
+    :commands (gptel-fn-complete)
     :init
     (defvar idiig/xref-map
       (let ((map (make-sparse-keymap)))
@@ -3338,9 +3338,10 @@ MCP error -32001: Request timed out)
         (define-key map (kbd ",") #'xref-go-back)
         (define-key map (kbd "/") #'xref-find-references)
         map)
-      "My key customizations for AI and xref.")
-    :config
-    (global-set-key (kbd "C-c .") idiig/xref-map))
+      "Key customizations for AI and xref.")
+    :bind
+    ("C-c ." . idiig/xref-map))
+
 #+end_src
 ***** git统合
 #+begin_src emacs-lisp
