@@ -1816,7 +1816,9 @@
 	    			     :args ("-y" "@upstash/context7-mcp")
 	    			     :env (:DEFAULT_MINIMUM_TOKENS "6000")))))
 	      :config (require 'mcp-hub)
-	      :hook (after-init . mcp-hub-start-all-server))
+	      :hook
+	      (after-init . (lambda () (run-with-idle-timer 1 nil #'mcp-hub-get-all-tool)))
+	      (gptel-mode . gptel-mcp-connect))
 	    (use-package gptel
 	      :commands (gptel-mode
 	    	     gptel-chat
