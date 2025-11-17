@@ -1822,7 +1822,8 @@
 	    	     gptel-chat
 	    	     gptel-complete
 	    	     gptel-menu
-	    	     gptel-fn-complete)
+	    	     gptel-fn-complete
+	    	     gptel-magit-install)
 	      :init
 	      (defvar idiig/copilot-model-list
 	        '(gpt-5-codex
