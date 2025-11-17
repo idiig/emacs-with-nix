@@ -3258,7 +3258,11 @@ line-spacing 0.3)= 这类做法会导致这些字体设置的更小的地方也�
 ***** =gptel= 本体
 #+begin_src emacs-lisp
   (use-package gptel
-    :commands (gptel-mode gptel-chat gptel-complete)
+    :commands (gptel-mode
+  	     gptel-chat
+  	     gptel-complete
+  	     gptel-menu
+  	     gptel-fn-complete)
     :init
     (defvar idiig/copilot-model-list
       '(gpt-5-codex
@@ -3438,7 +3442,7 @@ line-spacing 0.3)= 这类做法会导致这些字体设置的更小的地方也�
     (aidermacs-default-model "sonnet"))
 #+end_src
 
-*** TODO AI-Client (=claude-code=)
+*** TODO COMMENT AI-Client (=claude-code=)
 **** 依赖
 #+begin_src nix :noweb-ref epkgs
   claude-code

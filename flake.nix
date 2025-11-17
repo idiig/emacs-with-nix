@@ -1802,7 +1802,11 @@
 	      :config (require 'mcp-hub)
 	      :hook (after-init . mcp-hub-start-all-server))
 	    (use-package gptel
-	      :commands (gptel-mode gptel-chat gptel-complete)
+	      :commands (gptel-mode
+	    	     gptel-chat
+	    	     gptel-complete
+	    	     gptel-menu
+	    	     gptel-fn-complete)
 	      :init
 	      (defvar idiig/copilot-model-list
 	        '(gpt-5-codex
@@ -1940,11 +1944,6 @@
 	      :custom
 	      (aidermacs-default-chat-mode 'architect)
 	      (aidermacs-default-model "sonnet"))
-	    ;; Add to your init.el
-	    (use-package claude-code
-	      :init
-	      (add-to-list 'exec-path "${pkgs.claude-code}/bin")
-	      :bind (("C-c c" . claude-code-transient)))
 	    (use-package meow
 	      :init
 	      ;; https://github.com/meow-edit/meow/blob/master/KEYBINDING_QWERTY.org
@@ -2159,7 +2158,6 @@
               gptel-fn-complete
               gptel-magit
             aidermacs
-            claude-code
             meow
               meow-tree-sitter
             (eaf.withApplications [ eaf-browser eaf-pdf-viewer ])
