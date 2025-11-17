@@ -1716,6 +1716,51 @@
 	      :init
 	      (setq org-reveal-root "http://cdn.jsdelivr.net/reveal.js/3.0.0/")
 	      (setq org-reveal-mathjax t))
+	    (defun idiig/get-sops-secret-value (key &optional path)
+	      "Get secret value from SOPS-encrypted file.
+	    KEY is the key to lookup in the YAML file.
+	    PATH is the path to the secrets file (default: ~/.config/secrets.yaml).
+	    
+	    If the secrets file doesn't exist, display a helpful message with setup instructions."
+	      (let ((secrets-file (expand-file-name (or path "~/.config/secrets.yaml"))))
+	        (if (file-exists-p secrets-file)
+	            (let ((result (string-trim
+	                           (shell-command-to-string
+	    			(format "${pkgs.sops}/bin/sops -d %s | ${pkgs.yq-go}/bin/yq -r '.%s'" 
+	    				(shell-quote-argument secrets-file)
+	    				key)))))
+	              (if (or (string-empty-p result)
+	                      (string= result "null"))
+	                  (error "Key '%s' not found in %s" key secrets-file)
+	                result))
+	          (error "Secrets file not found: %s
+	    
+	    To set up SOPS secrets:
+	    
+	    1. Install required tools:
+	       - sops: nix-env -iA nixpkgs.sops (or brew install sops)
+	       - yq: nix-env -iA nixpkgs.yq-go (or brew install yq)
+	       - age: nix-env -iA nixpkgs.age (or brew install age)
+	    
+	    2. Generate an age key:
+	       mkdir -p ~/.config/sops/age
+	       age-keygen -o ~/.config/sops/age/keys.txt
+	    
+	    3. Create .sops.yaml config:
+	       cat > ~/.config/.sops.yaml << EOF
+	       creation_rules:
+	         - path_regex: secrets\\.yaml$
+	           age: $(grep 'public key:' ~/.config/sops/age/keys.txt | cut -d: -f2 | tr -d ' ')
+	       EOF
+	    
+	    4. Create and edit your secrets file:
+	       sops %s
+	    
+	    5. Add your secrets in YAML format:
+	       gh_pat_mcp: your_github_token_here
+	       openai_key: your_openai_key_here
+	    
+	    For more info: https://github.com/getsops/sops" secrets-file))))
 	    (use-package copilot
 	      :config
 	      (define-key copilot-completion-map (kbd "<tab>") 'copilot-accept-completion)
@@ -1730,10 +1775,52 @@
 	      :after (copilot)
 	      :custom
 	      (copilot-chat-use-polymode nil))
-	    (add-hook 'org-mode-hook
-	              (lambda ()
-	                (when (string-match-p "\\.ai\\.org\\'" (buffer-file-name))
-	                  (gptel-mode 1))))
+	    (use-package mcp
+	      :after gptel
+	      :custom
+	      (mcp-hub-servers
+	       `(("github" . (:command "${pkgs.nodejs}/bin/npx"
+	    			   :args ("-y" "@modelcontextprotocol/server-github")
+	    			   :env (:GITHUB_PERSONAL_ACCESS_TOKEN ,(idiig/get-sops-secret-value "gh_pat_mcp"))))
+	         ("duckduckgo" . (:command "${pkgs.uv}/bin/uvx"
+	    			       :args ("--python" "${pkgs.python313}/bin/python3.13"
+	    				      "duckduckgo-mcp-server")))
+	         ("nixos" . (:command "${pkgs.uv}/bin/uvx"
+	    			  :args ("--python" "${pkgs.python313}/bin/python3.13"
+	    				 "mcp-nixos")))
+	         ("fetch" . (:command "${pkgs.uv}/bin/uvx"
+	    			  :args ("--python" "${pkgs.python313}/bin/python3.13"
+	    				 "mcp-server-fetch")))
+	         ("filesystem" . (:command "${pkgs.nodejs}/bin/npx" :args ("-y" "@modelcontextprotocol/server-filesystem" ,(getenv "HOME"))))
+	         ("sequential-thinking" . (:command "${pkgs.nodejs}/bin/npx" :args ("-y" "@modelcontextprotocol/server-sequential-thinking")))
+	         ("context7" . (:command "${pkgs.nodejs}/bin/npx" :args ("-y" "@upstash/context7-mcp") :env (:DEFAULT_MINIMUM_TOKENS "6000")))))
+	      :config (require 'mcp-hub)
+	      :hook (after-init . mcp-hub-start-all-server))
+	    (use-package gptel
+	      :custom
+	      (gptel-model 'claude-sonnet-4.5)
+	      (gptel-default-mode 'org-mode)
+	      (gptel-use-curl t)
+	      (gptel-use-tools t)
+	      (gptel-confirm-tool-calls 'always)
+	      (gptel-include-tool-results 'auto)
+	      :config
+	      (require 'gptel-integrations)
+	      (require 'gptel-org)
+	      (setq gptel--system-message 
+	            (concat gptel--system-message " Make sure to use Japanese language."))
+	      (setq gptel-backend 
+	            (gptel-make-gh-copilot "Copilot"
+	                                   :stream t
+	                                   :models '(gpt-5-codex
+	                                            claude-sonnet-4.5
+	                                            claude-haiku-4.5
+	                                            gpt-5-mini
+	                                            grok-code-fast-1)))
+	      :hook (org-mode . (lambda ()
+	                          (when (and buffer-file-name
+	                                     (string-match-p "\\.ai\\.org\\'" buffer-file-name))
+	                            (gptel-mode 1)))))
 	    (add-to-list 'exec-path "${pkgs.aider-chat}/bin")
 	    (defvar idiig/supported-providers '("openai" "anthropic" "google")
 	      "List of supported AI providers for Aider.")
