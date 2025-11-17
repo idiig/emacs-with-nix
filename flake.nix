@@ -1846,7 +1846,7 @@
 	      (setq gptel-backend 
 	            (gptel-make-gh-copilot "Copilot"
 	                                   :stream t
-	                                   :models 'copilot-model-list))
+	                                   :models 'idiig/copilot-model-list))
 	      :hook (org-mode . (lambda ()
 	                          (when (and buffer-file-name
 	                                     (string-match-p "\\.ai\\.org\\'" buffer-file-name))
