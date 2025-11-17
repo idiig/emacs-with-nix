@@ -1826,6 +1826,10 @@
 	    	     gptel-menu
 	    	     gptel-fn-complete
 	    	     gptel-magit-install)
+	      :hook (org-mode . (lambda ()
+	                          (when (and buffer-file-name
+	                                     (string-match-p "\\.ai\\.org\\'" buffer-file-name))
+	                            (gptel-mode 1))))
 	      :init
 	      (defvar idiig/copilot-model-list
 	        '(gpt-5-codex
@@ -1850,14 +1854,7 @@
 	      (setq gptel-backend 
 	            (gptel-make-gh-copilot "Copilot"
 	                                   :stream t
-	                                   :models idiig/copilot-model-list))
-	      :hook (org-mode . (lambda ()
-	                          (when (and buffer-file-name
-	                                     (string-match-p "\\.ai\\.org\\'" buffer-file-name))
-	                            (gptel-mode 1)))))
-	    (use-package gptel-fn-complete
-	      :after gptel
-	      :commands (gptel-fn-complete))
+	                                   :models idiig/copilot-model-list)))
 	    (use-package gptel-magit
 	      :after gptel
 	      :custom

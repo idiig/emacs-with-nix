@@ -3291,6 +3291,16 @@ MCP error -32001: Request timed out)
 :header-args: :noweb-ref ecfg
 :END:
 ***** =gptel= 本体
+这段配置设置了 gptel 包，用于在 Emacs 中集成 AI 对话功能：
+
+- =:commands= :: 声明延迟加载的命令，包括对话、补全、菜单等功能
+- =:hook= :: 自动为以 =.ai.org= 结尾的 org 文件启用 gptel-mode
+- =:init= :: 定义可用的 AI 模型列表，包括 GPT、Claude、Grok 等多个模型
+- =:custom= :: 设置默认使用 Claude Sonnet 4.5 模型，org-mode 作为默认模
+  式，启用 curl 和工具调用功能
+- =:config= :: 加载集成模块，配置系统消息使用中文，设置后端为 GitHub
+  Copilot 并启用流式传输
+
 #+begin_src emacs-lisp
   (use-package gptel
     :commands (gptel-mode
@@ -3299,6 +3309,10 @@ MCP error -32001: Request timed out)
   	     gptel-menu
   	     gptel-fn-complete
   	     gptel-magit-install)
+    :hook (org-mode . (lambda ()
+                        (when (and buffer-file-name
+                                   (string-match-p "\\.ai\\.org\\'" buffer-file-name))
+                          (gptel-mode 1))))
     :init
     (defvar idiig/copilot-model-list
       '(gpt-5-codex
@@ -3323,19 +3337,13 @@ MCP error -32001: Request timed out)
     (setq gptel-backend 
           (gptel-make-gh-copilot "Copilot"
                                  :stream t
-                                 :models idiig/copilot-model-list))
-    :hook (org-mode . (lambda ()
-                        (when (and buffer-file-name
-                                   (string-match-p "\\.ai\\.org\\'" buffer-file-name))
-                          (gptel-mode 1)))))
-#+end_src
-***** 利用gptel的补全
-#+begin_src emacs-lisp
-  (use-package gptel-fn-complete
-    :after gptel
-    :commands (gptel-fn-complete))
+                                 :models idiig/copilot-model-list)))
 #+end_src
 ***** git统合
+这是一个 gptel-magit 的配置，用于在 Magit 中集成 AI 辅助功能。配置在
+gptel 加载后启动，使用 grok-code-fast-1 模型，并在进入 magit-mode 时自
+动安装相关功能。
+
 #+begin_src emacs-lisp
   (use-package gptel-magit
     :after gptel
