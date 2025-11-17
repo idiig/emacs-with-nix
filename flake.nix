@@ -1842,7 +1842,7 @@
 	          (define-key map (kbd "/") #'xref-find-references)
 	          map)
 	        "My key customizations for AI and xref.")
-	      :cofig
+	      :config
 	      (global-set-key (kbd "C-c .") idiig/xref-map))
 	    (use-package gptel-magit
 	      :after gptel

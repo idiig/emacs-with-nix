@@ -3288,7 +3288,7 @@ line-spacing 0.3)= 这类做法会导致这些字体设置的更小的地方也�
                                    (string-match-p "\\.ai\\.org\\'" buffer-file-name))
                           (gptel-mode 1)))))
 #+end_src
-***** 补全
+***** 利用gptel的补全
 #+begin_src emacs-lisp
   (use-package gptel-fn-complete
     :after gptel
@@ -3301,7 +3301,7 @@ line-spacing 0.3)= 这类做法会导致这些字体设置的更小的地方也�
         (define-key map (kbd "/") #'xref-find-references)
         map)
       "My key customizations for AI and xref.")
-    :cofig
+    :config
     (global-set-key (kbd "C-c .") idiig/xref-map))
 #+end_src
 ***** git统合
