@@ -1868,7 +1868,6 @@
 	    
 	    (use-package gptel-magit
 	      :after gptel
-	      :commands (gptel-magit-install)
 	      :hook (magit-mode . gptel-magit-install))
 	    (add-to-list 'exec-path "${pkgs.aider-chat}/bin")
 	    (defvar idiig/supported-providers '("openai" "anthropic" "google")
