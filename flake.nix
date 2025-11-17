@@ -1831,6 +1831,23 @@
 	                          (when (and buffer-file-name
 	                                     (string-match-p "\\.ai\\.org\\'" buffer-file-name))
 	                            (gptel-mode 1)))))
+	    (use-package gptel-fn-complete
+	      :after gptel
+	      :init
+	      (defvar idiig/xref-map
+	        (let ((map (make-sparse-keymap)))
+	          (define-key map (kbd "c") #'gptel-fn-complete)
+	          (define-key map (kbd ".") #'xref-find-definitions)
+	          (define-key map (kbd ",") #'xref-go-back)
+	          (define-key map (kbd "/") #'xref-find-references)
+	          map)
+	        "My key customizations for AI and xref.")
+	      :cofig
+	      (global-set-key (kbd "C-c .") idiig/xref-map))
+	    (use-package gptel-magit
+	      :after gptel
+	      :commands (gptel-magit-install)
+	      :hook (magit-mode . gptel-magit-install))
 	    (add-to-list 'exec-path "${pkgs.aider-chat}/bin")
 	    (defvar idiig/supported-providers '("openai" "anthropic" "google")
 	      "List of supported AI providers for Aider.")
@@ -2139,6 +2156,8 @@
             copilot-chat
             mcp
             gptel
+              gptel-fn-complete
+              gptel-magit
             aidermacs
             claude-code
             meow
