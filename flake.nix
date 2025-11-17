@@ -1726,6 +1726,10 @@
 	      (add-to-list 'copilot-indentation-alist '(emacs-lisp-mode 2))
 	    
 	      (setq copilot-max-char 99999999))
+	    (use-package copilot-chat
+	      :after (copilot)
+	      :custom
+	      (copilot-chat-use-polymode nil))
 	    (add-hook 'org-mode-hook
 	              (lambda ()
 	                (when (string-match-p "\\.ai\\.org\\'" (buffer-file-name))

@@ -3138,6 +3138,16 @@ line-spacing 0.3)= 这类做法会导致这些字体设置的更小的地方也�
 #+begin_src nix
   copilot-chat
 #+end_src
+**** 配置
+:PROPERTIES:
+:header-args: :noweb-ref ecfg
+:END:
+#+begin_src emacs-lisp
+  (use-package copilot-chat
+    :after (copilot)
+    :custom
+    (copilot-chat-use-polymode nil))
+#+end_src
 *** MCP
 **** 依赖
 :PROPERTIES:
