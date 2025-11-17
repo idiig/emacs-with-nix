@@ -1791,12 +1791,26 @@
 	         ("fetch" . (:command "${pkgs.uv}/bin/uvx"
 	    			  :args ("--python" "${pkgs.python313}/bin/python3.13"
 	    				 "mcp-server-fetch")))
-	         ("filesystem" . (:command "${pkgs.nodejs}/bin/npx" :args ("-y" "@modelcontextprotocol/server-filesystem" ,(getenv "HOME"))))
-	         ("sequential-thinking" . (:command "${pkgs.nodejs}/bin/npx" :args ("-y" "@modelcontextprotocol/server-sequential-thinking")))
-	         ("context7" . (:command "${pkgs.nodejs}/bin/npx" :args ("-y" "@upstash/context7-mcp") :env (:DEFAULT_MINIMUM_TOKENS "6000")))))
+	         ("filesystem" . (:command "${pkgs.nodejs}/bin/npx"
+	    			       :args ("-y" "@modelcontextprotocol/server-filesystem"
+	    				      ,(getenv "HOME"))))
+	         ("sequential-thinking" . (:command "${pkgs.nodejs}/bin/npx"
+	    					:args ("-y" "@modelcontextprotocol/server-sequential-thinking")))
+	         ("context7" . (:command "${pkgs.nodejs}/bin/npx"
+	    			     :args ("-y" "@upstash/context7-mcp")
+	    			     :env (:DEFAULT_MINIMUM_TOKENS "6000")))))
 	      :config (require 'mcp-hub)
 	      :hook (after-init . mcp-hub-start-all-server))
 	    (use-package gptel
+	      :commands (gptel-mode gptel-chat gptel-complete)
+	      :init
+	      (defvar idiig/copilot-model-list
+	        '(gpt-5-codex
+	          claude-sonnet-4.5
+	          claude-haiku-4.5
+	          gpt-5-mini
+	          grok-code-fast-1)
+	        "List of AI models available for Copilot.")
 	      :custom
 	      (gptel-model 'claude-sonnet-4.5)
 	      (gptel-default-mode 'org-mode)
@@ -1808,15 +1822,11 @@
 	      (require 'gptel-integrations)
 	      (require 'gptel-org)
 	      (setq gptel--system-message 
-	            (concat gptel--system-message " Make sure to use Japanese language."))
+	            (concat gptel--system-message " Make sure to use Chinese language."))
 	      (setq gptel-backend 
 	            (gptel-make-gh-copilot "Copilot"
 	                                   :stream t
-	                                   :models '(gpt-5-codex
-	                                            claude-sonnet-4.5
-	                                            claude-haiku-4.5
-	                                            gpt-5-mini
-	                                            grok-code-fast-1)))
+	                                   :models 'copilot-model-list))
 	      :hook (org-mode . (lambda ()
 	                          (when (and buffer-file-name
 	                                     (string-match-p "\\.ai\\.org\\'" buffer-file-name))
