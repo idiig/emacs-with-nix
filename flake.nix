@@ -1830,7 +1830,8 @@
 	          claude-sonnet-4.5
 	          claude-haiku-4.5
 	          gpt-5-mini
-	          grok-code-fast-1)
+	          grok-code-fast-1
+	          raptor-mini)
 	        "List of AI models available for Copilot.")
 	      :custom
 	      (gptel-model 'claude-sonnet-4.5)
@@ -1854,21 +1855,11 @@
 	                            (gptel-mode 1)))))
 	    (use-package gptel-fn-complete
 	      :after gptel
-	      :commands (gptel-fn-complete)
-	      :init
-	      (defvar idiig/xref-map
-	        (let ((map (make-sparse-keymap)))
-	          (define-key map (kbd "c") #'gptel-fn-complete)
-	          (define-key map (kbd ".") #'xref-find-definitions)
-	          (define-key map (kbd ",") #'xref-go-back)
-	          (define-key map (kbd "/") #'xref-find-references)
-	          map)
-	        "Key customizations for AI and xref.")
-	      :bind
-	      ("C-c ." . idiig/xref-map))
-	    
+	      :commands (gptel-fn-complete))
 	    (use-package gptel-magit
 	      :after gptel
+	      :custom
+	      (gptel-magit-model 'grok-code-fast-1)
 	      :hook (magit-mode . gptel-magit-install))
 	    (add-to-list 'exec-path "${pkgs.aider-chat}/bin")
 	    (defvar idiig/supported-providers '("openai" "anthropic" "google")
