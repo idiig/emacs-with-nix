@@ -1861,98 +1861,6 @@
 	      :custom
 	      (gptel-magit-model 'grok-code-fast-1)
 	      :hook (magit-mode . gptel-magit-install))
-	    (add-to-list 'exec-path "${pkgs.aider-chat}/bin")
-	    (defvar idiig/supported-providers '("openai" "anthropic" "google")
-	      "List of supported AI providers for Aider.")
-	    
-	    (defun idiig/provider-env-var (provider)
-	      "Return the environment variable name for the given PROVIDER.
-	    Uppercase the provider name and append '_API_KEY'."
-	      (let ((provider-lower (downcase provider)))
-	        (if (member provider-lower idiig/supported-providers)
-	            (concat (upcase provider-lower) "_API_KEY")
-	          (error "Unsupported provider: %s" provider))))
-	    
-	    (defun idiig/api-path (provider dir)
-	      "Return the file path for the API key of PROVIDER in directory DIR."
-	      (expand-file-name provider dir))
-	    
-	    (defun idiig/read-file-contents (file-path)
-	      "Return the contents of FILE-PATH as a string, with error handling."
-	      (condition-case err
-	          (if (file-exists-p file-path)
-	              (string-trim (with-temp-buffer
-	                             (insert-file-contents file-path)
-	                             (buffer-string)))
-	            (error "File does not exist: %s" file-path))
-	        (error
-	         (message "Error reading file %s: %s" file-path (error-message-string err))
-	         nil)))
-	    
-	    (defun idiig/setup-single-provider (provider api-dir)
-	      "Set up API key for a single PROVIDER from API-DIR.
-	    Return t on success, nil on failure."
-	      (let* ((provider-env (idiig/provider-env-var provider))
-	             (provider-path (idiig/api-path provider api-dir))
-	             (api-key (idiig/read-file-contents provider-path)))
-	        (if api-key
-	            (progn
-	              (setenv provider-env api-key)
-	              (message "Set %s from %s" provider-env provider-path)
-	              t)
-	          (progn
-	            (message "Failed to read API key for %s from %s" provider provider-path)
-	            nil))))
-	    
-	    (defun idiig/get-default-api-dir ()
-	      "Get the default API directory.
-	    Check if 'api-key' or 'api-keys' folder exists in current directory.
-	    Return the path if found, otherwise return current directory."
-	      (let ((current-dir default-directory)
-	            (possible-dirs '("api-key" "api-keys")))
-	        (or (seq-find (lambda (dir)
-	                        (let ((full-path (expand-file-name dir current-dir)))
-	                          (and (file-directory-p full-path) full-path)))
-	                      possible-dirs)
-	            ;; If none found, query user for directory using `read-directory-name`
-	    	(read-directory-name "Select API keys directory: " current-dir nil t))))
-	    
-	    (defun idiig/setup-api-keys (&optional api-dir)
-	      "Set up API keys for Aider from directory containing API files.
-	    If API-DIR is provided, use it directly. Otherwise, check if current
-	    folder has 'api-key' or 'api-keys' folder and use it as default.
-	    Interactively prompts for the directory with smart default."
-	      (interactive)
-	      (let* ((default-dir (idiig/get-default-api-dir))
-	             (prompt (if (string= default-dir default-directory)
-	                         "Select API keys directory: "
-	                       (format "Select API keys directory (default: %s): " 
-	                               (file-name-nondirectory (directory-file-name default-dir)))))
-	             (selected-dir (if (called-interactively-p 'any)
-	                               (read-directory-name prompt default-dir)
-	                             (or api-dir default-dir)))
-	             (results (mapcar (lambda (provider)
-	                                (idiig/setup-single-provider provider selected-dir))
-	                              idiig/supported-providers))
-	             (success-count (length (seq-filter #'identity results)))
-	             (total-count (length idiig/supported-providers)))
-	        
-	        ;; Provide comprehensive feedback
-	        (if (= success-count total-count)
-	            (message "Successfully set all %d API keys from directory: %s" 
-	                     total-count selected-dir)
-	          (message "Set %d of %d API keys from directory: %s (check messages for details)"
-	                   success-count total-count selected-dir))
-	        
-	        ;; Return success status for programmatic use
-	        (= success-count total-count)))
-	    (use-package aidermacs
-	      :bind (("C-c a" . aidermacs-transient-menu))
-	      :config
-	      (idiig/setup-api-keys)
-	      :custom
-	      (aidermacs-default-chat-mode 'architect)
-	      (aidermacs-default-model "sonnet"))
 	    (use-package meow
 	      :init
 	      ;; https://github.com/meow-edit/meow/blob/master/KEYBINDING_QWERTY.org
@@ -2167,7 +2075,6 @@
             gptel
               gptel-fn-complete
               gptel-magit
-            aidermacs
             meow
               meow-tree-sitter
             (eaf.withApplications [ eaf-browser eaf-pdf-viewer ])
