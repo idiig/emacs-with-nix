@@ -1160,6 +1160,22 @@
 	      :after
 	      (consult
 	       yas-minor-mode))
+	    (use-package citre
+	      :commands (citre-jump
+	    	     citre-jump-back
+	    	     citre-ace-peek
+	    	     citre-update-this-tags-file)
+	      :custom
+	      (citre-readtags-program "${pkgs.universal-ctags}/bin/readtags")
+	      (citre-ctags-program "${pkgs.universal-ctags}/bin/ctags")
+	      (citre-gtags-program "${pkgs.global}/bin/gtags")
+	      (citre-global-program "${pkgs.global}/bin/global")
+	      (citre-project-root-function #'vc-dir-root)
+	      ;; (citre-default-create-tags-file-location 'global-cache)
+	      (citre-edit-ctags-options-manually nil)
+	      (citre-auto-enable-citre-mode-modes '(prog-mode))
+	      :init
+	      (require 'citre-config))
 	    
 	    (use-package direnv
 	      :defer t
@@ -2128,6 +2144,7 @@
             # yasnippet
             yasnippet-snippets
               consult-yasnippet
+            citre
             
             direnv
             eat

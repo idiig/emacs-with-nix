@@ -2158,6 +2158,36 @@ Snippet 用于快速插入模板
      yas-minor-mode))
 #+end_src
 
+*** TAGS (=Citre=)
+**** 依赖
+:PROPERTIES:
+:header-args: :noweb-ref epkgs
+:END:
+#+begin_src nix
+  citre
+#+end_src
+**** 配置
+:PROPERTIES:
+:header-args: :noweb-ref ecfg
+:END:
+#+begin_src emacs-lisp
+  (use-package citre
+    :commands (citre-jump
+  	     citre-jump-back
+  	     citre-ace-peek
+  	     citre-update-this-tags-file)
+    :custom
+    (citre-readtags-program "${pkgs.universal-ctags}/bin/readtags")
+    (citre-ctags-program "${pkgs.universal-ctags}/bin/ctags")
+    (citre-gtags-program "${pkgs.global}/bin/gtags")
+    (citre-global-program "${pkgs.global}/bin/global")
+    (citre-project-root-function #'vc-dir-root)
+    ;; (citre-default-create-tags-file-location 'global-cache)
+    (citre-edit-ctags-options-manually nil)
+    (citre-auto-enable-citre-mode-modes '(prog-mode))
+    :init
+    (require 'citre-config))
+#+end_src
 *** 基于 tresitter 的结构化编程
 **** 依赖
 :PROPERTIES:
