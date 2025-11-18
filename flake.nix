@@ -1856,7 +1856,7 @@
 	                                   :stream t
 	                                   :models idiig/copilot-model-list)))
 	    (use-package gptel-magit
-	      :after gptel
+	      :after (gptel magit)
 	      :custom
 	      (gptel-magit-model 'grok-code-fast-1)
 	      :hook (magit-mode . gptel-magit-install))
