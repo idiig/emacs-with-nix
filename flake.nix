@@ -1853,7 +1853,7 @@
 	      (require 'gptel-integrations)
 	      (require 'gptel-org)
 	      (setq gptel--system-message 
-	            (concat gptel--system-message " Make sure to use Chinese language."))
+	            (concat gptel--system-message " Make sure to use Chinese language. Note org-mode markup symbols need spaces with CJK characters including CJK symbols, such as ，。、「」 etc.."))
 	      (setq gptel-backend 
 	            (gptel-make-gh-copilot "Copilot"
 	                                   :stream t
