@@ -3317,9 +3317,12 @@ MCP error -32001: Request timed out)
     (defvar idiig/copilot-model-list
       '(gpt-5-codex
         claude-sonnet-4.5
-        claude-haiku-4.5
+        claude-sonnet-4
+        claude-opus-4.1
         gpt-5-mini
+        gpt-5
         grok-code-fast-1
+        gemini-2.5-pro
         raptor-mini)
       "List of AI models available for Copilot.")
     :custom
@@ -3339,11 +3342,10 @@ MCP error -32001: Request timed out)
                                  :stream t
                                  :models idiig/copilot-model-list)))
 #+end_src
-***** git统合
+***** =magit= 统合
 这是一个 gptel-magit 的配置，用于在 Magit 中集成 AI 辅助功能。配置在
 gptel 加载后启动，使用 grok-code-fast-1 模型，并在进入 magit-mode 时自
 动安装相关功能。
-
 #+begin_src emacs-lisp
   (use-package gptel-magit
     :after (gptel magit)
