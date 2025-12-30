@@ -2500,6 +2500,9 @@ LSP:
   (use-package jsonian
     :after so-long
     :mode ("\\.json\\'" . jsonian-mode)
+    :init
+    (add-to-list 'major-mode-remap-alist '(json-mode . jsonian-mode))
+    (add-to-list 'major-mode-remap-alist '(json-ts-mode . jsonian-mode))
     :custom
     (jsonian-no-so-long-mode t))
 #+end_src
