@@ -1302,8 +1302,9 @@
 	     nil)
 	    (use-package jsonian
 	      :after so-long
+	      :mode ("\\.json\\'" . jsonian-mode)
 	      :custom
-	      (jsonian-no-so-long-mode))
+	      (jsonian-no-so-long-mode t))
 	    (add-to-list 'exec-path "${pkgs.plantuml}/bin")
 	    (with-eval-after-load 'org
 	      (setq org-plantuml-jar-path "${pkgs.plantuml}/lib/plantuml.jar")
@@ -2060,7 +2061,6 @@
             auctex
               auctex-latexmk
             jsonian
-              json-mode
             plantuml-mode
             ob-nix
               ob-go

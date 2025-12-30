@@ -2486,7 +2486,6 @@ LSP:
 :END:
 #+begin_src nix :noweb-ref epkgs
   jsonian
-    json-mode
 #+end_src
 
 #+begin_src emacs-lisp
@@ -2500,8 +2499,9 @@ LSP:
 #+begin_src emacs-lisp :noweb-ref ecfg
   (use-package jsonian
     :after so-long
+    :mode ("\\.json\\'" . jsonian-mode)
     :custom
-    (jsonian-no-so-long-mode))
+    (jsonian-no-so-long-mode t))
 #+end_src
 *** Web
 
