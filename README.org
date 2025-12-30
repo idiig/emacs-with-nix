@@ -3349,6 +3349,7 @@ gptel 加载后启动，使用 grok-code-fast-1 模型，并在进入 magit-mode
 #+begin_src emacs-lisp
   (use-package gptel-magit
     :after (gptel magit)
+    :commands magit-status
     :custom
     (gptel-magit-model 'grok-code-fast-1)
     :hook (magit-mode . gptel-magit-install))
