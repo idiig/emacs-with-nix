@@ -3131,6 +3131,16 @@ line-spacing 0.3)= 这类做法会导致这些字体设置的更小的地方也�
 #+begin_src nix
   dslide
 #+end_src
+***** 配置
+:PROPERTIES:
+:header-args: :noweb-ref ecfg
+:END:
+#+begin_src emacs-lisp
+  (use-package dslide
+    :commands (dslide-deck-develop dslide-deck-start)
+    :custom
+    (dslide-breadcrumb-separator " » "))
+#+end_src
 **** =org-modern=
 :PROPERTIES:
 :header-args: :noweb-ref epkgs

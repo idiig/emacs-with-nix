@@ -1736,6 +1736,10 @@
 	      :init
 	      (setq org-reveal-root "http://cdn.jsdelivr.net/reveal.js/3.0.0/")
 	      (setq org-reveal-mathjax t))
+	    (use-package dslide
+	      :commands (dslide-deck-develop dslide-deck-start)
+	      :custom
+	      (dslide-breadcrumb-separator " » "))
 	    (defun idiig/get-sops-secret-value (key &optional path)
 	      "Get secret value from SOPS-encrypted file.
 	    KEY is the key to lookup in the YAML file.
