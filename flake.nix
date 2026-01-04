@@ -1384,8 +1384,8 @@
 	    	org-tags-column 0		; 标签紧贴标题文本，不右对齐
 	    	
 	    	;; Org styling, hide markup etc.
-	    	org-hide-emphasis-markers t ; 隐藏强调标记符号 (*粗体* 显示为 粗体)
-	    	org-pretty-entities t)	  ; 美化显示实体字符 (\alpha 显示为 α)
+	    	org-hide-emphasis-markers nil ; 隐藏强调标记符号 (*粗体* 显示为 粗体)
+	    	org-pretty-entities nil)	  ; 美化显示实体字符 (\alpha 显示为 α)
 	    
 	      ;; Modes
 	      (auto-fill-mode 0)			; Disable auto-fill mode
@@ -1421,60 +1421,6 @@
 	      (with-eval-after-load 'oc
 	        (set-face-attribute 'org-cite nil
 	      			:slant 'italic)))
-	    (defvar idiig/org-line-height 1.8) ; 設定行高倍率
-	    (defvar idiig/org-target-faces '(org-cite
-	                                     org-cite-key
-	                                     org-verbatim
-	                                     org-footnote
-	    				 org-code
-	                                     ;; org-latex-and-related
-	                                     nil)) ;; 目標標題樣式列表，nil 代表普通文字
-	    
-	    ;; 清除覆蓋層
-	    (defun idiig/org-line-height-clear ()
-	      (remove-overlays (point-min) (point-max) 'idiig/org-overlay t))
-	    
-	    ;; 檢查是否為空行
-	    (defun idiig/org-empty-line-p ()
-	      (save-excursion
-	        (beginning-of-line)
-	        (looking-at-p "^[[:space:]]*$")))
-	    
-	    ;; 應用行高
-	    (defun idiig/org-line-height-apply ()
-	      (idiig/org-line-height-clear)
-	      (save-excursion
-	        (goto-char (point-min))
-	        (while (not (eobp))
-	          (let* ((line-start (line-beginning-position))
-	                 (line-end (line-end-position))
-	                 (invisible (get-char-property line-start 'invisible))
-	                 (face (get-text-property line-start 'face))
-	                 (has-face (or (memq face idiig/org-target-faces)
-	                              (and (listp face)
-	                                   (cl-some (lambda (f) (memq f idiig/org-target-faces)) face))))
-	                 (is-empty (idiig/org-empty-line-p)))
-	            (when (and has-face (not invisible) (not is-empty))
-	              (let ((ov (make-overlay line-start (min (1+ line-end) (point-max)))))
-	                (overlay-put ov 'line-height idiig/org-line-height)
-	                (overlay-put ov 'priority 100)
-	                (overlay-put ov 'idiig/org-overlay t))))
-	          (forward-line 1))))
-	    
-	    ;; Hook 函數
-	    (defun idiig/org-line-height-hook (&optional _state)
-	      (run-with-idle-timer 0.07 nil
-	                           (lambda (buf)
-	                             (when (buffer-live-p buf)
-	                               (with-current-buffer buf
-	                                 (idiig/org-line-height-apply))))
-	                           (current-buffer)))
-	    
-	    ;; 使用方式
-	    (add-hook 'org-mode-hook
-	              (lambda ()
-	                (idiig/org-line-height-apply)
-	                (add-hook 'org-cycle-hook #'idiig/org-line-height-hook nil t)))
 	    (defun idiig/org-mode-face-settings ()
 	      "Set custom face attributes for Org mode headings in current buffer only."
 	      
@@ -1594,9 +1540,9 @@
 	      :custom
 	      (org-bullets-bullet-list '("◉" "○" "●" "○" "●" "○" "●")))
 	    
-	    (font-lock-add-keywords 'org-mode
-	                            '(("^ *\\([-]\\) "
-	                               (0 (prog1 () (compose-region (match-beginning 1) (match-end 1) "•"))))))
+	    ;; (font-lock-add-keywords 'org-mode
+	    ;;                         '(("^ *\\([-]\\) "
+	    ;;                            (0 (prog1 () (compose-region (match-beginning 1) (match-end 1) "•"))))))
 	    
 	    ;; (with-eval-after-load 'org
 	    ;;   (setq org-ellipsis " ▾"
