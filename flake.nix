@@ -1701,6 +1701,9 @@
 	      :init
 	      (setq org-reveal-root "http://cdn.jsdelivr.net/reveal.js/3.0.0/")
 	      (setq org-reveal-mathjax t))
+	    (use-package ox-typst
+	      :commands (org-export-dispatch)
+	      :after org)
 	    (use-package dslide
 	      :commands (dslide-deck-develop dslide-deck-start)
 	      :custom
@@ -2043,10 +2046,10 @@
             valign
             citeproc
             ox-reveal
+            ox-typst
             org-present
             dslide
             org-modern
-            ox-typst
             copilot
             copilot-chat
             mcp

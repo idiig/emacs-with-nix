@@ -3090,24 +3090,42 @@ LSP:
     (setq org-reveal-root "http://cdn.jsdelivr.net/reveal.js/3.0.0/")
     (setq org-reveal-mathjax t))
 #+end_src
-****** =org-present=
+***** =ox-typst=
+****** 依赖
+:PROPERTIES:
+:header-args: :noweb-ref epkgs
+:END:
+#+begin_src nix
+  ox-typst
+#+end_src
+****** 配置
+:PROPERTIES:
+:header-args: :noweb-ref ecfg
+:END:
+#+begin_src emacs-lisp
+  (use-package ox-typst
+    :commands (org-export-dispatch)
+    :after org)
+#+end_src 
+**** 展示工具
+***** =org-present=
 用 =org-present= 作幻灯片发表。手动开启。
-******* 依赖
+****** 依赖
 :PROPERTIES:
 :header-args: :noweb-ref epkgs
 :END:
 #+begin_src nix
   org-present
 #+end_src
-****** =dslide=
-******* 依赖
+***** =dslide=
+****** 依赖
 :PROPERTIES:
 :header-args: :noweb-ref epkgs
 :END:
 #+begin_src nix
   dslide
 #+end_src
-******* 配置
+****** 配置
 :PROPERTIES:
 :header-args: :noweb-ref ecfg
 :END:
@@ -3117,22 +3135,13 @@ LSP:
     :custom
     (dslide-breadcrumb-separator " » "))
 #+end_src
-****** =org-modern=
+***** =org-modern=
 :PROPERTIES:
 :header-args: :noweb-ref epkgs
 :END:
 #+begin_src nix
   org-modern
 #+end_src
-***** =ox-typst=
-****** 依赖
-:PROPERTIES:
-:header-args: :noweb-ref epkgs
-:END:
-#+begin_src nix
-  ox-typst
-#+end_src
-**** 展示工具
 *** AI辅助功能
 **** API config
 :PROPERTIES:
