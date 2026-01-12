@@ -2507,7 +2507,8 @@ LSP:
 ***** 依赖
 
 #+begin_src nix :noweb-ref epkgs
-  typst-mode
+  typst-ts-mode
+    typst-preview
 #+end_src
 
 #+begin_src emacs-lisp :noweb-ref ecfg

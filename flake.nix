@@ -2035,7 +2035,8 @@
             jq-mode
             auctex
               auctex-latexmk
-            typst-mode
+            typst-ts-mode
+              typst-preview
             jsonian
             plantuml-mode
             ob-nix
