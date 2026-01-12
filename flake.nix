@@ -1063,6 +1063,21 @@
 	      (save-excursion (insert " ")))
 	    
 	    (bind-key* "C-." 'idiig/insert-space-after-point)
+	    (use-package spacious-padding
+	      :config
+	      (setq spacious-padding-widths
+	            '( :internal-border-width 15
+	               :header-line-width 4
+	               :mode-line-width 6
+	               :tab-width 4
+	               :right-divider-width 30
+	               :scroll-bar-width 8))
+	    
+	      ;; Read the doc string of `spacious-padding-subtle-mode-line' as it
+	      ;; is very flexible and provides several examples.
+	      (setq spacious-padding-subtle-mode-line
+	            `( :mode-line-active 'default
+	               :mode-line-inactive vertical-border)))
 	    ;; TODO: 这里未来需要改成在每个语言的设定的节点push进来
 	    (defvar idiig/language-list
 	      '("emacs-lisp" "python" "ditaa" "plantuml" "shell" "nix"
@@ -1295,6 +1310,11 @@
 	    (add-hook 'TeX-mode-hook 'idiig/run-prog-mode-hooks)
 	    (use-package auctex
 	      :defer t)
+	    (idiig//setup-nix-lsp-bridge-server 
+	     "typst" 
+	     "tinymist" 
+	     "${pkgs.tinymist}/bin" 
+	     nil)
 	    (idiig//setup-nix-lsp-bridge-server 
 	     "json" 
 	     "vscode-json-language-server" 
@@ -1975,6 +1995,7 @@
               pyim-basedict
             magit
             wanderlust
+            spacious-padding
             (melpaBuild {
               ename = "reader";
               pname = "emacs-reader";
@@ -2014,6 +2035,7 @@
             jq-mode
             auctex
               auctex-latexmk
+            typst-mode
             jsonian
             plantuml-mode
             ob-nix
@@ -2021,10 +2043,11 @@
             org-bullets
             valign
             citeproc
-            org-present
             ox-reveal
+            org-present
             dslide
             org-modern
+            ox-typst
             copilot
             copilot-chat
             mcp
