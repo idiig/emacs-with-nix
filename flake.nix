@@ -1183,8 +1183,8 @@
 	      :custom
 	      (citre-readtags-program "${pkgs.universal-ctags}/bin/readtags")
 	      (citre-ctags-program "${pkgs.universal-ctags}/bin/ctags")
-	      (citre-gtags-program "${pkgs.global}/bin/gtags")
-	      (citre-global-program "${pkgs.global}/bin/global")
+	      ;; (citre-gtags-program "${pkgs.global}/bin/gtags")
+	      ;; (citre-global-program "${pkgs.global}/bin/global")
 	      (citre-project-root-function #'vc-dir-root)
 	      ;; (citre-default-create-tags-file-location 'global-cache)
 	      (citre-edit-ctags-options-manually nil)
