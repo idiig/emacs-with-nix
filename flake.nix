@@ -1696,13 +1696,11 @@
 	      ;; 挂载 advice
 	      (advice-add 'org-cite-insert :around #'my/oc-insert-then-ask))
 	    (use-package ox-reveal
-	      :commands (org-export-dispatch)
 	      :after org
 	      :init
 	      (setq org-reveal-root "http://cdn.jsdelivr.net/reveal.js/3.0.0/")
 	      (setq org-reveal-mathjax t))
 	    (use-package ox-typst
-	      :commands (org-export-dispatch)
 	      :after org)
 	    (use-package dslide
 	      :commands (dslide-deck-develop dslide-deck-start)

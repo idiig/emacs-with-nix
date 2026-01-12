@@ -3084,7 +3084,6 @@ LSP:
 :END:
 #+begin_src emacs-lisp
   (use-package ox-reveal
-    :commands (org-export-dispatch)
     :after org
     :init
     (setq org-reveal-root "http://cdn.jsdelivr.net/reveal.js/3.0.0/")
@@ -3104,7 +3103,6 @@ LSP:
 :END:
 #+begin_src emacs-lisp
   (use-package ox-typst
-    :commands (org-export-dispatch)
     :after org)
 #+end_src 
 **** 展示工具
