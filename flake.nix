@@ -1064,6 +1064,7 @@
 	    
 	    (bind-key* "C-." 'idiig/insert-space-after-point)
 	    (use-package spacious-padding
+	      :defer t
 	      :config
 	      (setq spacious-padding-widths
 	            '( :internal-border-width 15
@@ -1183,8 +1184,6 @@
 	      :custom
 	      (citre-readtags-program "${pkgs.universal-ctags}/bin/readtags")
 	      (citre-ctags-program "${pkgs.universal-ctags}/bin/ctags")
-	      ;; (citre-gtags-program "${pkgs.global}/bin/gtags")
-	      ;; (citre-global-program "${pkgs.global}/bin/global")
 	      (citre-project-root-function #'vc-dir-root)
 	      ;; (citre-default-create-tags-file-location 'global-cache)
 	      (citre-edit-ctags-options-manually nil)
@@ -1833,8 +1832,7 @@
 	                                   :stream t
 	                                   :models idiig/copilot-model-list)))
 	    (use-package gptel-magit
-	      :after (gptel magit)
-	      :commands magit-status
+	      :commands gptel-magit-generate-message
 	      :custom
 	      (gptel-magit-model 'grok-code-fast-1)
 	      :hook (magit-mode . gptel-magit-install))

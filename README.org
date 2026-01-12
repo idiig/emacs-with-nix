@@ -1889,6 +1889,7 @@ minibuffer的检索]]。
 :END:
 #+begin_src emacs-lisp
   (use-package spacious-padding
+    :defer t
     :config
     (setq spacious-padding-widths
           '( :internal-border-width 15
@@ -1904,7 +1905,6 @@ minibuffer的检索]]。
           `( :mode-line-active 'default
              :mode-line-inactive vertical-border)))
 #+end_src
-
 
 ** 文档阅览 (=emacs-reader=)
 *** 依赖
@@ -2210,8 +2210,6 @@ Snippet 用于快速插入模板
     :custom
     (citre-readtags-program "${pkgs.universal-ctags}/bin/readtags")
     (citre-ctags-program "${pkgs.universal-ctags}/bin/ctags")
-    ;; (citre-gtags-program "${pkgs.global}/bin/gtags")
-    ;; (citre-global-program "${pkgs.global}/bin/global")
     (citre-project-root-function #'vc-dir-root)
     ;; (citre-default-create-tags-file-location 'global-cache)
     (citre-edit-ctags-options-manually nil)
@@ -3348,8 +3346,7 @@ gptel 加载后启动，使用 grok-code-fast-1 模型，并在进入 magit-mode
 动安装相关功能。
 #+begin_src emacs-lisp
   (use-package gptel-magit
-    :after (gptel magit)
-    :commands magit-status
+    :commands gptel-magit-generate-message
     :custom
     (gptel-magit-model 'grok-code-fast-1)
     :hook (magit-mode . gptel-magit-install))
