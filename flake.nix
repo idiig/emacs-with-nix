@@ -1082,7 +1082,7 @@
 	    ;; TODO: 这里未来需要改成在每个语言的设定的节点push进来
 	    (defvar idiig/language-list
 	      '("emacs-lisp" "python" "ditaa" "plantuml" "shell" "nix"
-	        "R" "haskell" "latex" "css" "lisp" "jq" "makefile" "go")
+	        "R" "haskell" "latex" "css" "lisp" "jq" "makefile" "go" "typst")
 	      "支持的编程语言列表。")
 	    
 	    (defun idiig/run-prog-mode-hooks ()
