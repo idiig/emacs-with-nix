@@ -1995,6 +1995,7 @@
             magit
             wanderlust
             spacious-padding
+              writeroom-mode
             (melpaBuild {
               ename = "reader";
               pname = "emacs-reader";

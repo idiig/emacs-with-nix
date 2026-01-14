@@ -1882,6 +1882,7 @@ minibuffer的检索]]。
 :END:
 #+begin_src nix
   spacious-padding
+    writeroom-mode
 #+end_src
 **** 配置
 :PROPERTIES:
