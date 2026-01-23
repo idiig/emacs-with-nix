@@ -1695,7 +1695,12 @@
 	    
 	      ;; 挂载 advice
 	      (advice-add 'org-cite-insert :around #'my/oc-insert-then-ask))
-	    (use-package vulpea)
+	    (use-package vulpea
+	      :defer t
+	      :init
+	      (setq vulpea-db-sync-directories '("~/Documents/mkhomepg/src/articles"))
+	      (vulpea-db-sync-full-scan)
+	      (vulpea-db-autosync-mode +1))
 	    (use-package ox-reveal
 	      :after org
 	      :init

@@ -3083,7 +3083,12 @@ LSP:
 :header-args: :noweb-ref ecfg
 :END:
 #+begin_src emacs-lisp
-  (use-package vulpea)
+  (use-package vulpea
+    :defer t
+    :init
+    (setq vulpea-db-sync-directories '("~/Documents/mkhomepg/src/articles"))
+    (vulpea-db-sync-full-scan)
+    (vulpea-db-autosync-mode +1))
 #+end_src
 **** 导出
 ***** =ox-reveal=
