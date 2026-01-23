@@ -1943,7 +1943,7 @@ minibuffer的检索]]。
   ;; TODO: 这里未来需要改成在每个语言的设定的节点push进来
   (defvar idiig/language-list
     '("emacs-lisp" "python" "ditaa" "plantuml" "shell" "nix"
-      "R" "haskell" "latex" "css" "lisp" "jq" "makefile" "go" "typst")
+      "R" "haskell" "latex" "css" "lisp" "jq" "makefile" "go")
     "支持的编程语言列表。")
 
   (defun idiig/run-prog-mode-hooks ()
@@ -3218,24 +3218,6 @@ LSP:
 
     (setq copilot-max-char 99999999))
 #+end_src
-**** Copilot Chat
-***** 依赖
-:PROPERTIES:
-:header-args: :noweb-ref epkgs
-:END:
-#+begin_src nix
-  copilot-chat
-#+end_src
-***** 配置
-:PROPERTIES:
-:header-args: :noweb-ref ecfg
-:END:
-#+begin_src emacs-lisp
-  (use-package copilot-chat
-    :after (copilot)
-    :custom
-    (copilot-chat-use-polymode nil))
-#+end_src
 **** MCP
 ***** 依赖
 :PROPERTIES:
@@ -3358,6 +3340,22 @@ gptel 加载后启动，使用 grok-code-fast-1 模型，并在进入 magit-mode
     :custom
     (gptel-magit-model 'grok-code-fast-1)
     :hook (magit-mode . gptel-magit-install))
+#+end_src
+**** Agent shell
+***** 依赖
+:PROPERTIES:
+:header-args: :noweb-ref epkgs
+:END:
+#+BEGIN_SRC nix
+  agent-shell
+#+END_SRC
+***** 配置
+:PROPERTIES:
+:header-args: :noweb-ref ecfg
+:END:
+#+begin_src emacs-lisp
+  (use-package agent-shell
+    :demand t)
 #+end_src
 **** COMMENT AI-pairing programming (=Aidermacs=)
 ***** 依赖

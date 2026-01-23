@@ -1082,7 +1082,7 @@
 	    ;; TODO: 这里未来需要改成在每个语言的设定的节点push进来
 	    (defvar idiig/language-list
 	      '("emacs-lisp" "python" "ditaa" "plantuml" "shell" "nix"
-	        "R" "haskell" "latex" "css" "lisp" "jq" "makefile" "go" "typst")
+	        "R" "haskell" "latex" "css" "lisp" "jq" "makefile" "go")
 	      "支持的编程语言列表。")
 	    
 	    (defun idiig/run-prog-mode-hooks ()
@@ -1761,10 +1761,6 @@
 	      (add-to-list 'copilot-indentation-alist '(emacs-lisp-mode 2))
 	    
 	      (setq copilot-max-char 99999999))
-	    (use-package copilot-chat
-	      :after (copilot)
-	      :custom
-	      (copilot-chat-use-polymode nil))
 	    (use-package mcp
 	      :after gptel
 	      :custom
@@ -1837,6 +1833,8 @@
 	      :custom
 	      (gptel-magit-model 'grok-code-fast-1)
 	      :hook (magit-mode . gptel-magit-install))
+	    (use-package agent-shell
+	      :demand t)
 	    (use-package meow
 	      :init
 	      ;; https://github.com/meow-edit/meow/blob/master/KEYBINDING_QWERTY.org
@@ -2050,11 +2048,11 @@
             dslide
             org-modern
             copilot
-            copilot-chat
             mcp
             gptel
               gptel-fn-complete
               gptel-magit
+            agent-shell
             meow
               meow-tree-sitter
             (eaf.withApplications [ eaf-browser eaf-pdf-viewer ])
