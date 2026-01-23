@@ -3090,6 +3090,8 @@ LSP:
     (vulpea-db-sync-full-scan)
     (vulpea-db-autosync-mode +1))
 #+end_src
+
+TODO: vulpea-consult
 **** 导出
 ***** =ox-reveal=
 ****** 依赖
