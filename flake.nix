@@ -1695,6 +1695,7 @@
 	    
 	      ;; 挂载 advice
 	      (advice-add 'org-cite-insert :around #'my/oc-insert-then-ask))
+	    (use-package vulpea)
 	    (use-package ox-reveal
 	      :after org
 	      :init
@@ -2042,6 +2043,7 @@
             org-bullets
             valign
             citeproc
+            vulpea
             ox-reveal
             ox-typst
             org-present

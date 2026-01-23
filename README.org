@@ -3070,6 +3070,21 @@ LSP:
     ;; 挂载 advice
     (advice-add 'org-cite-insert :around #'my/oc-insert-then-ask))
 #+end_src
+**** 数据库（=vulpea=）
+***** 依赖
+:PROPERTIES:
+:header-args: :noweb-ref epkgs
+:END:
+#+begin_src nix
+  vulpea
+#+end_src
+***** 配置
+:PROPERTIES:
+:header-args: :noweb-ref ecfg
+:END:
+#+begin_src emacs-lisp
+  (use-package vulpea)
+#+end_src
 **** 导出
 ***** =ox-reveal=
 ****** 依赖
