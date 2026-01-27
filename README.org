@@ -1758,6 +1758,18 @@ minibuffer的检索]]。
     ;; 使用nix路径中的git
     (add-to-list 'exec-path "${pkgs.git}/bin"))
 #+END_SRC
+** SSH (=tramp=)
+*** 配置
+:PROPERTIES:
+:header-args: :noweb-ref ecfg
+:END:
+#+begin_src emacs-lisp
+  (with-eval-after-load 'tramp
+    (setq tramp-default-remote-shell 
+          (or (executable-find "zsh")
+              (executable-find "nushell")
+              (executable-find "bash"))))
+#+end_src
 ** 邮件
 *** 依赖
 :PROPERTIES:
@@ -1907,7 +1919,7 @@ minibuffer的检索]]。
              :mode-line-inactive vertical-border)))
 #+end_src
 
-** 文档阅览 (=emacs-reader=)
+** COMMENT 文档阅览 (=emacs-reader=)
 *** 依赖
 :PROPERTIES:
 :header-args: :noweb-ref epkgs
@@ -1934,8 +1946,8 @@ minibuffer的检索]]。
 :PROPERTIES:
 :header-args: :noweb-ref ecfg
 :END:
-*** 编程工具
-**** 我有可能使用的语言
+** 编程工具
+*** 我有可能使用的语言
 :PROPERTIES:
 :header-args: :noweb-ref ecfg
 :END:
@@ -1953,14 +1965,14 @@ minibuffer的检索]]。
     (run-hooks 'prog-mode-hook))
 #+end_src
 
-**** 语言服务器 (=lsp-Bridge=)
+*** 语言服务器 (=lsp-Bridge=)
 :PROPERTIES:
 :CUSTOM_ID: lsp-bridge
 :END:
 语言服务器用于补全代码，提示文档，参照转跳等。这里我使用了 LSP-Bridge，
 其主要优势是通过 python 后端调用语言服务器，不卡 emacs 进程达到高速的
 补全。其他倾向的代替选项有 emacs 捆绑 =eglot= 。
-***** 依赖
+**** 依赖
 :PROPERTIES:
 :header-args: :noweb-ref epkgs
 :END:
@@ -2009,11 +2021,11 @@ minibuffer的检索]]。
   AttributeError: 'datetime.datetime' object has no attribute 'task'
 #+end_example
 
-***** 配置
+**** 配置
 :PROPERTIES:
 :header-args: :noweb-ref ecfg
 :END:
-****** 后续的设置宏，用于配置 Nix 环境下的 LSP 服务器
+***** 后续的设置宏，用于配置 Nix 环境下的 LSP 服务器
 #+begin_src emacs-lisp
   (defvar idiig/lsp-extra-paths nil
     "Emacs 侧已配置的 LSP 可执行目录清单。会被写入到项目的 .emacs-lsp-paths。")
@@ -2093,7 +2105,7 @@ minibuffer的检索]]。
 
 *注意* ：语言服务器不会自动安装，如果在新电脑中出现缺少个别语言服务器
 的情况，我们可以手动安装。
-****** 弹窗补全优先设置
+***** 弹窗补全优先设置
 #+begin_src emacs-lisp
   (with-eval-after-load 'lsp-bridge
     (defun idiig/acm-prefer-lsp-all ()
@@ -2116,9 +2128,9 @@ minibuffer的检索]]。
 
     (add-hook 'lsp-bridge-mode-hook #'idiig/acm-prefer-lsp-all))
 #+end_src
-**** TODO Treesitter
+*** TODO Treesitter
 用于解析语法和语法高亮
-***** 依赖
+**** 依赖
 :PROPERTIES:
 :header-args: :noweb-ref epkgs
 :END:
@@ -2127,7 +2139,7 @@ minibuffer的检索]]。
   treesit-auto
 #+end_src
 
-***** 配置
+**** 配置
 :PROPERTIES:
 :header-args: :noweb-ref ecfg
 :END:
@@ -2149,9 +2161,9 @@ minibuffer的检索]]。
 我们可以手动 =treesit-auto-install-all= 。下载目前所有可能的语言的
 treesit。
 
-**** Snippet (=yasnippet=)
+*** Snippet (=yasnippet=)
 Snippet 用于快速插入模板
-***** 依赖
+**** 依赖
 :PROPERTIES:
 :header-args: :noweb-ref epkgs
 :END:
@@ -2163,7 +2175,7 @@ Snippet 用于快速插入模板
     consult-yasnippet
 #+end_src
 
-***** 配置
+**** 配置
 :PROPERTIES:
 :header-args: :noweb-ref ecfg
 :END:
@@ -2190,15 +2202,15 @@ Snippet 用于快速插入模板
      yas-minor-mode))
 #+end_src
 
-**** TAGS (=Citre=)
-***** 依赖
+*** TAGS (=Citre=)
+**** 依赖
 :PROPERTIES:
 :header-args: :noweb-ref epkgs
 :END:
 #+begin_src nix
   citre
 #+end_src
-***** 配置
+**** 配置
 :PROPERTIES:
 :header-args: :noweb-ref ecfg
 :END:
@@ -2218,29 +2230,29 @@ Snippet 用于快速插入模板
     :init
     (require 'citre-config))
 #+end_src
-**** 基于 tresitter 的结构化编程
-***** 依赖
+*** 基于 tresitter 的结构化编程
+**** 依赖
 :PROPERTIES:
 :header-args: :noweb-ref epkgs
 :END:
 #+begin_src nix
 #+end_src
 
-***** 配置
+**** 配置
 :PROPERTIES:
 :header-args: :noweb-ref ecfg
 :END:
 #+begin_src emacs-lisp
 #+end_src
-**** 自动化环境管理 (=direnv=)
-***** 依赖
+*** 自动化环境管理 (=direnv=)
+**** 依赖
 :PROPERTIES:
 :header-args: :noweb-ref epkgs
 :END:
 #+begin_src nix
   direnv
 #+end_src
-***** 配置
+**** 配置
 :PROPERTIES:
 :header-args: :noweb-ref ecfg
 :END:
@@ -2301,28 +2313,25 @@ Snippet 用于快速插入模板
     (when (fboundp 'direnv-update-environment)
       (advice-add 'direnv-update-environment :after #'idiig/direnv--restart-lsp-bridge)))
 #+end_src
-**** 终端 (=eat=)
-***** 依赖
+*** 终端 (=eat=)
+**** 依赖
 :PROPERTIES:
 :header-args: :noweb-ref epkgs
 :END:
 #+begin_src nix
   eat
 #+end_src
-***** 配置
+**** 配置
 :PROPERTIES:
 :header-args: :noweb-ref ecfg
 :END:
 #+begin_src emacs-lisp
-  ;; For `eat-eshell-mode'.
   (add-hook 'eshell-load-hook #'eat-eshell-mode)
-
-  ;; For `eat-eshell-visual-command-mode'.
   (add-hook 'eshell-load-hook #'eat-eshell-visual-command-mode)
 #+end_src
-*** 编程与文档语言
-**** Nix
-***** 依赖
+** 编程与文档语言
+*** Nix
+**** 依赖
 #+begin_src nix :noweb-ref epkgs
   nix-mode
 #+end_src
@@ -2339,18 +2348,18 @@ Snippet 用于快速插入模板
 设置 nix 的语言服务器。注意这里使用的是在 LSP-Bridge 节中写的宏（参看
 [[#lsp-bridge]]）。
 
-***** 配置
-**** Lisp
-***** RERL
+**** 配置
+*** Lisp
+**** RERL
 :PROPERTIES:
 :header-args: :noweb-ref epkgs
 :END:
-****** 依赖
+***** 依赖
 #+begin_src nix
   slime
     geiser                        # for scheme
 #+end_src
-****** 配置
+***** 配置
 :PROPERTIES:
 :header-args: :noweb-ref ecfg
 :END:
@@ -2363,9 +2372,9 @@ Snippet 用于快速插入模板
     :config
     (slime-setup '(slime-fancy)))
 #+end_src
-***** 方言
-****** Elisp
-******* 配置
+**** 方言
+***** Elisp
+****** 配置
 :PROPERTIES:
 :header-args: :noweb-ref ecfg
 :END:
@@ -2374,8 +2383,8 @@ Snippet 用于快速插入模板
   (add-hook 'eval-expression-minibuffer-setup 'idiig/run-prog-mode-hooks)
 #+end_src
 
-****** Clojure
-******* 依赖
+***** Clojure
+****** 依赖
 #+begin_src emacs-lisp :noweb-ref ecfg
   (idiig//setup-nix-lsp-bridge-server 
    "clojure" 				; language name
@@ -2384,9 +2393,9 @@ Snippet 用于快速插入模板
    nil)					; other dependencies
 #+end_src
 
-**** Python
-***** 本体
-****** 依赖
+*** Python
+**** 本体
+***** 依赖
 #+begin_src emacs-lisp :noweb-ref ecfg
   (idiig//setup-nix-lsp-bridge-server 
    "python" 
@@ -2394,11 +2403,11 @@ Snippet 用于快速插入模板
    "${pkgs.basedpyright}/bin" 
    "${pkgs.stdenv.cc.cc.lib}/lib")
 #+end_src
-****** 配置
-***** 虚拟环境
-**** Haskell
-***** 本体
-****** 依赖
+***** 配置
+**** 虚拟环境
+*** Haskell
+**** 本体
+***** 依赖
 Major mode:
 #+begin_src nix :noweb-ref epkgs
   haskell-mode
@@ -2411,10 +2420,10 @@ Major mode:
    "${pkgs.haskell-language-server}/bin" 
    nil)
 #+end_src
-**** R
-**** Go
-***** 本体
-****** 依赖
+*** R
+*** Go
+**** 本体
+***** 依赖
 Major mode:
 #+begin_src nix :noweb-ref epkgs
   go-mode
@@ -2428,7 +2437,7 @@ LSP:
    "${pkgs.gopls}/bin" 
    nil)
 #+end_src
-****** 配置
+***** 配置
 #+begin_src emacs-lisp :noweb-ref ecfg
   (defun idiig/go-prefer-lsp ()
     (when (derived-mode-p 'go-mode 'go-ts-mode)
@@ -2446,8 +2455,8 @@ LSP:
   (add-hook 'go-mode-hook #'idiig/go-prefer-lsp)
   (add-hook 'go-ts-mode-hook #'idiig/go-prefer-lsp)
 #+end_src
-**** Shell
-***** 依赖
+*** Shell
+**** 依赖
 #+begin_src emacs-lisp :noweb-ref ecfg
   (idiig//setup-nix-lsp-bridge-server 
    "bash" 				; language name
@@ -2456,22 +2465,20 @@ LSP:
    nil)					; other dependencies
 #+end_src
 
-***** 配置
-****** 用 =bash= 作为默认 shell
+**** 配置
+***** 用 =bash= 作为默认 shell
 #+begin_src emacs-lisp :noweb-ref ecfg
   ;; (setq shell-command-switch "-ic")
-  (setq-default explicit-shell-file-name "${pkgs.bashInteractive
-  }/bin/bash")
-  (setq shell-file-name "${pkgs.bashInteractive
-  }/bin/bash")
+  (setq-default explicit-shell-file-name "${pkgs.bashInteractive}/bin/bash")
+  (setq shell-file-name "${pkgs.bashInteractive}/bin/bash")
 #+end_src
 
-**** jq
+*** jq
 #+begin_src nix :noweb-ref epkgs
   jq-mode
 #+end_src
-**** TeX
-***** 依赖
+*** TeX
+**** 依赖
 :PROPERTIES:
 :header-args: :noweb-ref ecfg
 :END:
@@ -2488,7 +2495,7 @@ LSP:
    nil)
 #+end_src
 
-***** 配置
+**** 配置
 :PROPERTIES:
 :header-args: :noweb-ref ecfg
 :END:
@@ -2501,9 +2508,9 @@ LSP:
     :defer t)
 #+end_src
 
-**** Typst
+*** Typst
 
-***** 依赖
+**** 依赖
 
 #+begin_src nix :noweb-ref epkgs
   typst-ts-mode
@@ -2518,9 +2525,9 @@ LSP:
    nil)
 #+end_src
 
-**** XML
-**** JSON
-***** 依赖
+*** XML
+*** JSON
+**** 依赖
 :PROPERTIES:
 :header-args: :noweb-ref ecfg
 :END:
@@ -2535,7 +2542,7 @@ LSP:
    "${pkgs.vscode-langservers-extracted}/bin" 
    nil)
 #+end_src
-***** 配置
+**** 配置
 #+begin_src emacs-lisp :noweb-ref ecfg
   (use-package jsonian
     :after so-long
@@ -2546,15 +2553,15 @@ LSP:
     :custom
     (jsonian-no-so-long-mode t))
 #+end_src
-**** Web
-**** Java
-***** 依赖
+*** Web
+*** Java
+**** 依赖
 #+begin_src nix :noweb-ref 
   (pkgs.jre_minimal)
 #+end_src
 
-**** PlantUML
-***** 依赖
+*** PlantUML
+**** 依赖
 :PROPERTIES:
 :header-args: :noweb-ref epkgs
 :END:
@@ -2570,28 +2577,28 @@ LSP:
     (setq org-plantuml-exec-mode 'plantuml))
 #+end_src
 
-**** GraphViz
-***** 依赖
+*** GraphViz
+**** 依赖
 #+begin_src emacs-lisp :noweb-ref ecfg
   (add-to-list 'exec-path "${pkgs.graphviz}/bin")
 #+end_src
-*** Org相关配置
-**** Org本体
+** Org相关配置
+*** Org本体
 :PROPERTIES:
 :header-args: :noweb-ref ecfg
 :END:
-***** 绑定 prog mode
+**** 绑定 prog mode
 #+begin_src emacs-lisp
   (add-hook 'org-mode-hook 'idiig/run-prog-mode-hooks)
 #+end_src
-***** 代码块支持语言
-****** 依赖
+**** 代码块支持语言
+***** 依赖
 由于 =ob-nix=, =ob-go= 还没有默认。我们需要添加这些依赖
 #+begin_src nix :noweb-ref epkgs
   ob-nix
     ob-go
 #+end_src
-****** 配置
+***** 配置
 #+begin_src emacs-lisp
   (defun idiig/load-org-babel-languages ()
     "根据 `idiig/language-list` 启用 `org-babel` 语言。"
@@ -2613,7 +2620,7 @@ LSP:
   ;; 特殊
   (setq org-babel-shell-command (executable-find "bash"))
 #+end_src
-***** 结构化插入Babel模板
+**** 结构化插入Babel模板
 =org-insert-structure-template= 后选择 =s= (src block) 时自动提示插入代码
 块的语言。
 
@@ -2632,8 +2639,8 @@ LSP:
 
     (advice-add 'org-insert-structure-template :around #'idiig/org-insert-structure-template-src-advice))
 #+end_src
-***** 基础设定
-****** 默认进入 org-mode 时的设定
+**** 基础设定
+***** 默认进入 org-mode 时的设定
 - 显示图片
 - 显示 LaTeX 公式
 - 折叠显示所有顶层节点
@@ -2652,7 +2659,7 @@ LSP:
   	      (org-fold-hide-block-all)	  ; 隐藏所有代码块
   	      (org-fold-hide-drawer-all)))) ; 隐藏所有抽屉
 #+end_src
-****** 一些好用的调整
+***** 一些好用的调整
 - 允许shift用于选择
 - 增强 C-a/C-e 行为：无视 =**= 等 org 标签跳到开始和结尾
 - 插入标题时考虑内容结构，在内容后插入
@@ -2670,7 +2677,7 @@ LSP:
   	org-display-remote-inline-images t)) ; 远程图片文件可以通过 =C-u C-c C-x C-v= 被看到
 #+end_src
 
-****** 展开标题时折叠其他的标题
+***** 展开标题时折叠其他的标题
 每次在 Org mode 中展开一个标题时，会自动折叠整个文档，只保留当前标题及
 其直接子节点展开，同时保持父级标题可见。
 
@@ -2695,8 +2702,8 @@ LSP:
   (add-hook 'org-cycle-hook #'idiig/org-focus-after-cycle)
 #+end_src
 
-***** 面貌
-****** 基础美化
+**** 面貌
+***** 基础美化
 :PROPERTIES:
 :header-args: :noweb-ref ecfg
 :END:
@@ -2746,7 +2753,7 @@ LSP:
     			:slant 'italic)))
 #+end_src
 
-****** 字体，缩进，换行设定
+***** 字体，缩进，换行设定
 :PROPERTIES:
 :header-args: :noweb-ref ecfg
 :END:
@@ -2851,7 +2858,7 @@ LSP:
 
   ;; (add-hook 'org-mode-hook 'idiig/org-mode-face-settings)
 #+end_src
-****** 数学渲染
+***** 数学渲染
 #+begin_src emacs-lisp
   (with-eval-after-load 'org
     (add-to-list
@@ -2868,15 +2875,15 @@ LSP:
 
     (setq org-latex-create-formula-image-program 'idiig-dvisvgm))
 #+end_src
-****** Bullets
-******* 依赖
+***** Bullets
+****** 依赖
 :PROPERTIES:
 :header-args: :noweb-ref epkgs
 :END:
 #+begin_src nix
   org-bullets
 #+end_src
-******* 配置
+****** 配置
 :PROPERTIES:
 :header-args: :noweb-ref ecfg
 :END:
@@ -2895,21 +2902,21 @@ LSP:
   ;;   (setq org-ellipsis " ▾"
   ;;         org-hide-emphasis-markers t))
 #+end_src
-****** 表格
-******* 依赖
+***** 表格
+****** 依赖
 :PROPERTIES:
 :header-args: :noweb-ref epkgs
 :END:
 #+begin_src nix
   valign
 #+end_src
-******* 配置
+****** 配置
 #+begin_src emacs-lisp
   (use-package valign
     :diminish valign-mode
     :hook (org-mode . valign-mode))
 #+end_src
-**** 括号匹配 
+*** 括号匹配 
 #+begin_src emacs-lisp
   ;; Org mode: pair $ for inline math, * for bold, / for italic, = for code
   (with-eval-after-load elec-pair
@@ -2922,15 +2929,15 @@ LSP:
   		 (?= . ?=)		; Verbatim =...=
   		 (?~ . ?~))))))		; Code ~...~
 #+end_src
-**** 文献引用处理器 (=citeproc-el=)
-***** 依赖
+*** 文献引用处理器 (=citeproc-el=)
+**** 依赖
 :PROPERTIES:
 :header-args: :noweb-ref epkgs
 :END:
 #+begin_src nix
   citeproc
 #+end_src
-***** 配置
+**** 配置
 :PROPERTIES:
 :header-args: :noweb-ref ecfg
 :END:
@@ -2942,12 +2949,12 @@ LSP:
           (odt  csl)
           (t    biblatex))))
 #+end_src
-**** 出入引用配置 (=oc=, =oc-basic=)
+*** 出入引用配置 (=oc=, =oc-basic=)
 :PROPERTIES:
 :header-args: :noweb-ref ecfg
 :END:
 =org-cite= 增强：插入后选择样式和参数。
-***** 配置
+**** 配置
 #+begin_src emacs-lisp
   (with-eval-after-load 'oc
     (require 'oc-basic)
@@ -3070,15 +3077,15 @@ LSP:
     ;; 挂载 advice
     (advice-add 'org-cite-insert :around #'my/oc-insert-then-ask))
 #+end_src
-**** 数据库（=vulpea=）
-***** 依赖
+*** 数据库（=vulpea=）
+**** 依赖
 :PROPERTIES:
 :header-args: :noweb-ref epkgs
 :END:
 #+begin_src nix
   vulpea
 #+end_src
-***** 配置
+**** 配置
 :PROPERTIES:
 :header-args: :noweb-ref ecfg
 :END:
@@ -3092,16 +3099,16 @@ LSP:
 #+end_src
 
 TODO: vulpea-consult
-**** 导出
-***** =ox-reveal=
-****** 依赖
+*** 导出
+**** =ox-reveal=
+***** 依赖
 :PROPERTIES:
 :header-args: :noweb-ref epkgs
 :END:
 #+begin_src nix
   ox-reveal
 #+end_src
-****** 配置
+***** 配置
 :PROPERTIES:
 :header-args: :noweb-ref ecfg
 :END:
@@ -3112,15 +3119,15 @@ TODO: vulpea-consult
     (setq org-reveal-root "http://cdn.jsdelivr.net/reveal.js/3.0.0/")
     (setq org-reveal-mathjax t))
 #+end_src
-***** =ox-typst=
-****** 依赖
+**** =ox-typst=
+***** 依赖
 :PROPERTIES:
 :header-args: :noweb-ref epkgs
 :END:
 #+begin_src nix
   ox-typst
 #+end_src
-****** 配置
+***** 配置
 :PROPERTIES:
 :header-args: :noweb-ref ecfg
 :END:
@@ -3128,25 +3135,25 @@ TODO: vulpea-consult
   (use-package ox-typst
     :after org)
 #+end_src 
-**** 展示工具
-***** =org-present=
+*** 展示工具
+**** =org-present=
 用 =org-present= 作幻灯片发表。手动开启。
-****** 依赖
+***** 依赖
 :PROPERTIES:
 :header-args: :noweb-ref epkgs
 :END:
 #+begin_src nix
   org-present
 #+end_src
-***** =dslide=
-****** 依赖
+**** =dslide=
+***** 依赖
 :PROPERTIES:
 :header-args: :noweb-ref epkgs
 :END:
 #+begin_src nix
   dslide
 #+end_src
-****** 配置
+***** 配置
 :PROPERTIES:
 :header-args: :noweb-ref ecfg
 :END:
@@ -3156,15 +3163,15 @@ TODO: vulpea-consult
     :custom
     (dslide-breadcrumb-separator " » "))
 #+end_src
-***** =org-modern=
+**** =org-modern=
 :PROPERTIES:
 :header-args: :noweb-ref epkgs
 :END:
 #+begin_src nix
   org-modern
 #+end_src
-*** AI辅助功能
-**** API config
+** AI辅助功能
+*** API config
 :PROPERTIES:
 :header-args: :noweb-ref ecfg
 :END:
@@ -3216,15 +3223,15 @@ TODO: vulpea-consult
 
   For more info: https://github.com/getsops/sops" secrets-file))))
 #+end_src
-**** Copilot
-***** 依赖
+*** Copilot
+**** 依赖
 :PROPERTIES:
 :header-args: :noweb-ref epkgs
 :END:
 #+begin_src nix
   copilot
 #+end_src
-***** 配置
+**** 配置
 :PROPERTIES:
 :header-args: :noweb-ref ecfg
 :END:
@@ -3240,15 +3247,15 @@ TODO: vulpea-consult
 
     (setq copilot-max-char 99999999))
 #+end_src
-**** MCP
-***** 依赖
+*** MCP
+**** 依赖
 :PROPERTIES:
 :header-args: :noweb-ref epkgs
 :END:
 #+begin_src nix
   mcp
 #+end_src
-***** 配置
+**** 配置
 :PROPERTIES:
 :header-args: :noweb-ref ecfg
 :END:
@@ -3286,8 +3293,8 @@ MCP error -32001: Request timed out)
     (after-init . (lambda () (run-with-idle-timer 1 nil #'mcp-hub-get-all-tool)))
     (gptel-mode . gptel-mcp-connect))
 #+end_src
-**** gptel
-***** 依赖
+*** gptel
+**** 依赖
 :PROPERTIES:
 :header-args: :noweb-ref epkgs
 :END:
@@ -3296,11 +3303,11 @@ MCP error -32001: Request timed out)
     gptel-fn-complete
     gptel-magit
 #+END_SRC
-***** 配置
+**** 配置
 :PROPERTIES:
 :header-args: :noweb-ref ecfg
 :END:
-****** =gptel= 本体
+***** =gptel= 本体
 这段配置设置了 gptel 包，用于在 Emacs 中集成 AI 对话功能：
 
 - =:commands= :: 声明延迟加载的命令，包括对话、补全、菜单等功能
@@ -3352,7 +3359,7 @@ MCP error -32001: Request timed out)
                                  :stream t
                                  :models idiig/copilot-model-list)))
 #+end_src
-****** =magit= 统合
+***** =magit= 统合
 这是一个 gptel-magit 的配置，用于在 Magit 中集成 AI 辅助功能。配置在
 gptel 加载后启动，使用 grok-code-fast-1 模型，并在进入 magit-mode 时自
 动安装相关功能。
@@ -3363,15 +3370,15 @@ gptel 加载后启动，使用 grok-code-fast-1 模型，并在进入 magit-mode
     (gptel-magit-model 'grok-code-fast-1)
     :hook (magit-mode . gptel-magit-install))
 #+end_src
-**** Agent shell
-***** 依赖
+*** Agent shell
+**** 依赖
 :PROPERTIES:
 :header-args: :noweb-ref epkgs
 :END:
 #+BEGIN_SRC nix
   agent-shell
 #+END_SRC
-***** 配置
+**** 配置
 :PROPERTIES:
 :header-args: :noweb-ref ecfg
 :END:
@@ -3379,12 +3386,12 @@ gptel 加载后启动，使用 grok-code-fast-1 模型，并在进入 magit-mode
   (use-package agent-shell
     :demand t)
 #+end_src
-**** TODO COMMENT AI-Client (=claude-code=)
-***** 依赖
+*** TODO COMMENT AI-Client (=claude-code=)
+**** 依赖
 #+begin_src nix :noweb-ref epkgs
   claude-code
 #+end_src
-***** 配置
+**** 配置
 #+begin_src emacs-lisp :noweb-ref ecfg
   ;; Add to your init.el
   (use-package claude-code
@@ -3393,8 +3400,8 @@ gptel 加载后启动，使用 grok-code-fast-1 模型，并在进入 magit-mode
     :bind (("C-c c" . claude-code-transient)))
 #+end_src
 
-*** 模态编辑 (=meow=)
-**** 依赖
+** 模态编辑 (=meow=)
+*** 依赖
 :PROPERTIES:
 :header-args: :noweb-ref epkgs
 :END:
@@ -3403,7 +3410,7 @@ gptel 加载后启动，使用 grok-code-fast-1 模型，并在进入 magit-mode
     meow-tree-sitter
 #+end_src
 
-**** 配置
+*** 配置
 :PROPERTIES:
 :header-args: :noweb-ref ecfg
 :END:
@@ -3521,10 +3528,10 @@ insert-state 时重新打开输入方式：
   	    (deactivate-input-method)))
 #+end_src
 
-*** 多线程丰富功能 (=EAF=)
+** 多线程丰富功能 (=EAF=)
 EAF（Emacs Application Framework）是一个在 Emacs 中运行的应用框架，我
 偶尔使用这个框架来使用浏览器和 PDF 阅读器等应用。
-**** 依赖
+*** 依赖
 :PROPERTIES:
 :header-args: :noweb-ref epkgs
 :END:
@@ -3532,7 +3539,7 @@ EAF（Emacs Application Framework）是一个在 Emacs 中运行的应用框架�
   (eaf.withApplications [ eaf-browser eaf-pdf-viewer ])
 #+end_src
 
-**** 配置
+*** 配置
 :PROPERTIES:
 :header-args: :noweb-ref ecfg
 :END:
@@ -3549,7 +3556,7 @@ EAF（Emacs Application Framework）是一个在 Emacs 中运行的应用框架�
           eaf-browser-enable-tampermonkey t)	     ; 使用油猴
 #+end_src
 
-*** 特殊扩展
+** 特殊扩展
 扩展主要针对不存在于 =nixpkgs= 中的包，这里我基本上使用了[[https://codeberg.org/heraplem/nix-emacs-extra/src/branch/emacs-application-framework/packages/eaf][这个链接的代
 码和方法]]，由于Nix水平有限，我在代码中增加了一些注释提示自己：
 
@@ -3639,11 +3646,11 @@ EAF（Emacs Application Framework）是一个在 Emacs 中运行的应用框架�
   ]
 #+end_src
 
-**** COMMENT EAF
+*** COMMENT EAF
 EAF 是一个可编程扩展的框架，它自带一系列丰富的应用。
-***** 外部元
+**** 外部元
 eaf还没有在 =nixpkgs= 中被打包，所以需要自己打包依赖。
-****** eaf本体
+***** eaf本体
 - 以下代码是外部元的链接
 #+begin_src nix :noweb-ref externals
   eaf = {
@@ -3760,7 +3767,7 @@ eaf还没有在 =nixpkgs= 中被打包，所以需要自己打包依赖。
   })
 #+end_src
 
-****** eaf浏览器
+***** eaf浏览器
 - 外部元链接
 #+begin_src nix :noweb-ref externals
   eaf-browser = {
@@ -3804,7 +3811,7 @@ eaf还没有在 =nixpkgs= 中被打包，所以需要自己打包依赖。
   })
 #+end_src
 
-****** eaf阅读器
+***** eaf阅读器
 - 外部元的链接
 #+begin_src nix :noweb-ref externals
   eaf-pdf-viewer = {
@@ -3817,7 +3824,7 @@ eaf还没有在 =nixpkgs= 中被打包，所以需要自己打包依赖。
 #+begin_src nix :tangle -
 #+end_src
 
-***** 依赖
+**** 依赖
 :PROPERTIES:
 :header-args: :noweb-ref epkgs
 :END:
@@ -3828,7 +3835,7 @@ eaf还没有在 =nixpkgs= 中被打包，所以需要自己打包依赖。
     # eaf-pdf-viewer
 #+end_src
 
-***** 配置
+**** 配置
 :PROPERTIES:
 :header-args: :noweb-ref ecfg
 :END:

@@ -989,6 +989,11 @@
 	      :init
 	      ;; 使用nix路径中的git
 	      (add-to-list 'exec-path "${pkgs.git}/bin"))
+	    (with-eval-after-load 'tramp
+	      (setq tramp-default-remote-shell 
+	            (or (executable-find "zsh")
+	                (executable-find "nushell")
+	                (executable-find "bash"))))
 	    (defvar idiig/writing-environment-list '("\\.org\\'"
 	                                             "\\.md\\'"
 	                                             "\\.qmd\\'"
@@ -1238,10 +1243,7 @@
 	      (advice-add 'direnv-allow :after #'idiig/direnv--restart-lsp-bridge)
 	      (when (fboundp 'direnv-update-environment)
 	        (advice-add 'direnv-update-environment :after #'idiig/direnv--restart-lsp-bridge)))
-	    ;; For `eat-eshell-mode'.
 	    (add-hook 'eshell-load-hook #'eat-eshell-mode)
-	    
-	    ;; For `eat-eshell-visual-command-mode'.
 	    (add-hook 'eshell-load-hook #'eat-eshell-visual-command-mode)
 	    (idiig//setup-nix-lsp-bridge-server 
 	     "nix" 
@@ -1297,10 +1299,8 @@
 	     "${pkgs.bash-language-server}/bin" 	; dependency nixpkg path
 	     nil)					; other dependencies
 	    ;; (setq shell-command-switch "-ic")
-	    (setq-default explicit-shell-file-name "${pkgs.bashInteractive
-	    }/bin/bash")
-	    (setq shell-file-name "${pkgs.bashInteractive
-	    }/bin/bash")
+	    (setq-default explicit-shell-file-name "${pkgs.bashInteractive}/bin/bash")
+	    (setq shell-file-name "${pkgs.bashInteractive}/bin/bash")
 	    (idiig//setup-nix-lsp-bridge-server 
 	     "tex" 
 	     "texlab" 
@@ -2000,22 +2000,6 @@
             wanderlust
             spacious-padding
               writeroom-mode
-            (melpaBuild {
-              ename = "reader";
-              pname = "emacs-reader";
-              version = "20250630";
-              src = pkgs.fetchFromGitea {
-                domain = "codeberg.org";
-                owner = "divyaranjan";
-                repo = "emacs-reader";
-                rev = "9d62d26fe4ae63e5cecf57bc399b20f7feefb620"; # replace with 'tag' for stable
-                hash = "sha256-hkRa52PYfBG090jior3GPOeZyftwmpr2Q7jPKFHsR88=";
-              };
-              files = ''(:defaults "render-core.so")'';
-              nativeBuildInputs = [ pkgs.pkg-config ];
-              buildInputs = with pkgs; [ gcc mupdf gnumake pkg-config ];
-              preBuild = "make clean all";
-            })
             (lsp-bridge.override {
               # 指定使用 Python 3.11 而不是 3.12
               python3 = pkgs.python311;
