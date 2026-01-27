@@ -305,10 +305,14 @@
 	      (dired-isearch-filenames t)
 	      
 	      :hook
-	      ;; Enable auto-revert and highlight current line in dired buffers
 	      (dired-mode . (lambda ()
+	    		  ;; Enable auto-revert
 	                      (auto-revert-mode 1)
-	                      (hl-line-mode 1)))
+	    		  ;; Enable highlight current line
+	                      (hl-line-mode 1)
+	    		  ;; Disable BSD ls when not supported
+	    		  (when (file-remote-p dired-directory)
+	    		    (setq-local dired-actual-switches "-alhB"))))
 	      
 	      :config
 	      ;; Enable 'a' key to open directories in same buffer instead of creating new ones
@@ -1298,9 +1302,6 @@
 	     "bash-language-server" 		; lsp name
 	     "${pkgs.bash-language-server}/bin" 	; dependency nixpkg path
 	     nil)					; other dependencies
-	    ;; (setq shell-command-switch "-ic")
-	    (setq-default explicit-shell-file-name "${pkgs.bashInteractive}/bin/bash")
-	    (setq shell-file-name "${pkgs.bashInteractive}/bin/bash")
 	    (idiig//setup-nix-lsp-bridge-server 
 	     "tex" 
 	     "texlab" 
