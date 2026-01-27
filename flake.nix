@@ -285,9 +285,6 @@
 	    (use-package dired
 	      :commands (dired dired-jump)
 	      :custom
-	      ;; Use human-readable file sizes and group directories first
-	      (dired-listing-switches "-AGFhlv --group-directories-first --time-style=long-iso")
-	      
 	      ;; Intelligently guess target directory for operations (e.g., in split windows)
 	      (dired-dwim-target t)
 	      
@@ -310,9 +307,16 @@
 	                      (auto-revert-mode 1)
 	    		  ;; Enable highlight current line
 	                      (hl-line-mode 1)
-	    		  ;; Disable BSD ls when not supported
+	    		  ;; Disable GNU ls flag when BSD ls
 	    		  (when (file-remote-p dired-directory)
-	    		    (setq-local dired-actual-switches "-alhB"))))
+	                        (setq-local dired-actual-switches
+	                                    (if (string-match-p "gnu"
+	                                                        (or (ignore-errors
+	                                                              (shell-command-to-string 
+	                                                               "ls --version 2>/dev/null"))
+	                                                            ""))
+	                                        "-AGFhlv --group-directories-first --time-style=long-iso"
+	                                      "-AGFhlv")))))
 	      
 	      :config
 	      ;; Enable 'a' key to open directories in same buffer instead of creating new ones
