@@ -1705,8 +1705,24 @@
 	      (advice-add 'org-cite-insert :around #'my/oc-insert-then-ask))
 	    (use-package vulpea
 	      :after org
-	      :init
-	      (setq vulpea-db-sync-directories '("~/Documents/mkhomepg/src/articles"))
+	      :config
+	      (defvar idiig/vulpea-directory
+	        (concat user-emacs-directory "vulpea/")
+	        "Path to the Vulpea articles directory.")
+	      (defvar idiig/vulpea-db-path
+	        (concat idiig/vulpea-directory "notes")
+	        "Path to the Vulpea database file.")
+	      (defvar idiig/vulpea-db-repo-url "git@github.com:idiig/notes.git"
+	        "URL of the Vulpea database git repository.")
+	      (unless (file-exists-p idiig/vulpea-db-path)
+	        (make-directory idiig/vulpea-directory t)
+	        (let ((result (shell-command 
+	                       (format "git clone %s %s" 
+	                               idiig/vulpea-db-repo-url 
+	                               idiig/vulpea-db-path))))
+	          (when (not (= result 0))
+	            (warn "Failed to clone Vulpea database repository"))))
+	      (setq vulpea-db-sync-directories '(idiig/vulpea-db-path))
 	      (vulpea-db-sync-full-scan)
 	      (vulpea-db-autosync-mode +1))
 	    (use-package ox-reveal
