@@ -12,3 +12,4 @@ result/*
 .aider*
 /.emacs-lsp-paths
 *.org#
+/.agent-shell/
