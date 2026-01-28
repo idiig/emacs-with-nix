@@ -1204,9 +1204,8 @@
 	      (citre-auto-enable-citre-mode-modes '(prog-mode))
 	      :init
 	      (require 'citre-config))
-	    
 	    (use-package direnv
-	      :defer t
+	      :commands (direnv-allow direnv-update-environment)
 	      :init
 	      (add-to-list 'exec-path "${pkgs.direnv}/bin")
 	      :config
@@ -2077,8 +2076,33 @@
 
           # Emacs-external dependency 
           emacsExternalTools = with pkgs; [
-            fd
             ripgrep
+              fd
+            cmigemo
+            git
+            universal-ctags
+            direnv
+            nixd
+            sbcl
+            clojure-lsp
+            basedpyright
+              stdenv.cc.cc.lib
+            haskell-language-server
+            gopls
+            bash-language-server
+            texlab
+              texliveMedium
+            tinymist
+            vscode-langservers-extracted
+            plantuml
+            graphviz
+            sops
+            	yq-go
+            nodejs
+              uv
+              python313
+            claude-code-acp
+            wmctrl
           ];
 
           # Wrapper
