@@ -3403,22 +3403,10 @@ gptel 加载后启动，使用 grok-code-fast-1 模型，并在进入 magit-mode
 :END:
 #+begin_src emacs-lisp
   (use-package agent-shell
-    :demand t)
+    :demand t
+    :config
+    (add-to-list 'exec-path "${pkgs.claude-code-acp}/bin"))
 #+end_src
-*** TODO COMMENT AI-Client (=claude-code=)
-**** 依赖
-#+begin_src nix :noweb-ref epkgs
-  claude-code
-#+end_src
-**** 配置
-#+begin_src emacs-lisp :noweb-ref ecfg
-  ;; Add to your init.el
-  (use-package claude-code
-    :init
-    (add-to-list 'exec-path "${pkgs.claude-code}/bin")
-    :bind (("C-c c" . claude-code-transient)))
-#+end_src
-
 ** 模态编辑 (=meow=)
 *** 依赖
 :PROPERTIES:

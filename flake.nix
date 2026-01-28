@@ -1864,7 +1864,9 @@
 	      (gptel-magit-model 'grok-code-fast-1)
 	      :hook (magit-mode . gptel-magit-install))
 	    (use-package agent-shell
-	      :demand t)
+	      :demand t
+	      :config
+	      (add-to-list 'exec-path "${pkgs.claude-code-acp}/bin"))
 	    (use-package meow
 	      :init
 	      ;; https://github.com/meow-edit/meow/blob/master/KEYBINDING_QWERTY.org
