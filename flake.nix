@@ -1722,8 +1722,7 @@
 	                               idiig/vulpea-db-path))))
 	          (when (not (= result 0))
 	            (warn "Failed to clone Vulpea database repository"))))
-	      :init
-	      (setq vulpea-db-sync-directories '(idiig/vulpea-db-path))
+	      (setq vulpea-db-sync-directories `(,idiig/vulpea-db-path))
 	      (vulpea-db-sync-full-scan)
 	      (vulpea-db-autosync-mode +1))
 	    (use-package ox-reveal
