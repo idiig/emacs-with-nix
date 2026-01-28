@@ -2074,7 +2074,25 @@
               meow-tree-sitter
             (eaf.withApplications [ eaf-browser eaf-pdf-viewer ])
           ]);
-          
+
+          # Emacs-external dependency 
+          emacsExternalTools = with pkgs; [
+            fd
+            ripgrep
+          ];
+
+          # Wrapper
+          wrappedEmacs = pkgs.symlinkJoin {
+            name = "emacs-wrapped";
+            paths = [ emacsWithPackages ];
+            buildInputs = [ pkgs.makeWrapper ];
+            postBuild = ''
+              wrapProgram $out/bin/emacs \
+                --prefix PATH : "${pkgs.lib.makeBinPath emacsExternalTools}" \
+                --set QT_QUICK_BACKEND software \
+                --set LIBGL_ALWAYS_SOFTWARE 1 \
+            '';
+          };
 	      in {
 		      packages.default = pkgs.writeShellScriptBin "script" ''
 	      #!/usr/bin/env bash
@@ -2105,11 +2123,9 @@
 		      sed -i \"\" '/^alias ne=/d' "$HOME/.bashrc"
 	      fi
 
-	      echo "alias ne='QT_QUICK_BACKEND=software LIBGL_ALWAYS_SOFTWARE=1 ${emacsWithPackages}/bin/emacs --init-dir \"$EMACS_DIR\"'" >> "$HOME/.bashrc"
-
-	      # 提示用户手动 source 而不是直接执行，以避免 shell 继承问题
-	      echo "请手动运行 'source ~/.bashrc' 以使 alias 生效"
-	      echo "Emacs 配置已同步到 $EMACS_DIR"
+	      echo "alias ne='${wrappedEmacs}/bin/emacs --init-dir \"$EMACS_DIR\"'" >> "$HOME/.bashrc"
+	      
+	      echo "Please 'source ~/.bashrc' activate alias ne"
 	      '';  
 	      });
 }

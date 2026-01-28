@@ -142,7 +142,24 @@ flake.nix。接下去运行可以通过在终端运行下面进行调试和版�
             emacsWithPackages = ((pkgs.emacsPackagesFor emacs).overrideScope overrides).withPackages (epkgs: with epkgs; [
               <<epkgs>>
             ]);
-            
+
+            # Emacs-external dependency 
+            emacsExternalTools = with pkgs; [
+              <<deps>>
+            ];
+
+            # Wrapper
+            wrappedEmacs = pkgs.symlinkJoin {
+              name = "emacs-wrapped";
+              paths = [ emacsWithPackages ];
+              buildInputs = [ pkgs.makeWrapper ];
+              postBuild = ''
+                wrapProgram $out/bin/emacs \
+                  --prefix PATH : "${pkgs.lib.makeBinPath emacsExternalTools}" \
+                  --set QT_QUICK_BACKEND software \
+                  --set LIBGL_ALWAYS_SOFTWARE 1 \
+              '';
+            };
   	      in {
   		      packages.default = pkgs.writeShellScriptBin "script" ''
   	      #!/usr/bin/env bash
@@ -164,11 +181,9 @@ flake.nix。接下去运行可以通过在终端运行下面进行调试和版�
   		      sed -i \"\" '/^alias ne=/d' "$HOME/.bashrc"
   	      fi
 
-  	      echo "alias ne='QT_QUICK_BACKEND=software LIBGL_ALWAYS_SOFTWARE=1 ${emacsWithPackages}/bin/emacs --init-dir \"$EMACS_DIR\"'" >> "$HOME/.bashrc"
-
-  	      # 提示用户手动 source 而不是直接执行，以避免 shell 继承问题
-  	      echo "请手动运行 'source ~/.bashrc' 以使 alias 生效"
-  	      echo "Emacs 配置已同步到 $EMACS_DIR"
+  	      echo "alias ne='${wrappedEmacs}/bin/emacs --init-dir \"$EMACS_DIR\"'" >> "$HOME/.bashrc"
+  	      
+  	      echo "Please 'source ~/.bashrc' activate alias ne"
   	      '';  
   	      });
   }
@@ -1511,7 +1526,7 @@ minibuffer的检索]]。
     (skk-load . (lambda ()
                   (require 'context-skk))))
 #+end_src
-*** 检索（Migemo）
+*** 检索 (Migemo)
 **** 依赖
 :PROPERTIES:
 :header-args: :noweb-ref epkgs
