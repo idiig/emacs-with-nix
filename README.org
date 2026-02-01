@@ -3344,7 +3344,7 @@ TODO: vulpea-consult
 从 SOPS 加密的 YAML 文件中安全地获取密钥值。核心功能：从加密的配置文件
 中读取敏感信息（如 API tokens、密码等），避免在代码中硬编码明文密钥。
 #+begin_src emacs-lisp
-  (defun idiig/get-sops-secret-value (key &optional path)
+  (defun idiig/get-sops-secret-value	 (key &optional path)
     "Get secret value from SOPS-encrypted file.
   KEY is the key to lookup in the YAML file.
   PATH is the path to the secrets file (default: ~/.config/secrets.yaml).
@@ -3560,6 +3560,7 @@ gptel 加载后启动，使用 grok-code-fast-1 模型，并在进入 magit-mode
 :END:
 #+begin_src nix
   claude-code-acp
+    codex-acp
 #+end_src
 **** 配置
 :PROPERTIES:

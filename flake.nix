@@ -1735,7 +1735,7 @@
 	      :commands (dslide-deck-develop dslide-deck-start)
 	      :custom
 	      (dslide-breadcrumb-separator " » "))
-	    (defun idiig/get-sops-secret-value (key &optional path)
+	    (defun idiig/get-sops-secret-value	 (key &optional path)
 	      "Get secret value from SOPS-encrypted file.
 	    KEY is the key to lookup in the YAML file.
 	    PATH is the path to the secrets file (default: ~/.config/secrets.yaml).
@@ -2102,6 +2102,7 @@
               uv
               python313
             claude-code-acp
+              codex-acp
             wmctrl
           ];
 
