@@ -740,15 +740,15 @@
 	    
 	    ;; 在 emacs 启动时应用这个 advice
 	    (add-hook 'emacs-startup-hook #'idiig/apply-backward-kill-word-or-region-advice)
-	    (defvar idiig/fixed-width-font "Sarasa Mono J"
-	      "The font to use for monospaced (fixed width) text.")
-	    (defvar idiig/variable-width-font "Sarasa Gothic J"
-	      "The font to use for variable-pitch (document) text.")
+	      (defvar idiig/fixed-width-font "Sarasa Mono J"
+	        "The font to use for monospaced (fixed width) text.")
+	      (defvar idiig/variable-width-font "Sarasa Gothic J"
+	        "The font to use for variable-pitch (document) text.")
 	    
-	    (defvar idiig/font-profiles
-	      '((small . (135 . 105))
-	        (large . (330 . 240)))
-	      "Font size profiles. Each entry is (profile . (main-height . lower-height)).")
+	      (defvar idiig/font-profiles
+	        '((small . (135 . 105))
+	          (large . (330 . 240)))
+	        "Font size profiles. Each entry is (profile . (main-height . lower-height)).")
 	    
 	    (defun idiig/apply-font-profile (profile)
 	      "Apply font PROFILE ('small or 'large)."
@@ -757,6 +757,9 @@
 	        (let* ((sizes (alist-get profile idiig/font-profiles))
 	               (main-height (car sizes))
 	               (lower-height (cdr sizes)))
+	          ;; 同步更新变量，保持向后兼容
+	          (setq idiig/font-height main-height)
+	          (setq idiig/lower-font-height lower-height)
 	          (set-face-attribute 'mode-line nil
 	                              :inherit 'unspecified
 	                              :height lower-height)
@@ -780,13 +783,13 @@
 	          (set-face-attribute 'minibuffer-prompt nil :inherit 'fixed-pitch)
 	          (set-face-attribute 'header-line nil :inherit 'fixed-pitch)
 	          (message "Font profile set to: %s" profile))))
-	    
-	    (add-hook 'after-init-hook
-	              (lambda ()
-	                (when (display-graphic-p)
-	                  (set-face-attribute 'menu nil :inherit 'unspecified)
-	                  (set-face-attribute 'tool-bar nil :inherit 'unspecified)
-	                  (idiig/apply-font-profile 'large))))
+	          
+	      (add-hook 'after-init-hook
+	                (lambda ()
+	                  (when (display-graphic-p)
+	                    (set-face-attribute 'menu nil :inherit 'unspecified)
+	                    (set-face-attribute 'tool-bar nil :inherit 'unspecified)
+	                    (idiig/apply-font-profile 'large))))
 	    (use-package ddskk
 	      :defer t
 	      :bind (("C-x j" . skk-mode))
