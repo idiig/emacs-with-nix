@@ -1848,8 +1848,10 @@
 	      :hook (magit-mode . gptel-magit-install))
 	    (use-package agent-shell
 	      :demand t
+	      :custom
+	      (agent-shell-header-style '2)
 	      :config
-	      (add-to-list 'exec-path "${pkgs.claude-code-acp}/bin"))
+	      (add-to-list 'exec-path "${pkgs.claude-agent-acp}/bin"))
 	    (use-package meow
 	      :init
 	      ;; https://github.com/meow-edit/meow/blob/master/KEYBINDING_QWERTY.org
@@ -2010,8 +2012,8 @@
             spacious-padding
               writeroom-mode
             (lsp-bridge.override {
-              # 指定使用 Python 3.11 而不是 3.12
-              python3 = pkgs.python311;
+              # 指定使用 Python 3.13 而不是 3.12
+              python3 = pkgs.python313;
             })
               markdown-mode
               yasnippet
@@ -2085,7 +2087,7 @@
             nodejs
               uv
               python313
-            claude-code-acp
+            claude-agent-acp
               codex-acp
             wmctrl
           ];

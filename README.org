@@ -1993,8 +1993,8 @@ minibuffer的检索]]。
 :END:
 #+begin_src nix
   (lsp-bridge.override {
-    # 指定使用 Python 3.11 而不是 3.12
-    python3 = pkgs.python311;
+    # 指定使用 Python 3.13 而不是 3.12
+    python3 = pkgs.python313;
   })
     markdown-mode
     yasnippet
@@ -2007,7 +2007,7 @@ minibuffer的检索]]。
   ~'datetime.datetime' object has no attribute 'task'~
 
 这可能是 Python 3.12.9 中的一个 bug，或者是 epc 包与 Python 3.12.9 不
-兼容的结果。因此我们在 =lsp-bridge= 的环境中使用了 311 的版本。
+兼容的结果。因此我们在 =lsp-bridge= 的环境中使用了 313 的版本。
 #+begin_example
   Traceback (most recent call last):
     File "/nix/store/1bn994va1akp3m0jvg4fj9wzlqmn1kkq-python3-3.12.9-env/lib/python3.12/site-packages/epc/py3compat.py", line 26, in <module>
@@ -3543,7 +3543,7 @@ gptel 加载后启动，使用 grok-code-fast-1 模型，并在进入 magit-mode
 :header-args: :noweb-ref deps
 :END:
 #+begin_src nix
-  claude-code-acp
+  claude-agent-acp
     codex-acp
 #+end_src
 **** 配置
@@ -3556,7 +3556,7 @@ gptel 加载后启动，使用 grok-code-fast-1 模型，并在进入 magit-mode
     :custom
     (agent-shell-header-style '2)
     :config
-    (add-to-list 'exec-path "${pkgs.claude-code-acp}/bin"))
+    (add-to-list 'exec-path "${pkgs.claude-agent-acp}/bin"))
 #+end_src
 ** 模态编辑 (=meow=)
 *** 依赖
