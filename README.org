@@ -1421,70 +1421,51 @@ minibuffer的检索]]。
 #+begin_src emacs-lisp
   (defvar idiig/fixed-width-font "Sarasa Mono J"
     "The font to use for monospaced (fixed width) text.")
-
   (defvar idiig/variable-width-font "Sarasa Gothic J"
     "The font to use for variable-pitch (document) text.")
 
-  (defun idiig/scale-to-nearest-ten (value scale)
-    "Scale VALUE by SCALE and round to nearest multiple of 10.
-  For example: (idiig/scale-to-nearest-ten 1080 0.15) => 160"
-    (* 10 (round (/ (* value scale) 10.0))))
+  (defvar idiig/font-profiles
+    '((small . (135 . 105))
+      (large . (330 . 240)))
+    "Font size profiles. Each entry is (profile . (main-height . lower-height)).")
 
-  (defun idiig/set-fonts-based-on-screen-size (scale)
-    "Set fonts based on the screen size.
-  SCALE is the ratio of font height to screen height (e.g., 0.15)."
+  (defun idiig/apply-font-profile (profile)
+    "Apply font PROFILE ('small or 'large)."
+    (interactive (list (intern (completing-read "Profile: " '("small" "large")))))
     (when (display-graphic-p)
-      (let* ((screen-height (display-pixel-height))
-  	   (my-font-height (idiig/scale-to-nearest-ten screen-height scale)))
-        my-font-height)))
-
-  (defvar idiig/font-height
-    (idiig/set-fonts-based-on-screen-size 0.15)
-    "Font height based on screen size.")
-
-  (defvar idiig/lower-font-height 
-    (idiig/set-fonts-based-on-screen-size 0.10)
-    "Lower font height based on screen size.")
+      (let* ((sizes (alist-get profile idiig/font-profiles))
+             (main-height (car sizes))
+             (lower-height (cdr sizes)))
+        (set-face-attribute 'mode-line nil
+                            :inherit 'unspecified
+                            :height lower-height)
+        (set-face-attribute 'mode-line-inactive nil
+                            :inherit 'unspecified
+                            :height lower-height)
+        (set-face-attribute 'default nil
+                            :font idiig/fixed-width-font
+                            :background "#fbf7f0"
+                            :weight 'regular
+                            :height main-height)
+        (set-face-attribute 'fixed-pitch nil
+                            :font idiig/fixed-width-font
+                            :weight 'regular
+                            :height main-height)
+        (set-face-attribute 'variable-pitch nil
+                            :font idiig/variable-width-font
+                            :weight 'regular
+                            :height main-height)
+        (set-face-attribute 'comint-highlight-prompt nil :inherit 'fixed-pitch)
+        (set-face-attribute 'minibuffer-prompt nil :inherit 'fixed-pitch)
+        (set-face-attribute 'header-line nil :inherit 'fixed-pitch)
+        (message "Font profile set to: %s" profile))))
 
   (add-hook 'after-init-hook
-  	  (lambda ()
-  	    (when (display-graphic-p)
-  	      
-  	      ;; 工具栏，菜单保持默认字体
-  	      (set-face-attribute 'menu nil
-  				  :inherit 'unspecified)
-  	      (set-face-attribute 'tool-bar nil
-  				  :inherit 'unspecified)
-
-  	      ;; 设置 mode-line 字体
-  	      (set-face-attribute 'mode-line nil
-  				  :inherit 'unspecified
-  				  :height idiig/lower-font-height)
-  	      (set-face-attribute 'mode-line-inactive nil
-  				  :inherit 'unspecified
-  				  :height idiig/lower-font-height)
-  	      
-  	      (set-face-attribute 'default nil
-  				  :font idiig/fixed-width-font
-  				  :background "#fbf7f0"
-  				  :weight 'regular
-  				  :height idiig/font-height)
-  	      (set-face-attribute 'fixed-pitch nil
-  				  :font idiig/fixed-width-font
-  				  :weight 'regular
-  				  :height idiig/font-height)
-  	      (set-face-attribute 'variable-pitch nil
-  				  :font idiig/variable-width-font
-  				  :weight 'regular
-  				  :height idiig/font-height)
-  	      ;; 设置 comint 提示符字体
-  	      (set-face-attribute 'comint-highlight-prompt nil
-  				  :inherit 'fixed-pitch)
-  	      ;; 设置 minibuffer prompt 字体
-  	      (set-face-attribute 'minibuffer-prompt nil
-  				  :inherit 'fixed-pitch)
-  	      (set-face-attribute 'header-line nil
-  				  :inherit 'fixed-pitch))))
+            (lambda ()
+              (when (display-graphic-p)
+                (set-face-attribute 'menu nil :inherit 'unspecified)
+                (set-face-attribute 'tool-bar nil :inherit 'unspecified)
+                (idiig/apply-font-profile 'large))))
 #+end_src
 
 ** 日文
