@@ -3553,6 +3553,8 @@ gptel 加载后启动，使用 grok-code-fast-1 模型，并在进入 magit-mode
 #+begin_src emacs-lisp
   (use-package agent-shell
     :demand t
+    :custom
+    (agent-shell-header-style '2)
     :config
     (add-to-list 'exec-path "${pkgs.claude-code-acp}/bin"))
 #+end_src
