@@ -3275,7 +3275,16 @@ TODO: vulpea-consult
 #+begin_src emacs-lisp
   (use-package ox-typst
     :after org)
-#+end_src 
+#+end_src
+**** =htmlize=
+org-modeのHTMLエクスポート時にソースブロックのシンタックスハイライトを保持する。
+***** 依赖
+:PROPERTIES:
+:header-args: :noweb-ref epkgs
+:END:
+#+begin_src nix
+  htmlize
+#+end_src
 *** 展示工具
 **** =org-present=
 用 =org-present= 作幻灯片发表。手动开启。

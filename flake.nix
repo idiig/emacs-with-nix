@@ -2046,6 +2046,7 @@
             vulpea
             ox-reveal
             ox-typst
+            htmlize
             org-present
             dslide
             org-modern
