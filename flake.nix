@@ -1951,6 +1951,7 @@
 	    	  (lambda ()
 	    	    (setq the-late-input-method current-input-method)
 	    	    (deactivate-input-method)))
+	    ${pkgs.lib.optionalString (!pkgs.stdenv.isDarwin) ''
 	    (require 'eaf)
 	    (require 'eaf-browser)
 	    (require 'eaf-pdf-viewer)
@@ -1960,6 +1961,7 @@
 	            eaf-browser-auto-import-chrome-cookies nil   ; 非自动 cookies
 	            eaf-browser-enable-autofill t                ; 自动填充密码
 	            eaf-browser-enable-tampermonkey t)	     ; 使用油猴
+	    ''}
 	    '';
 
 		      # early-init 配置文件
@@ -1982,7 +1984,12 @@
 	    '';
 
           # 首先定义你的基础 Emacs
-          emacs = pkgs.emacs30-gtk3;
+          # 用 emacs31-gtk3 而非 emacs30-gtk3：30.2 在较新版本的 clang 下编译
+          # NS（Cocoa）后端的 .m 文件时会报 "unknown type name 'bool'"，是
+          # Emacs/gnulib 在 C23 探测下的上游兼容性 bug，只影响 Objective-C
+          # 编译单元；31 系列已经不受影响，且在 cache.nixos.org 上有预编译
+          # 缓存，无需本地编译 Emacs 核心。
+          emacs = pkgs.emacs31-gtk3;
 
           # 定义覆盖函数
           overrides = final: prev: mkPackages pkgs final;
@@ -2058,7 +2065,8 @@
             agent-shell
             meow
               meow-tree-sitter
-            (eaf.withApplications [ eaf-browser eaf-pdf-viewer ])
+            ] ++ pkgs.lib.optionals (!pkgs.stdenv.isDarwin) [
+              (eaf.withApplications [ eaf-browser eaf-pdf-viewer ])
           ]);
 
           # Emacs-external dependency 
