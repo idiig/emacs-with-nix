@@ -25,6 +25,7 @@
 
 		      # 主配置文件
 		      emacsConfig = pkgs.writeText "init.el" ''
+	    ;; -*- lexical-binding: t; -*-
 	    ;; 在mac中使用Command key作为meta
 	    (setq mac-option-key-is-meta nil
 	          mac-command-key-is-meta t
