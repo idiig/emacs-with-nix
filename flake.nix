@@ -1942,6 +1942,12 @@
 	      (meow-setup)
 	      :config
 	      (meow-global-mode 1))
+	    
+	    ;; jk 快速退出 insert 状态
+	    (use-package key-chord
+	      :config
+	      (key-chord-mode 1)
+	      (key-chord-define meow-insert-state-keymap "jk" 'meow-insert-exit))
 	    (require 'meow-tree-sitter)
 	    (meow-tree-sitter-register-defaults)  
 	    (defvar-local the-late-input-method nil)
@@ -2067,6 +2073,7 @@
             agent-shell
             meow
               meow-tree-sitter
+            key-chord
             ] ++ pkgs.lib.optionals (!pkgs.stdenv.isDarwin) [
               (eaf.withApplications [ eaf-browser eaf-pdf-viewer ])
           ]);
