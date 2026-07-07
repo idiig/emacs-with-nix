@@ -3582,7 +3582,6 @@ gptel 加载后启动，使用 grok-code-fast-1 模型，并在进入 magit-mode
 #+begin_src nix
   meow
     meow-tree-sitter
-  key-chord
 #+end_src
 
 *** 配置
@@ -3680,11 +3679,19 @@ gptel 加载后启动，使用 grok-code-fast-1 模型，并在进入 magit-mode
     :config
     (meow-global-mode 1))
 
-  ;; jk 快速退出 insert 状态
-  (use-package key-chord
-    :config
-    (key-chord-mode 1)
-    (key-chord-define meow-insert-state-keymap "jk" 'meow-insert-exit))
+  ;; jk 快速退出 insert 状态（时间差判断，无需额外包）
+  (defun meow--jk-k ()
+    (interactive)
+    (if (and (eq (char-before) ?j)
+             (< (- (float-time) (get 'meow--jk-k 'last-j)) 0.15))
+        (progn (delete-char -1) (meow-insert-exit))
+      (insert "k")))
+  (defun meow--jk-j ()
+    (interactive)
+    (put 'meow--jk-k 'last-j (float-time))
+    (insert "j"))
+  (define-key meow-insert-state-keymap (kbd "j") #'meow--jk-j)
+  (define-key meow-insert-state-keymap (kbd "k") #'meow--jk-k)
 #+end_src
 
 #+RESULTS:

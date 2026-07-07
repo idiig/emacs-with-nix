@@ -1943,11 +1943,19 @@
 	      :config
 	      (meow-global-mode 1))
 	    
-	    ;; jk 快速退出 insert 状态
-	    (use-package key-chord
-	      :config
-	      (key-chord-mode 1)
-	      (key-chord-define meow-insert-state-keymap "jk" 'meow-insert-exit))
+	    ;; jk 快速退出 insert 状态（时间差判断，无需额外包）
+	    (defun meow--jk-k ()
+	      (interactive)
+	      (if (and (eq (char-before) ?j)
+	               (< (- (float-time) (get 'meow--jk-k 'last-j)) 0.15))
+	          (progn (delete-char -1) (meow-insert-exit))
+	        (insert "k")))
+	    (defun meow--jk-j ()
+	      (interactive)
+	      (put 'meow--jk-k 'last-j (float-time))
+	      (insert "j"))
+	    (define-key meow-insert-state-keymap (kbd "j") #'meow--jk-j)
+	    (define-key meow-insert-state-keymap (kbd "k") #'meow--jk-k)
 	    (require 'meow-tree-sitter)
 	    (meow-tree-sitter-register-defaults)  
 	    (defvar-local the-late-input-method nil)
@@ -2073,7 +2081,6 @@
             agent-shell
             meow
               meow-tree-sitter
-            key-chord
             ] ++ pkgs.lib.optionals (!pkgs.stdenv.isDarwin) [
               (eaf.withApplications [ eaf-browser eaf-pdf-viewer ])
           ]);
