@@ -1967,6 +1967,7 @@
 
 		      # early-init 配置文件
 		      emacsEarlyInitConfig = pkgs.writeText "early-init.el" ''
+	    ;; -*- lexical-binding: t; -*-
 	    ;; 增加 GC 阈值，加快启动
 	    (setq gc-cons-threshold 402653184 gc-cons-percentage 0.6)
 	    
