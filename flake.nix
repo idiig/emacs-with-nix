@@ -23,9 +23,9 @@
 			      overlays = [ emacs-overlay.overlay ];
 		      };
 
-		      # 主配置文件
-		      emacsConfig = pkgs.writeText "init.el" ''
-	    ;; -*- lexical-binding: t; -*-
+		      # 主配置文件（首行 cookie 用字符串拼接，确保在第0列）
+		      emacsConfig = pkgs.writeText "init.el"
+		        (";; -*- lexical-binding: t; -*-\n" + ''
 	    ;; 在mac中使用Command key作为meta
 	    (setq mac-option-key-is-meta nil
 	          mac-command-key-is-meta t
@@ -1963,11 +1963,11 @@
 	            eaf-browser-enable-autofill t                ; 自动填充密码
 	            eaf-browser-enable-tampermonkey t)	     ; 使用油猴
 	    ''}
-	    '';
+	    '');
 
-		      # early-init 配置文件
-		      emacsEarlyInitConfig = pkgs.writeText "early-init.el" ''
-	    ;; -*- lexical-binding: t; -*-
+		      # early-init 配置文件（同上）
+		      emacsEarlyInitConfig = pkgs.writeText "early-init.el"
+		        (";; -*- lexical-binding: t; -*-\n" + ''
 	    ;; 增加 GC 阈值，加快启动
 	    (setq gc-cons-threshold 402653184 gc-cons-percentage 0.6)
 	    
@@ -1983,7 +1983,7 @@
 	          long-line-threshold 1000
 	          large-hscroll-threshold 1000
 	          syntax-wholeline-max 1000)
-	    '';
+	    '');
 
           # 首先定义你的基础 Emacs
           # 用 emacs31-gtk3 而非 emacs30-gtk3：30.2 在较新版本的 clang 下编译
