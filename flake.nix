@@ -1266,6 +1266,14 @@
 	     "hls" 
 	     "${pkgs.haskell-language-server}/bin" 
 	     nil)
+	    (idiig//setup-nix-lsp-bridge-server
+	     "r"
+	     "rlanguageserver"
+	     "${pkgs.rWrapper.override { packages = with pkgs.rPackages; [ languageserver ]; }}/bin"
+	     nil)
+	    (use-package ess
+	      :defer t
+	      :commands (R ess-r-mode))
 	    (idiig//setup-nix-lsp-bridge-server 
 	     "go" 
 	     "gopls" 
@@ -2053,6 +2061,7 @@
             slime
               geiser                        # for scheme
             haskell-mode
+            ess
             go-mode
             jq-mode
             auctex
@@ -2099,6 +2108,7 @@
             basedpyright
               stdenv.cc.cc.lib
             haskell-language-server
+            (rWrapper.override { packages = with rPackages; [ languageserver ]; })
             gopls
             bash-language-server
             texlab

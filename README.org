@@ -2483,6 +2483,48 @@ Snippet 用于快速插入模板
    nil)
 #+end_src
 *** R
+org-babel 的 R 代码块（=org-babel-R-initiate-session=）依赖 =ESS=
+(=ess-r-mode=) 才能创建/连接 R session，否则 =C-c C-c= 执行 R 代码块时会
+报错 ~failed to load required package "ESS"~ 。这里同时安装 =ess= 和 R
+解释器本体。
+**** 依赖
+:PROPERTIES:
+:header-args: :noweb-ref epkgs
+:END:
+#+begin_src nix
+  ess
+#+end_src
+**** 外部依赖
+:PROPERTIES:
+:header-args: :noweb-ref deps
+:END:
+lsp-bridge 默认把 =ess-r-mode= 映射到内置的 =rlanguageserver= 配置，实
+际命令是 =R --slave -e "languageserver::run()"= 。所以这里用
+=rWrapper= 打包 R 并预装 =languageserver= 这个 R 包，而不是安装裸的
+=R= 。
+#+begin_src nix
+  (rWrapper.override { packages = with rPackages; [ languageserver ]; })
+#+end_src
+**** 路径配置
+:PROPERTIES:
+:header-args: :noweb-ref ecfg
+:END:
+#+begin_src emacs-lisp
+  (idiig//setup-nix-lsp-bridge-server
+   "r"
+   "rlanguageserver"
+   "${pkgs.rWrapper.override { packages = with pkgs.rPackages; [ languageserver ]; }}/bin"
+   nil)
+#+end_src
+**** 配置
+:PROPERTIES:
+:header-args: :noweb-ref ecfg
+:END:
+#+begin_src emacs-lisp
+  (use-package ess
+    :defer t
+    :commands (R ess-r-mode))
+#+end_src
 *** Go
 **** 依赖
 :PROPERTIES:
