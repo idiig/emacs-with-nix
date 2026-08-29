@@ -1097,21 +1097,26 @@
 	    LANGUAGE 是语言名称，如 'python'。
 	    SERVER-NAME 是服务器名称，如 'basedpyright'。
 	    EXECUTABLE-PATH 是服务器可执行文件的路径。
-	    LIB-PATH 是可选的库路径，添加到 LD_LIBRARY_PATH。"
-	      `(with-eval-after-load 'lsp-bridge
+	    LIB-PATH 是可选的库路径，添加到 LD_LIBRARY_PATH。
+	    以下设定立即生效，不必等待 lsp-bridge 加载：`lsp-bridge-<language>-lsp-server'
+	    是 lsp-bridge 真正启动语言服务器时才按符号取值，提前 setq 不影响其
+	    defcustom 的默认值处理；exec-path/idiig/lsp-extra-paths 也需要尽早可用，
+	    否则 org-babel 的会话初始化、direnv 提前写出的 .emacs-lsp-paths 可能看
+	    不到这里加的路径（因为它们不一定在 lsp-bridge 加载之后才发生）。"
+	      `(progn
 	         ;; 设置 LSP 服务器
 	         (setq ,(intern (format "lsp-bridge-%s-lsp-server" language)) ,server-name)
-	         
+	    
 	         ;; 添加可执行文件路径到 exec-path
 	         ,(when executable-path
 	            `(progn
 	    	   (add-to-list 'exec-path ,executable-path)
 	    	   (add-to-list 'idiig/lsp-extra-paths ,executable-path)))
-	         
+	    
 	         ;; 添加库路径到 LD_LIBRARY_PATH
 	         ,(when lib-path
-	            `(setenv "LD_LIBRARY_PATH" 
-	                     (concat ,lib-path ":" 
+	            `(setenv "LD_LIBRARY_PATH"
+	                     (concat ,lib-path ":"
 	                             (or (getenv "LD_LIBRARY_PATH") ""))))))
 	    (use-package lsp-bridge
 	      :defer t
@@ -1974,7 +1979,7 @@
 	    	  (lambda ()
 	    	    (setq the-late-input-method current-input-method)
 	    	    (deactivate-input-method)))
-	    ${pkgs.lib.optionalString (!pkgs.stdenv.isDarwin) ''
+	    ${pkgs.lib.optionalString (!pkgs.stdenv.hostPlatform.isDarwin) ''
 	    (require 'eaf)
 	    (require 'eaf-browser)
 	    (require 'eaf-pdf-viewer)
@@ -2016,7 +2021,25 @@
           emacs = pkgs.emacs31-gtk3;
 
           # 定义覆盖函数
-          overrides = final: prev: mkPackages pkgs final;
+          # typst-ts-mode 的 typst-ts-compile.el 把 ;;;###autoload 直接标
+          # 在 (define-compilation-mode ...) 宏调用上面，autoload.el 不认
+          # 识这个宏，只能把宏调用原样抄进已发布 tar 包内预生成的
+          # typst-ts-mode-autoloads.el（cookie 注释本身不会留在输出里）。
+          # package-activate-all 在 compile.el（定义该宏）加载之前就会求
+          # 值这份 autoloads，于是报 (void-function define-compilation-mode)。
+          # typst-ts-compile.el 本身第一行就 (require 'compile)，正常加载
+          # 完全没问题；这个包是 elpaBuild（dontUnpack = true，直接从 tar
+          # 装进 $out），没有可 patchPhase 的源码树，只能在 postInstall 里
+          # （抢在默认 postInstall 的 native-compile 循环之前）直接删掉已
+          # 安装的 autoloads 文件里那一段裸露的宏调用。
+          overrides = final: prev: mkPackages pkgs final // {
+            typst-ts-mode = prev.typst-ts-mode.overrideAttrs (old: {
+              postInstall = ''
+                sed -i '/^(define-compilation-mode/,/^(register-definition-prefixes/{/^(register-definition-prefixes/!d}' \
+                  "$out"/share/emacs/site-lisp/elpa/typst-ts-mode-*/typst-ts-mode-autoloads.el
+              '' + (old.postInstall or "");
+            });
+          };
           
           # 创建扩展的包集合并选择包
           emacsWithPackages = ((pkgs.emacsPackagesFor emacs).overrideScope overrides).withPackages (epkgs: with epkgs; [
@@ -2090,7 +2113,7 @@
             agent-shell
             meow
               meow-tree-sitter
-            ] ++ pkgs.lib.optionals (!pkgs.stdenv.isDarwin) [
+            ] ++ pkgs.lib.optionals (!pkgs.stdenv.hostPlatform.isDarwin) [
               (eaf.withApplications [ eaf-browser eaf-pdf-viewer ])
           ]);
 

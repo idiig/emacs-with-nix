@@ -143,7 +143,25 @@ flake.nix。接下去运行可以通过在终端运行下面进行调试和版�
             emacs = pkgs.emacs31-gtk3;
 
             # 定义覆盖函数
-            overrides = final: prev: mkPackages pkgs final;
+            # typst-ts-mode 的 typst-ts-compile.el 把 ;;;###autoload 直接标
+            # 在 (define-compilation-mode ...) 宏调用上面，autoload.el 不认
+            # 识这个宏，只能把宏调用原样抄进已发布 tar 包内预生成的
+            # typst-ts-mode-autoloads.el（cookie 注释本身不会留在输出里）。
+            # package-activate-all 在 compile.el（定义该宏）加载之前就会求
+            # 值这份 autoloads，于是报 (void-function define-compilation-mode)。
+            # typst-ts-compile.el 本身第一行就 (require 'compile)，正常加载
+            # 完全没问题；这个包是 elpaBuild（dontUnpack = true，直接从 tar
+            # 装进 $out），没有可 patchPhase 的源码树，只能在 postInstall 里
+            # （抢在默认 postInstall 的 native-compile 循环之前）直接删掉已
+            # 安装的 autoloads 文件里那一段裸露的宏调用。
+            overrides = final: prev: mkPackages pkgs final // {
+              typst-ts-mode = prev.typst-ts-mode.overrideAttrs (old: {
+                postInstall = ''
+                  sed -i '/^(define-compilation-mode/,/^(register-definition-prefixes/{/^(register-definition-prefixes/!d}' \
+                    "$out"/share/emacs/site-lisp/elpa/typst-ts-mode-*/typst-ts-mode-autoloads.el
+                '' + (old.postInstall or "");
+              });
+            };
             
             # 创建扩展的包集合并选择包
             emacsWithPackages = ((pkgs.emacsPackagesFor emacs).overrideScope overrides).withPackages (epkgs: with epkgs; [
@@ -2054,42 +2072,57 @@ minibuffer的检索]]。
   LANGUAGE 是语言名称，如 'python'。
   SERVER-NAME 是服务器名称，如 'basedpyright'。
   EXECUTABLE-PATH 是服务器可执行文件的路径。
-  LIB-PATH 是可选的库路径，添加到 LD_LIBRARY_PATH。"
-    `(with-eval-after-load 'lsp-bridge
+  LIB-PATH 是可选的库路径，添加到 LD_LIBRARY_PATH。
+  以下设定立即生效，不必等待 lsp-bridge 加载：`lsp-bridge-<language>-lsp-server'
+  是 lsp-bridge 真正启动语言服务器时才按符号取值，提前 setq 不影响其
+  defcustom 的默认值处理；exec-path/idiig/lsp-extra-paths 也需要尽早可用，
+  否则 org-babel 的会话初始化、direnv 提前写出的 .emacs-lsp-paths 可能看
+  不到这里加的路径（因为它们不一定在 lsp-bridge 加载之后才发生）。"
+    `(progn
        ;; 设置 LSP 服务器
        (setq ,(intern (format "lsp-bridge-%s-lsp-server" language)) ,server-name)
-       
+
        ;; 添加可执行文件路径到 exec-path
        ,(when executable-path
           `(progn
   	   (add-to-list 'exec-path ,executable-path)
   	   (add-to-list 'idiig/lsp-extra-paths ,executable-path)))
-       
+
        ;; 添加库路径到 LD_LIBRARY_PATH
        ,(when lib-path
-          `(setenv "LD_LIBRARY_PATH" 
-                   (concat ,lib-path ":" 
+          `(setenv "LD_LIBRARY_PATH"
+                   (concat ,lib-path ":"
                            (or (getenv "LD_LIBRARY_PATH") ""))))))
 #+end_src
 上面这个宏用于生成 LSP-Bridge 的设定，因为语言服务器本身需要用户自己安
 装，而本配置又需要 Nix 保证复现，所以我们需要把 nix 路径的语言服务器传
 递给 emacs ，而且语言服务器往往需要匹配的 C++ 的库。因此我希望通过上面
 的代码生成系列配置，同时设定语言，语言服务器，语言服务器的可执行文件路
-径，依赖的 C 库。宏使用如下：
+径，依赖的 C 库。
+
+*注意*：这里不再用 =with-eval-after-load 'lsp-bridge= 包裹。原因是
+=lsp-bridge-<language>-lsp-server= 只有在 lsp-bridge 真正需要为某个
+buffer 挑选语言服务器时才会被读取（按符号取值，不是加载时求值），提前
+=setq= 完全不影响；而 =exec-path= 和 =idiig/lsp-extra-paths= 延后到
+lsp-bridge 加载之后才添加，反而会导致 lsp-bridge 加载之前发生的事情（比
+如打开 org 文件时 =org-babel-R-command= 用 =executable-find= 找解释器，
+或 direnv 提前把 =idiig/lsp-extra-paths= 写入 =.emacs-lsp-paths=）看不
+到这些路径。宏使用如下：
 #+begin_src emacs-lisp :noweb-ref -
-  (idiig//setup-nix-lsp-bridge-server 
-   "python" 
-   "basedpyright" 
-   "${pkgs.basedpyright}/bin" 
+  (idiig//setup-nix-lsp-bridge-server
+   "python"
+   "basedpyright"
+   "${pkgs.basedpyright}/bin"
    "${pkgs.stdenv.cc.cc.lib}/lib")
 #+end_src
 宏展开后如下：
 #+begin_src emacs-lisp :noweb-ref -
-  (with-eval-after-load 'lsp-bridge
-    (setq lsp-bridge-python-lsp-bridge-server "basedpyright")
+  (progn
+    (setq lsp-bridge-python-lsp-server "basedpyright")
     (add-to-list 'exec-path "${pkgs.basedpyright}/bin")
-    (setenv "LD_LIBRARY_PATH" 
-            (concat "${pkgs.stdenv.cc.cc.lib}/lib:" 
+    (add-to-list 'idiig/lsp-extra-paths "${pkgs.basedpyright}/bin")
+    (setenv "LD_LIBRARY_PATH"
+            (concat "${pkgs.stdenv.cc.cc.lib}/lib:"
                     (or (getenv "LD_LIBRARY_PATH") ""))))
 #+end_src
 后面是 LSP-Bridge 本体的配置：
@@ -3616,6 +3649,7 @@ gptel 加载后启动，使用 grok-code-fast-1 模型，并在进入 magit-mode
     :config
     (add-to-list 'exec-path "${pkgs.claude-agent-acp}/bin"))
 #+end_src
+
 ** 模态编辑 (=meow=)
 *** 依赖
 :PROPERTIES:
@@ -3768,13 +3802,13 @@ Chromium 构建系统（ninja + GN），会绕过 nixpkgs 的 clang wrapper 直�
 用裸 =clang=，导致在 macOS 上找不到 libc++ 的头文件（=cstdint=、=array=
 等）而编译失败。这是 nixpkgs 里长期存在、跟随 Qt/Chromium 版本反复出现
 的已知 darwin 问题（参见 [[https://github.com/NixOS/nixpkgs/issues/433314][nixpkgs#433314]]），不是这份配置能修的，所以用
-=pkgs.stdenv.isDarwin= 判断，只在非 macOS 系统上启用这两个应用。
+=pkgs.stdenv.hostPlatform.isDarwin= 判断，只在非 macOS 系统上启用这两个应用。
 *** 依赖
 :PROPERTIES:
 :header-args: :noweb-ref epkgs
 :END:
 #+begin_src nix
-] ++ pkgs.lib.optionals (!pkgs.stdenv.isDarwin) [
+] ++ pkgs.lib.optionals (!pkgs.stdenv.hostPlatform.isDarwin) [
   (eaf.withApplications [ eaf-browser eaf-pdf-viewer ])
 #+end_src
 *** 外部依赖
@@ -3792,7 +3826,7 @@ Chromium 构建系统（ninja + GN），会绕过 nixpkgs 的 clang wrapper 直�
 言混写在同一个代码块里。=macos-excluded= 是一个通用的 noweb 目标，之后
 其他只在非 macOS 启用的 elisp 配置也可以汇入这里。
 #+begin_src nix :noweb yes
-  ${pkgs.lib.optionalString (!pkgs.stdenv.isDarwin) ''
+  ${pkgs.lib.optionalString (!pkgs.stdenv.hostPlatform.isDarwin) ''
   <<macos-excluded>>
   ''}
 #+end_src
