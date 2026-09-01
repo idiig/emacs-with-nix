@@ -3537,21 +3537,38 @@ starter template the first time)."
            (sops-config (expand-file-name "~/.config/.sops.yaml")))
       (unless (file-exists-p age-key-file)
         (make-directory (file-name-directory age-key-file) t)
-        (shell-command (format "${pkgs.age}/bin/age-keygen -o %s"
-                                (shell-quote-argument age-key-file)))
+        (unless (zerop (shell-command (format "${pkgs.age}/bin/age-keygen -o %s"
+                                               (shell-quote-argument age-key-file))))
+          (error "idiig/sops-secrets-setup: age-keygen failed, see *Shell Command Output*"))
         (message "idiig/sops-secrets-setup: generated age key at %s" age-key-file))
-      (unless (file-exists-p sops-config)
-        (let ((public-key (string-trim
-                            (shell-command-to-string
-                             (format "grep 'public key:' %s | cut -d: -f2 | tr -d ' '"
-                                     (shell-quote-argument age-key-file))))))
+      (let ((public-key (string-trim
+                          (shell-command-to-string
+                           (format "grep 'public key:' %s | cut -d: -f2 | tr -d ' '"
+                                   (shell-quote-argument age-key-file))))))
+        (unless (string-prefix-p "age1" public-key)
+          (error "idiig/sops-secrets-setup: could not read an age public key from %s (got %S)"
+                 age-key-file public-key))
+        ;; (Re)write .sops.yaml whenever it doesn't already contain this key,
+        ;; so a stale or half-written config from a previous failed run gets
+        ;; healed instead of silently reused forever.
+        (unless (and (file-exists-p sops-config)
+                     (with-temp-buffer
+                       (insert-file-contents sops-config)
+                       (search-forward public-key nil t)))
           (with-temp-file sops-config
             (insert (format "creation_rules:\n  - path_regex: %s$\n    age: %s\n"
                              (regexp-quote (file-name-nondirectory secrets-file))
                              public-key)))
           (message "idiig/sops-secrets-setup: wrote %s" sops-config)))
-      (async-shell-command (format "${pkgs.sops}/bin/sops %s"
-                                    (shell-quote-argument secrets-file)))))
+      ;; sops shells out to $EDITOR (e.g. nano) for interactive editing, which
+      ;; needs a real pty; `async-shell-command' only gives it a pipe, so run
+      ;; it inside `term' instead.
+      (let* ((name "sops-secrets-setup")
+             (buf (make-term name "${pkgs.sops}/bin/sops" nil secrets-file)))
+        (with-current-buffer buf
+          (term-mode)
+          (term-char-mode))
+        (switch-to-buffer (format "*%s*" name)))))
 #+end_src
 *** Copilot
 **** 依赖
