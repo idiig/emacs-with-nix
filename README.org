@@ -3494,6 +3494,7 @@ org-modeのHTMLエクスポート時にソースブロックのシンタック�
 #+begin_src nix
   sops
   	yq-go
+  	age
 #+end_src
 **** 配置
 :PROPERTIES:
@@ -3519,34 +3520,38 @@ org-modeのHTMLエクスポート時にソースブロックのシンタック�
                     (string= result "null"))
                 (error "Key '%s' not found in %s" key secrets-file)
               result))
-        (error "Secrets file not found: %s
+        (error "Secrets file not found: %s.  Run M-x idiig/sops-secrets-setup to bootstrap it"
+               secrets-file))))
 
-  To set up SOPS secrets:
+  (defun idiig/sops-secrets-setup (&optional path)
+    "Bootstrap the SOPS-encrypted secrets file used by `idiig/get-sops-secret-value'.
+PATH defaults to ~/.config/secrets.yaml.
 
-  1. Install required tools:
-     - sops: nix-env -iA nixpkgs.sops (or brew install sops)
-     - yq: nix-env -iA nixpkgs.yq-go (or brew install yq)
-     - age: nix-env -iA nixpkgs.age (or brew install age)
-
-  2. Generate an age key:
-     mkdir -p ~/.config/sops/age
-     age-keygen -o ~/.config/sops/age/keys.txt
-
-  3. Create .sops.yaml config:
-     cat > ~/.config/.sops.yaml << EOF
-     creation_rules:
-       - path_regex: secrets\\.yaml$
-         age: $(grep 'public key:' ~/.config/sops/age/keys.txt | cut -d: -f2 | tr -d ' ')
-     EOF
-
-  4. Create and edit your secrets file:
-     sops %s
-
-  5. Add your secrets in YAML format:
-     gh_pat_mcp: your_github_token_here
-     openai_key: your_openai_key_here
-
-  For more info: https://github.com/getsops/sops" secrets-file secrets-file))))
+Generates an age key under ~/.config/sops/age/keys.txt if missing,
+writes a matching ~/.config/.sops.yaml creation rule if missing, then
+opens PATH with sops for interactive editing (sops creates it from a
+starter template the first time)."
+    (interactive)
+    (let* ((secrets-file (expand-file-name (or path "~/.config/secrets.yaml")))
+           (age-key-file (expand-file-name "~/.config/sops/age/keys.txt"))
+           (sops-config (expand-file-name "~/.config/.sops.yaml")))
+      (unless (file-exists-p age-key-file)
+        (make-directory (file-name-directory age-key-file) t)
+        (shell-command (format "${pkgs.age}/bin/age-keygen -o %s"
+                                (shell-quote-argument age-key-file)))
+        (message "idiig/sops-secrets-setup: generated age key at %s" age-key-file))
+      (unless (file-exists-p sops-config)
+        (let ((public-key (string-trim
+                            (shell-command-to-string
+                             (format "grep 'public key:' %s | cut -d: -f2 | tr -d ' '"
+                                     (shell-quote-argument age-key-file))))))
+          (with-temp-file sops-config
+            (insert (format "creation_rules:\n  - path_regex: %s$\n    age: %s\n"
+                             (regexp-quote (file-name-nondirectory secrets-file))
+                             public-key)))
+          (message "idiig/sops-secrets-setup: wrote %s" sops-config)))
+      (async-shell-command (format "${pkgs.sops}/bin/sops %s"
+                                    (shell-quote-argument secrets-file)))))
 #+end_src
 *** Copilot
 **** 依赖
