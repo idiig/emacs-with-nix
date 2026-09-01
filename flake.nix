@@ -1799,8 +1799,13 @@
 	          ;; (already pulled in by magit) so the edit happens in this Emacs
 	          ;; instead of needing a separate terminal editor.
 	          (require 'with-editor)
-	          (with-editor-async-shell-command (format "${pkgs.sops}/bin/sops %s"
-	                                                     (shell-quote-argument secrets-file)))))
+	          ;; sops looks for .sops.yaml by walking up from the *current working
+	          ;; directory*, not from the target file's directory, so without this
+	          ;; it fails with "config file not found" unless invoked from
+	          ;; ~/.config already.
+	          (let ((default-directory (file-name-directory secrets-file)))
+	            (with-editor-async-shell-command (format "${pkgs.sops}/bin/sops %s"
+	                                                       (shell-quote-argument secrets-file))))))
 	    (use-package copilot
 	      :config
 	      (define-key copilot-completion-map (kbd "<tab>") 'copilot-accept-completion)
