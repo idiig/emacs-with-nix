@@ -2124,6 +2124,7 @@
               typst-preview
             jsonian
             plantuml-mode
+            dyalog-mode
             ob-nix
               ob-go
             org-bullets

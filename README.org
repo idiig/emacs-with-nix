@@ -2870,6 +2870,16 @@ lsp-bridge 默认把 =ess-r-mode= 映射到内置的 =rlanguageserver= 配置，
 #+begin_src emacs-lisp
   (add-to-list 'exec-path "${pkgs.graphviz}/bin")
 #+end_src
+*** Dyalog APL
+[[https://github.com/harsman/dyalog-mode][dyalog-mode]] 是给 Dyalog APL 用的 major mode，提供语法高亮和缩进，不需
+要额外的语言服务器或外部工具。
+**** 依赖
+:PROPERTIES:
+:header-args: :noweb-ref epkgs
+:END:
+#+begin_src nix
+  dyalog-mode
+#+end_src
 ** Org相关配置
 *** Org本体
 :PROPERTIES:
