@@ -1782,7 +1782,7 @@
 	       gh_pat_mcp: your_github_token_here
 	       openai_key: your_openai_key_here
 	    
-	    For more info: https://github.com/getsops/sops" secrets-file))))
+	    For more info: https://github.com/getsops/sops" secrets-file secrets-file))))
 	    (use-package copilot
 	      :config
 	      (define-key copilot-completion-map (kbd "<tab>") 'copilot-accept-completion)
