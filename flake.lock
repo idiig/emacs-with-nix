@@ -89,7 +89,8 @@
       "inputs": {
         "emacs-overlay": "emacs-overlay",
         "flake-utils": "flake-utils",
-        "nixpkgs": "nixpkgs_2"
+        "nixpkgs": "nixpkgs_2",
+        "tramp-rpc": "tramp-rpc"
       }
     },
     "systems": {
@@ -104,6 +105,22 @@
       "original": {
         "owner": "nix-systems",
         "repo": "default",
+        "type": "github"
+      }
+    },
+    "tramp-rpc": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1788180064,
+        "narHash": "sha256-vHjVNWR/exkJ5v9AhH1uEeJ/5wNpmLARTyYeCofNET0=",
+        "owner": "ArthurHeymans",
+        "repo": "emacs-tramp-rpc",
+        "rev": "76a295718afd3687867c7a7357263d616454eaa2",
+        "type": "github"
+      },
+      "original": {
+        "owner": "ArthurHeymans",
+        "repo": "emacs-tramp-rpc",
         "type": "github"
       }
     }

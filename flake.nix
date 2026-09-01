@@ -5,7 +5,10 @@
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
     flake-utils.url = "github:numtide/flake-utils";
     emacs-overlay.url = "github:nix-community/emacs-overlay";
-    
+    tramp-rpc = {
+      url = "github:ArthurHeymans/emacs-tramp-rpc";
+      flake = false;
+    };
   };
 
   outputs = inputs@{ self, nixpkgs, flake-utils, emacs-overlay, ... }:
@@ -984,7 +987,9 @@
 	      ;; 使用nix路径中的git
 	      (add-to-list 'exec-path "${pkgs.git}/bin"))
 	    (with-eval-after-load 'tramp
-	      (setq tramp-default-remote-shell 
+	      (require 'tramp-rpc))
+	    (with-eval-after-load 'tramp
+	      (setq tramp-default-remote-shell
 	            (or (executable-find "zsh")
 	                (executable-find "nushell")
 	                (executable-find "bash"))))
@@ -2062,6 +2067,7 @@
             pyim
               pyim-basedict
             magit
+            tramp-rpc
             wanderlust
             spacious-padding
               writeroom-mode

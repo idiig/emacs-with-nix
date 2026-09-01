@@ -1808,13 +1808,96 @@ minibuffer的检索]]。
     (add-to-list 'exec-path "${pkgs.git}/bin"))
 #+END_SRC
 ** SSH (=tramp=)
+*** tramp-rpc
+[[https://github.com/ArthurHeymans/emacs-tramp-rpc][emacs-tramp-rpc]] 用 RPC （msgpack over SSH）取代 tramp 默认的逐条 shell
+命令解析，加快远程文件操作的速度。这个包还没有进入 =nixpkgs=，所以需要
+自己打包。
+**** 外部元
+- 以下代码是外部元的链接
+#+begin_src nix :noweb-ref externals
+  tramp-rpc = {
+    url = "github:ArthurHeymans/emacs-tramp-rpc";
+    flake = false;
+  };
+#+end_src
+
+- 以下代码是 tramp-rpc 的打包文件。参照上游 flake.nix 里 =overlays.default=
+  的做法：额外打包一份满足版本要求的 =tramp=（nixpkgs 自带的 GNU ELPA 快照版
+  本太旧），再交叉编译 Linux/musl 的 RPC server 二进制并塞进包里，供
+  =tramp-rpc-deploy= 自动部署到远程主机。
+#+begin_src nix :tangle externals/tramp-rpc/default.nix
+  { package_src
+  , elispFileVersion
+  , lib
+  , melpaBuild
+  , fetchFromGitHub
+  , msgpack
+  , pkgsCross
+  }: let
+    trampVersion = "2.8.2";
+
+    trampForTrampRpc = melpaBuild {
+      pname = "tramp";
+      version = trampVersion;
+      src = fetchFromGitHub {
+        owner = "emacsmirror";
+        repo = "tramp";
+        rev = "904779d264156bfb4ecfc7fa6c40910354cf4ee8";
+        hash = "sha256-Bw/uysv6SbTmfwg/uSBga+wQRD+tEB/3f6FqE02Wqeg=";
+      };
+      files = ''("lisp/*.el")'';
+      postPatch = ''
+        substitute lisp/trampver.el.in lisp/trampver.el \
+          --replace-fail '@configure_input@' 'Generated for the tramp-rpc Nix package' \
+          --replace-fail '@PACKAGE_VERSION@' '${trampVersion}' \
+          --replace-fail '@PACKAGE_BUGREPORT@' 'tramp-devel@gnu.org' \
+          --replace-fail '@EMACS_REQUIRED_VERSION@' '28.1' \
+          --replace-fail '@PACKAGE_URL@' 'https://www.gnu.org/software/tramp/' \
+          --replace-fail '@TRAMP_EMACS_VERSION_CHECK@' '"ok"'
+      '';
+      packageRequires = [ ];
+    };
+
+    serverPackages = map (arch: {
+      package = arch.callPackage "${package_src}/default.nix" { };
+      system = arch.stdenv.hostPlatform.system;
+    }) (with pkgsCross; [ musl64 aarch64-multiplatform-musl ]);
+  in melpaBuild rec {
+    pname = "tramp-rpc";
+    version = elispFileVersion "${package_src}/lisp/tramp-rpc.el";
+    src = package_src;
+    files = ''("lisp/*")'';
+
+    postInstall = lib.concatMapStringsSep "\n" (server: ''
+      install -m755 -D ${server.package}/bin/tramp-rpc-server $out/share/emacs/site-lisp/elpa/${pname}-${version}/binaries/${server.system}/tramp-rpc-server
+    '') serverPackages;
+
+    packageRequires = [ trampForTrampRpc msgpack ];
+  }
+#+end_src
+**** 依赖
+:PROPERTIES:
+:header-args: :noweb-ref epkgs
+:END:
+#+begin_src nix
+  tramp-rpc
+#+end_src
+**** 配置
+:PROPERTIES:
+:header-args: :noweb-ref ecfg
+:END:
+用 =/rpc:user@host:/path/to/file= 访问远程文件即可启用加速。
+#+begin_src emacs-lisp
+  (with-eval-after-load 'tramp
+    (require 'tramp-rpc))
+#+end_src
 *** 配置
 :PROPERTIES:
 :header-args: :noweb-ref ecfg
 :END:
 #+begin_src emacs-lisp
   (with-eval-after-load 'tramp
-    (setq tramp-default-remote-shell 
+    (setq tramp-default-remote-shell
           (or (executable-find "zsh")
               (executable-find "nushell")
               (executable-find "bash"))))
