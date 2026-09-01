@@ -1795,15 +1795,12 @@
 	                                 (regexp-quote (file-name-nondirectory secrets-file))
 	                                 public-key)))
 	              (message "idiig/sops-secrets-setup: wrote %s" sops-config)))
-	          ;; sops shells out to $EDITOR (e.g. nano) for interactive editing, which
-	          ;; needs a real pty; `async-shell-command' only gives it a pipe, so run
-	          ;; it inside `term' instead.
-	          (let* ((name "sops-secrets-setup")
-	                 (buf (make-term name "${pkgs.sops}/bin/sops" nil secrets-file)))
-	            (with-current-buffer buf
-	              (term-mode)
-	              (term-char-mode))
-	            (switch-to-buffer (format "*%s*" name)))))
+	          ;; sops shells out to $EDITOR for interactive editing; use `with-editor'
+	          ;; (already pulled in by magit) so the edit happens in this Emacs
+	          ;; instead of needing a separate terminal editor.
+	          (require 'with-editor)
+	          (with-editor-async-shell-command (format "${pkgs.sops}/bin/sops %s"
+	                                                     (shell-quote-argument secrets-file)))))
 	    (use-package copilot
 	      :config
 	      (define-key copilot-completion-map (kbd "<tab>") 'copilot-accept-completion)
@@ -2132,6 +2129,7 @@
             org-present
             dslide
             org-modern
+            with-editor
             copilot
             mcp
             gptel

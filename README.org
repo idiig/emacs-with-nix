@@ -3487,6 +3487,15 @@ org-modeのHTMLエクスポート時にソースブロックのシンタック�
 #+end_src
 ** AI辅助功能
 *** API config
+**** 依赖
+:PROPERTIES:
+:header-args: :noweb-ref epkgs
+:END:
+- =with-editor= ：让 =sops= 调用的 =$EDITOR= 转发回当前 Emacs 里编辑，而不是
+  弹一个独立终端
+#+begin_src nix
+  with-editor
+#+end_src
 **** 外部依赖
 :PROPERTIES:
 :header-args: :noweb-ref deps
@@ -3560,15 +3569,12 @@ starter template the first time)."
                              (regexp-quote (file-name-nondirectory secrets-file))
                              public-key)))
           (message "idiig/sops-secrets-setup: wrote %s" sops-config)))
-      ;; sops shells out to $EDITOR (e.g. nano) for interactive editing, which
-      ;; needs a real pty; `async-shell-command' only gives it a pipe, so run
-      ;; it inside `term' instead.
-      (let* ((name "sops-secrets-setup")
-             (buf (make-term name "${pkgs.sops}/bin/sops" nil secrets-file)))
-        (with-current-buffer buf
-          (term-mode)
-          (term-char-mode))
-        (switch-to-buffer (format "*%s*" name)))))
+      ;; sops shells out to $EDITOR for interactive editing; use `with-editor'
+      ;; (already pulled in by magit) so the edit happens in this Emacs
+      ;; instead of needing a separate terminal editor.
+      (require 'with-editor)
+      (with-editor-async-shell-command (format "${pkgs.sops}/bin/sops %s"
+                                                 (shell-quote-argument secrets-file)))))
 #+end_src
 *** Copilot
 **** 依赖
