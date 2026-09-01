@@ -828,6 +828,35 @@ enclosing bracket pair."
                (ignore-errors (backward-up-list))
                (funcall fn))))))
 #+END_SRC
+**** 输入时预览补全 (=completion-preview=, built-in)
+:PROPERTIES:
+:header-args: :noweb-ref ecfg
+:END:
+Emacs 30+ 自带的功能，输入时以浅色文字内联预览排在第一位的补全候选。走
+的是标准 =completion-at-point-functions= 管线，跟 LSP-Bridge 自己的异步
+补全弹窗是两套机制、互不冲突——在被 LSP-Bridge 接管的编程语言 buffer 里
+基本不会显示，主要在 =M-x=、elisp scratch、shell 等走原生补全的地方起
+作用。配置参照 [[https://protesilaos.com/codelog/2026-08-29-emacs-completion-preview-mode/][Prot 的这篇文章]]：
+- =M-i= 采纳当前候选，=M-n=/=M-p= 切换候选，=M-<return>= 直接插入完整补全，
+  =<tab>= 交给 *Completions* buffer 看完整列表
+- org-mode 会重新绑定 self-insert-command，不加下面这行的话
+  completion-preview 在 org buffer 里根本不会触发
+#+begin_src emacs-lisp
+  (use-package completion-preview
+    :demand t
+    :bind
+    ( :map completion-preview-active-mode-map
+      ("M-i" . completion-preview-insert-word)
+      ("M-n" . completion-preview-next-candidate)
+      ("M-p" . completion-preview-prev-candidate)
+      ("M-<return>" . completion-preview-insert)
+      ("<tab>" . completion-preview-complete))
+    :config
+    (setq completion-preview-minimum-symbol-length 2)
+    (with-eval-after-load 'org
+      (add-to-list 'completion-preview-commands #'org-self-insert-command))
+    (global-completion-preview-mode 1))
+#+end_src
 **** 便利的光标首尾移动 (=mwim=)
 ***** 依赖
 :PROPERTIES:

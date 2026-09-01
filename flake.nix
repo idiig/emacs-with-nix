@@ -370,6 +370,20 @@
 	              (t (save-excursion
 	                   (ignore-errors (backward-up-list))
 	                   (funcall fn))))))
+	    (use-package completion-preview
+	      :demand t
+	      :bind
+	      ( :map completion-preview-active-mode-map
+	        ("M-i" . completion-preview-insert-word)
+	        ("M-n" . completion-preview-next-candidate)
+	        ("M-p" . completion-preview-prev-candidate)
+	        ("M-<return>" . completion-preview-insert)
+	        ("<tab>" . completion-preview-complete))
+	      :config
+	      (setq completion-preview-minimum-symbol-length 2)
+	      (with-eval-after-load 'org
+	        (add-to-list 'completion-preview-commands #'org-self-insert-command))
+	      (global-completion-preview-mode 1))
 	    (use-package mwim
 	      :bind
 	      ("C-a" . mwim-beginning-of-code-or-line-or-comment)
