@@ -1341,6 +1341,11 @@
 	      (setq org-plantuml-executable-path "${pkgs.plantuml}/bin/plantuml")
 	      (setq org-plantuml-exec-mode 'plantuml))
 	    (add-to-list 'exec-path "${pkgs.graphviz}/bin")
+	    (use-package gnu-apl-mode
+	      :demand t)
+	    
+	    (add-hook 'dyalog-mode-hook
+	              (lambda () (set-input-method "APL-Z")))
 	    (add-hook 'org-mode-hook 'idiig/run-prog-mode-hooks)
 	    (defun idiig/load-org-babel-languages ()
 	      "根据 `idiig/language-list` 启用 `org-babel` 语言。"
@@ -2125,6 +2130,7 @@
             jsonian
             plantuml-mode
             dyalog-mode
+              gnu-apl-mode
             ob-nix
               ob-go
             org-bullets

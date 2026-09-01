@@ -2873,12 +2873,31 @@ lsp-bridge 默认把 =ess-r-mode= 映射到内置的 =rlanguageserver= 配置，
 *** Dyalog APL
 [[https://github.com/harsman/dyalog-mode][dyalog-mode]] 是给 Dyalog APL 用的 major mode，提供语法高亮和缩进，不需
 要额外的语言服务器或外部工具。
+
+Dyalog 官方的 APL 符号输入法（IME）只支持 Windows，所以这里借用
+[[https://github.com/lokedhs/gnu-apl-mode][gnu-apl-mode]] 里定义的 =APL-Z= quail 输入法来输入 APL 符号——它是纯
+Emacs 层面的按键映射，不需要真的装 GNU APL 解释器。
 **** 依赖
 :PROPERTIES:
 :header-args: :noweb-ref epkgs
 :END:
 #+begin_src nix
   dyalog-mode
+    gnu-apl-mode
+#+end_src
+**** 配置
+:PROPERTIES:
+:header-args: :noweb-ref ecfg
+:END:
+默认前缀键是 =.=（可自定义 =gnu-apl-key-prefix=），比如 =.i= 输入 =⍳=、=.r=
+输入 =⍴=，具体对应表在 =gnu-apl-symbols.el= 里。用 =C-\= 手动切换开关；这
+里额外在进入 =dyalog-mode= 时默认打开。
+#+begin_src emacs-lisp
+  (use-package gnu-apl-mode
+    :demand t)
+
+  (add-hook 'dyalog-mode-hook
+            (lambda () (set-input-method "APL-Z")))
 #+end_src
 ** Org相关配置
 *** Org本体
