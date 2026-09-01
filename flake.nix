@@ -1894,6 +1894,8 @@
 	      (agent-shell-header-style '2)
 	      :config
 	      (add-to-list 'exec-path "${pkgs.claude-agent-acp}/bin"))
+	    (use-package eca
+	      :commands (eca eca-transient-menu))
 	    (use-package meow
 	      :init
 	      ;; https://github.com/meow-edit/meow/blob/master/KEYBINDING_QWERTY.org
@@ -2141,6 +2143,7 @@
               gptel-fn-complete
               gptel-magit
             agent-shell
+            eca
             meow
               meow-tree-sitter
             ] ++ pkgs.lib.optionals (!pkgs.stdenv.hostPlatform.isDarwin) [

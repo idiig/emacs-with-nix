@@ -3765,6 +3765,27 @@ gptel 加载后启动，使用 grok-code-fast-1 模型，并在进入 magit-mode
     :config
     (add-to-list 'exec-path "${pkgs.claude-agent-acp}/bin"))
 #+end_src
+*** ECA
+[[https://github.com/editor-code-assistant/eca-emacs][eca-emacs]] 是 [[https://github.com/editor-code-assistant/eca][ECA (Editor Code Assistant)]] 的 Emacs 客户端，通过
+JSON-RPC 连接外部 =eca= server，提供聊天、代码补全、上下文管理等功能。
+**** 依赖
+:PROPERTIES:
+:header-args: :noweb-ref epkgs
+:END:
+#+begin_src nix
+  eca
+#+end_src
+**** 配置
+:PROPERTIES:
+:header-args: :noweb-ref ecfg
+:END:
+不设置 =eca-custom-command= 的话，会先找 =$PATH= 里现成的 =eca=，找不到就自
+动下载一份缓存到本地；=M-x eca= 启动。
+#+begin_src emacs-lisp
+  (use-package eca
+    :commands (eca eca-transient-menu))
+#+end_src
+
 
 ** 模态编辑 (=meow=)
 *** 依赖
