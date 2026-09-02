@@ -1914,11 +1914,15 @@
 	        (setq gptel-backend
 	              (gptel-make-gh-copilot "Copilot" :stream t))
 	    
-	        (defun idiig/gptel-gh-select-model (&optional backend)
+	        (defun idiig/gptel-gh-select-model ()
 	          "Prompt to pick a Copilot model from the live, entitled model
 	    list (queried from Copilot's /models endpoint), and set
-	    `gptel-model' to the selection.  BACKEND defaults to
-	    `gptel-backend'.
+	    `gptel-model' to the selection.  Rebuilds `gptel-backend' with
+	    just that live model list instead of mutating the existing
+	    struct in place (mutating via `setf' on a `cl-defstruct' slot
+	    needs that struct's setf-expander registered at compile time,
+	    which a lazily `:command'-loaded package like gptel usually
+	    isn't, so plain `gptel-make-gh-copilot' is used here instead).
 	    
 	    Unlike a hand-written or gptel's built-in static model list,
 	    this reflects what Copilot actually currently enables for this
@@ -1927,37 +1931,38 @@
 	    of gptel's `:config' (so `gptel-model' is never left at nil),
 	    and can be re-run any time with \\[idiig/gptel-gh-select-model]."
 	          (interactive)
-	          (let* ((backend (or backend gptel-backend))
-	                 (gptel-backend backend))
-	            (unless (gptel--gh-p backend)
-	              (user-error "Not a GitHub Copilot backend"))
-	            (gptel--gh-auth)
-	            (let* ((token (plist-get (gptel--gh-token backend) :token))
-	                   (url-request-method "GET")
-	                   (url-request-extra-headers
-	                    `(("Authorization" . ,(concat "Bearer " token))
-	                      ("openai-intent" . "conversation-panel")
-	                      ("copilot-integration-id" . "vscode-chat")
-	                      ("editor-version" . ,(concat "emacs/" emacs-version))))
-	                   (url (concat (gptel-backend-protocol backend) "://"
-	                                (gptel-backend-host backend) "/models"))
-	                   (buf (url-retrieve-synchronously url t t 10)))
-	              (unless buf (user-error "Failed to reach Copilot /models endpoint"))
-	              (unwind-protect
-	                  (with-current-buffer buf
-	                    (goto-char (point-min))
-	                    (re-search-forward "^$" nil t)
-	                    (let* ((data (json-parse-buffer :object-type 'plist :array-type 'list))
-	                           (enabled (seq-filter
-	                                     (lambda (m) (eq (plist-get m :model_picker_enabled) t))
-	                                     (plist-get data :data)))
-	                           (ids (mapcar (lambda (m) (plist-get m :id)) enabled))
-	                           (choice (completing-read "Copilot model: " ids nil t)))
-	                      (setf (gptel-backend-models backend)
-	                            (gptel--process-models (mapcar #'intern ids)))
-	                      (setq gptel-model (intern choice))
-	                      (message "gptel-model -> %s" choice)))
-	                (kill-buffer buf)))))
+	          (unless (gptel--gh-p gptel-backend)
+	            (user-error "Not a GitHub Copilot backend"))
+	          (gptel--gh-auth)
+	          (let* ((backend gptel-backend)
+	                 (token (plist-get (gptel--gh-token backend) :token))
+	                 (url-request-method "GET")
+	                 (url-request-extra-headers
+	                  `(("Authorization" . ,(concat "Bearer " token))
+	                    ("openai-intent" . "conversation-panel")
+	                    ("copilot-integration-id" . "vscode-chat")
+	                    ("editor-version" . ,(concat "emacs/" emacs-version))))
+	                 (url (concat (gptel-backend-protocol backend) "://"
+	                              (gptel-backend-host backend) "/models"))
+	                 (buf (url-retrieve-synchronously url t t 10)))
+	            (unless buf (user-error "Failed to reach Copilot /models endpoint"))
+	            (unwind-protect
+	                (with-current-buffer buf
+	                  (goto-char (point-min))
+	                  (re-search-forward "^$" nil t)
+	                  (let* ((data (json-parse-buffer :object-type 'plist :array-type 'list))
+	                         (enabled (seq-filter
+	                                   (lambda (m) (eq (plist-get m :model_picker_enabled) t))
+	                                   (plist-get data :data)))
+	                         (ids (mapcar (lambda (m) (plist-get m :id)) enabled))
+	                         (choice (completing-read "Copilot model: " ids nil t)))
+	                    (setq gptel-backend
+	                          (gptel-make-gh-copilot (gptel-backend-name backend)
+	                                                 :stream t
+	                                                 :models (mapcar #'intern ids)))
+	                    (setq gptel-model (intern choice))
+	                    (message "gptel-model -> %s" choice)))
+	              (kill-buffer buf))))
 	    
 	        (idiig/gptel-gh-select-model))
 	    (use-package gptel-magit
