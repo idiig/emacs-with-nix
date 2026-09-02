@@ -1040,6 +1040,15 @@
 	            (setq idiig/sops-required-keys
 	                  (append idiig/sops-required-keys (list entry))))))
 	    
+	      (defvar idiig/sops-todo-prefix "TODO: "
+	        "Prefix `idiig/sops-fill-missing-keys' writes on placeholder values.
+	      A value starting with this prefix is a non-empty string, so a naive
+	      \"is this key present\" check would treat it as a real secret and
+	      happily hand it to whatever's asking.  `idiig/get-sops-secret-value'
+	      and `idiig/sops-key-present-p' both special-case this prefix so a
+	      forgotten placeholder fails loudly instead of silently being used as
+	      if it were real.")
+	    
 	      (defun idiig/get-sops-secret-value	 (key &optional path)
 	        "Get secret value from SOPS-encrypted file.
 	      KEY is the key to lookup in the YAML file.
@@ -1060,15 +1069,23 @@
 	      			(format "${pkgs.sops}/bin/sops -d %s | ${pkgs.yq-go}/bin/yq -r '.%s'"
 	      				(shell-quote-argument secrets-file)
 	      				key)))))
-	                (if (or (string-empty-p result)
-	                        (string= result "null"))
-	                    (error "Key '%s' not found in %s" key secrets-file)
-	                  result))
+	                (cond
+	                 ((or (string-empty-p result) (string= result "null"))
+	                  (error (concat "Key '%s' not found in %s.  "
+	                                 "Run M-x idiig/sops-secrets-setup to fill in "
+	                                 "a placeholder for it, then replace the "
+	                                 "placeholder with a real value")
+	                         key secrets-file))
+	                 ((string-prefix-p idiig/sops-todo-prefix result)
+	                  (error "Key '%s' in %s still has a placeholder value: %s"
+	                         key secrets-file result))
+	                 (t result)))
 	            (error "Secrets file not found: %s.  Run M-x idiig/sops-secrets-setup to bootstrap it"
 	                   secrets-file))))
 	    
 	      (defun idiig/sops-key-present-p (key secrets-file)
-	        "Non-nil if KEY already has a non-null value in SECRETS-FILE.
+	        "Non-nil if KEY already has a real value in SECRETS-FILE -- not
+	    missing, and not still an `idiig/sops-todo-prefix' placeholder.
 	    Returns nil (rather than erroring, unlike `idiig/get-sops-secret-value')
 	    when SECRETS-FILE doesn't exist yet, since that just means every key
 	    is \"missing\"."
@@ -1080,7 +1097,9 @@
 	                             (shell-command-to-string
 	      			(format "${pkgs.sops}/bin/sops -d %s | ${pkgs.yq-go}/bin/yq -r '.%s'"
 	      				(shell-quote-argument secrets-file) key)))))
-	               (not (or (string-empty-p result) (string= result "null"))))))
+	               (not (or (string-empty-p result)
+	                        (string= result "null")
+	                        (string-prefix-p idiig/sops-todo-prefix result))))))
 	    
 	      (defun idiig/sops-fill-missing-keys (secrets-file)
 	        "Ensure every key in `idiig/sops-required-keys' exists in
@@ -1101,7 +1120,7 @@
 	                (unless (zerop (call-process
 	                                 "${pkgs.sops}/bin/sops" nil nil nil
 	                                 "set" secrets-file (format "[\"%s\"]" (car entry))
-	                                 (json-encode-string (format "TODO: %s" (cdr entry)))))
+	                                 (json-encode-string (format "%s%s" idiig/sops-todo-prefix (cdr entry)))))
 	                  (error "idiig/sops-fill-missing-keys: `sops set' failed for %s"
 	                         (car entry))))
 	            ;; File doesn't exist yet: sops can't `set' into nothing, so seed a
@@ -1110,7 +1129,7 @@
 	              (with-temp-file secrets-file
 	                (dolist (entry missing)
 	                  (insert (format "%s: %s\n" (car entry)
-	                                   (json-encode-string (format "TODO: %s" (cdr entry)))))))
+	                                   (json-encode-string (format "%s%s" idiig/sops-todo-prefix (cdr entry)))))))
 	              (unless (zerop (call-process "${pkgs.sops}/bin/sops" nil nil nil
 	                                            "--encrypt" "--in-place" secrets-file))
 	                (error "idiig/sops-fill-missing-keys: `sops --encrypt --in-place' failed on %s"
@@ -1180,12 +1199,16 @@
 	    (defun idiig/davmail-ensure-config ()
 	      "Regenerate `idiig/davmail-properties-file'.
 	    No secret lives in this file: Office 365 auth happens through the
-	    O365Interactive browser popup, and davmail caches the refresh token
-	    itself, so it is safe to always overwrite this file."
+	    O365DeviceCode flow (the only interactive mode that works with
+	    davmail.server=true / headless mode -- O365Interactive needs a GUI
+	    browser popup and fails outright under headless with \"O365Interactive
+	    not supported in headless mode\", confirmed against a real davmail
+	    log), and davmail caches the refresh token itself, so it is safe to
+	    always overwrite this file."
 	      (with-temp-file idiig/davmail-properties-file
 	        (insert "davmail.server=true\n")
 	        (insert "davmail.mode=O365EWS\n")
-	        (insert "davmail.authentication=O365Interactive\n")
+	        (insert "davmail.authentication=O365DeviceCode\n")
 	        (insert "davmail.url=https://outlook.office365.com/EWS/Exchange.asmx\n")
 	        (insert (format "davmail.imapPort=%d\n" idiig/davmail-imap-port))
 	        (insert (format "davmail.smtpPort=%d\n" idiig/davmail-smtp-port))
@@ -1209,8 +1232,9 @@
 	    (defun idiig/davmail-ensure-running ()
 	      "Start the davmail gateway unless it is already running.
 	    The first IMAP/SMTP connection after startup triggers davmail's
-	    O365Interactive browser login; later connections reuse the cached
-	    refresh token, so this does not prompt again every time."
+	    O365DeviceCode flow -- watch the *davmail* process buffer for a URL
+	    and a short code to enter in any browser.  Later connections reuse
+	    the cached refresh token, so this does not prompt again every time."
 	      (unless (idiig/davmail-running-p)
 	        (idiig/davmail-ensure-config)
 	        (start-process idiig/davmail-process-name "*davmail*"
@@ -1278,32 +1302,39 @@
 	       ("mail_gmail_app_password" . "Gmail App Password (Google Account -> Security -> 2-Step Verification -> App passwords; needs 2FA enabled)")
 	       ("mail_hotmail_user" . "Hotmail/Outlook.com full address, used for both login and From")
 	       ("mail_hotmail_local_password" . "Arbitrary local password for the davmail IMAP/SMTP handshake -- NOT your real Microsoft password")))
-	    (with-eval-after-load 'wl
-	      (setq wl-folders-file (expand-file-name ".folders" idiig/mail-directory)))
+	      (with-eval-after-load 'wl
+	        (setq wl-folders-file (expand-file-name ".folders" idiig/mail-directory)))
 	    
-	    (defun idiig/mail-account-folder-line (account)
-	      "One `wl-folders-file' line for ACCOUNT, an entry of `idiig/mail-accounts'."
-	      (let* ((plist (cdr account))
-	             (user (idiig/get-sops-secret-value (plist-get plist :login-key)))
-	             (tls (plist-get plist :imap-tls)))
-	        (format "  %%INBOX:%s%s@%s:%d%s \"%s\"\n"
-	                user
-	                (if tls "/clear" "")
-	                (plist-get plist :imap-host)
-	                (plist-get plist :imap-port)
-	                (if tls "!" "")
-	                (plist-get plist :petname))))
+	      (defun idiig/mail-account-folder-line (account)
+	        "One `wl-folders-file' line for ACCOUNT, an entry of `idiig/mail-accounts'.
+	    Quotes the username: elmo's folder-spec grammar is
+	    USER@HOST:PORT, and Gmail/Hotmail logins are themselves full
+	    email addresses containing an @, which is ambiguous unless
+	    quoted (confirmed against a real connection log: unquoted
+	    \"chewingguno@gmail.com/clear@imap.gmail.com:993!\" mis-parses
+	    and elmo can't connect at all -- SDF's bare \"idg\" username has
+	    no @, which is why only SDF worked)."
+	        (let* ((plist (cdr account))
+	               (user (idiig/get-sops-secret-value (plist-get plist :login-key)))
+	               (tls (plist-get plist :imap-tls)))
+	          (format "  %%INBOX:\"%s\"%s@%s:%d%s \"%s\"\n"
+	                  user
+	                  (if tls "/clear" "")
+	                  (plist-get plist :imap-host)
+	                  (plist-get plist :imap-port)
+	                  (if tls "!" "")
+	                  (plist-get plist :petname))))
 	    
-	    (defun idiig/mail-folders-setup ()
-	      "Bootstrap `wl-folders-file' from `idiig/mail-accounts' if it does
-	    not exist yet.  Only runs once: after that this is a normal dotfile
-	    the user is free to edit by hand (add sub-folders, rename petnames,
-	    reorder, ...) without it being clobbered on the next Emacs start."
-	      (interactive)
-	      (unless (file-exists-p wl-folders-file)
-	        (with-temp-file wl-folders-file
-	          (dolist (account idiig/mail-accounts)
-	            (insert (idiig/mail-account-folder-line account))))))
+	      (defun idiig/mail-folders-setup ()
+	        "Bootstrap `wl-folders-file' from `idiig/mail-accounts' if it does
+	      not exist yet.  Only runs once: after that this is a normal dotfile
+	      the user is free to edit by hand (add sub-folders, rename petnames,
+	      reorder, ...) without it being clobbered on the next Emacs start."
+	        (interactive)
+	        (unless (file-exists-p wl-folders-file)
+	          (with-temp-file wl-folders-file
+	            (dolist (account idiig/mail-accounts)
+	              (insert (idiig/mail-account-folder-line account))))))
 	    (with-eval-after-load 'wl
 	      (setq elmo-passwd-storage-type 'auth-source))
 	    
@@ -1428,12 +1459,14 @@
 	      :after wl
 	      :config
 	      (bbdb-insinuate-wl))
-	    (defun idiig/wl-bootstrap ()
+	    (defun idiig/wl-bootstrap (&rest _args)
 	      "Prepare everything Wanderlust needs before opening: start the
 	    davmail gateway, bootstrap `wl-folders-file' and the signature file
 	    if missing, and warm the auth-source password cache.  Runs before
-	    every `wl' call via advice; each step no-ops once already done, so
-	    repeating this on every call is cheap."
+	    every `wl' call via :before advice, which passes through whatever
+	    arguments `wl' was called with (an optional prefix arg) -- ARGS
+	    absorbs those since this function doesn't need them.  Each step
+	    no-ops once already done, so repeating this on every call is cheap."
 	      (idiig/davmail-ensure-running)
 	      (idiig/mail-folders-setup)
 	      (idiig/mail-signature-setup)
