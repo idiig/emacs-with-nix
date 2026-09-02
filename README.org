@@ -1976,6 +1976,26 @@ minibuffer的检索]]。
     "Path to the sops creation-rules file that grants `idiig/sops-age-key-file'
 access to `idiig/sops-secrets-file'.")
 
+  (defvar idiig/sops-required-keys nil
+    "Alist of (KEY . DESCRIPTION) for every sops key some feature in this
+  config reads via `idiig/get-sops-secret-value'.  Features register
+  their own keys with `idiig/sops-register-keys' next to wherever they
+  define what the key is for, instead of this list being maintained by
+  hand in one place.  `idiig/sops-secrets-setup' uses this to pre-fill
+  any key that's still missing with a placeholder describing what
+  belongs there, so opening the file for editing shows exactly what's
+  left to fill in instead of the user having to remember key names.")
+
+  (defun idiig/sops-register-keys (alist)
+    "Register ALIST, a list of (KEY . DESCRIPTION) pairs, onto
+  `idiig/sops-required-keys'.  Keys already registered are left alone
+  (first registration wins), so this is safe to call unconditionally
+  at load time."
+    (dolist (entry alist)
+      (unless (assoc (car entry) idiig/sops-required-keys)
+        (setq idiig/sops-required-keys
+              (append idiig/sops-required-keys (list entry))))))
+
   (defun idiig/get-sops-secret-value	 (key &optional path)
     "Get secret value from SOPS-encrypted file.
   KEY is the key to lookup in the YAML file.
@@ -2003,14 +2023,63 @@ access to `idiig/sops-secrets-file'.")
         (error "Secrets file not found: %s.  Run M-x idiig/sops-secrets-setup to bootstrap it"
                secrets-file))))
 
+  (defun idiig/sops-key-present-p (key secrets-file)
+    "Non-nil if KEY already has a non-null value in SECRETS-FILE.
+Returns nil (rather than erroring, unlike `idiig/get-sops-secret-value')
+when SECRETS-FILE doesn't exist yet, since that just means every key
+is \"missing\"."
+    (and (file-exists-p secrets-file)
+         (let* ((process-environment
+                 (cons (format "SOPS_AGE_KEY_FILE=%s" idiig/sops-age-key-file)
+                       process-environment))
+                (result (string-trim
+                         (shell-command-to-string
+  			(format "${pkgs.sops}/bin/sops -d %s | ${pkgs.yq-go}/bin/yq -r '.%s'"
+  				(shell-quote-argument secrets-file) key)))))
+           (not (or (string-empty-p result) (string= result "null"))))))
+
+  (defun idiig/sops-fill-missing-keys (secrets-file)
+    "Ensure every key in `idiig/sops-required-keys' exists in
+SECRETS-FILE, filling any that's missing with a placeholder that
+embeds its description -- so opening the file for editing shows
+exactly what still needs a real value instead of just a bare key.
+Never touches a key that already has a value; assumes SOPS_AGE_KEY_FILE
+and default-directory are already set up correctly by the caller."
+    (require 'json)
+    (let ((missing (seq-remove (lambda (entry)
+                                  (idiig/sops-key-present-p (car entry) secrets-file))
+                                idiig/sops-required-keys)))
+      (if (file-exists-p secrets-file)
+          ;; File already exists: patch in only the keys that are missing,
+          ;; one `sops set' per key, so nothing the user already filled in
+          ;; gets touched.
+          (dolist (entry missing)
+            (unless (zerop (call-process
+                             "${pkgs.sops}/bin/sops" nil nil nil
+                             "set" secrets-file (format "[\"%s\"]" (car entry))
+                             (json-encode-string (format "TODO: %s" (cdr entry)))))
+              (error "idiig/sops-fill-missing-keys: `sops set' failed for %s"
+                     (car entry))))
+        ;; File doesn't exist yet: sops can't `set' into nothing, so seed a
+        ;; plaintext file with every required key and encrypt it in place.
+        (when missing
+          (with-temp-file secrets-file
+            (dolist (entry missing)
+              (insert (format "%s: %s\n" (car entry)
+                               (json-encode-string (format "TODO: %s" (cdr entry)))))))
+          (unless (zerop (call-process "${pkgs.sops}/bin/sops" nil nil nil
+                                        "--encrypt" "--in-place" secrets-file))
+            (error "idiig/sops-fill-missing-keys: `sops --encrypt --in-place' failed on %s"
+                   secrets-file))))))
+
   (defun idiig/sops-secrets-setup (&optional path)
     "Bootstrap the SOPS-encrypted secrets file used by `idiig/get-sops-secret-value'.
 PATH defaults to `idiig/sops-secrets-file'.
 
 Generates an age key at `idiig/sops-age-key-file' if missing, writes a
-matching `idiig/sops-config-file' creation rule if missing, then opens
-PATH with sops for interactive editing (sops creates it from a starter
-template the first time)."
+matching `idiig/sops-config-file' creation rule if missing, fills in
+placeholders for any key in `idiig/sops-required-keys' that's still
+missing, then opens PATH with sops for interactive editing."
     (interactive)
     (let* ((secrets-file (expand-file-name (or path idiig/sops-secrets-file)))
            (age-key-file idiig/sops-age-key-file)
@@ -2053,10 +2122,18 @@ template the first time)."
       (let ((default-directory (file-name-directory secrets-file))
             (process-environment
              (cons (format "SOPS_AGE_KEY_FILE=%s" age-key-file) process-environment)))
+        (idiig/sops-fill-missing-keys secrets-file)
         (with-editor-async-shell-command (format "${pkgs.sops}/bin/sops %s"
                                                    (shell-quote-argument secrets-file))))))
 #+end_src
 ** 邮件
+3 个账号：SDF（用户名密码）、Gmail（App Password）、Hotmail/Outlook.com
+（基础认证已被微软下线，走 =davmail= 网关把 OAuth2 转成本地
+IMAP/SMTP）。账号的用户名/密码都存在 SOPS 里，通过
+[[*密钥管理 (=sops=)][=idiig/get-sops-secret-value=]] 读取，配置文件
+本身不出现明文。本地文件（消息缓存、签名、订阅列表）都放在
+=~/mails/= 下面，不做跨机器 git 同步——IMAP 账号天然以服务器为准，
+本地缓存每台机器各自建即可。
 *** 依赖
 :PROPERTIES:
 :header-args: :noweb-ref epkgs
@@ -2064,36 +2141,387 @@ template the first time)."
 #+begin_src nix
   wanderlust
 #+end_src
-*** TODO 配置
+*** 外部依赖
+:PROPERTIES:
+:header-args: :noweb-ref deps
+:END:
+- =davmail= ：本地网关，把 Outlook.com/Hotmail 要求的 OAuth2 认证转换
+  成普通的本地 IMAP/SMTP，这样 Wanderlust 完全不用感知 OAuth2
+#+begin_src nix
+  davmail
+#+end_src
+*** 配置
 :PROPERTIES:
 :header-args: :noweb-ref ecfg
 :END:
-账号相关的敏感信息（用户名、密码等）不直接写死在这份配置里，参照
-[[*密钥管理 (=sops=)][=idiig/get-sops-secret-value=]] 从 SOPS 加密的
-=~/.config/secrets.yaml= 中按需读取。
-**** TODO 入口与启动
-- 设 =mail-user-agent= 为 =wl-user-agent=，让 =C-x m= 走 Wanderlust 撰写
-  邮件
-- =use-package wl :commands (wl wl-draft)= 惰性加载，避免拖慢启动
-**** TODO 收发服务器 (IMAP / SMTP)
-- 收信：=elmo-imap4-default-server= / =-user= / =-authenticate-type= /
-  =-port= / =-stream-type=
-- 发信：=wl-smtp-posting-server= / =-posting-port= /
-  =-authenticate-type= / =-connection-type=
-- 用户名、密码通过 =idiig/get-sops-secret-value= 从 =secrets.yaml=
-  读取，配置文件里不出现明文
-**** TODO 本地目录与订阅 folders
-- =elmo-localdir-folder-path= 指定本地缓存/归档根目录（默认
-  =~/Mail=）
-- =wl-folders-file=（默认 =~/.folders=）用 elmo 的前缀语法订阅文件
-  夹，如 =%inbox= 表示 IMAP，=+inbox= 表示本地 MH 目录
-- 是否要把 =~/.folders= 也纳入这份 Nix 配置一起管理，多机同步时再
-  决定
-**** TODO 签名与外观
-- =wl-signature-file-name= 指定签名文件
-- =wl-stay-folder-window= / =wl-folder-window-width= 控制目录树的显
-  示与宽度
-- =wl-summary-weekday-name-lang= 等摘要显示细节
+下面按依赖顺序拆成几节，=davmail= 网关要放在最前面，因为「账号」那
+一节的 Hotmail 条目要引用它的本地端口。
+
+**** Outlook (=davmail= 网关)
+生成 =davmail.properties=（=davmail.server=true= + =O365EWS= +
+=O365Interactive=，无需写入任何密钥——真正的登录是浏览器弹窗完成
+的，token 由 davmail 自己缓存），然后用 =start-process= 拉起来，作为
+独立后台服务持续跑，不随 Emacs 退出而结束——重新拉起一个 JVM 有启动
+开销，没道理绑定 Emacs 的生命周期。因此「是否已经在跑」不能看 Emacs
+自己的进程列表（那样只能看到当前会话起的进程，看不到上一次会话留下
+的，会导致重复启动、抢同一个端口），而是直接探测
+=idiig/davmail-imap-port= 端口有没有被占用。本地监听端口用
+=idiig/davmail-imap-port= / =idiig/davmail-smtp-port=（默认
+1143 / 1025，和 davmail 自带默认值一致）两个 defvar 记录，供下面
+「账号」那节的 Hotmail 条目引用。
+
+*注意*：davmail 本地 IMAP/SMTP 那端到底要不要一个「像样」的密码、还
+是随便什么字符串都行，官方 FAQ 没写清楚——这个等第一次实际连接时再
+确认，先按需要一个值来处理（存一个和真实 Microsoft 密码无关的
+=mail_hotmail_local_password=）。
+#+begin_src emacs-lisp
+  ;; Local davmail listener ports; `idiig/mail-accounts' (below) points
+  ;; its Hotmail entry at these instead of duplicating the numbers.
+  (defvar idiig/davmail-imap-port 1143)
+  (defvar idiig/davmail-smtp-port 1025)
+  (defvar idiig/davmail-properties-file
+    (expand-file-name "~/.config/davmail.properties"))
+  (defvar idiig/davmail-process-name "davmail")
+
+  (defun idiig/davmail-ensure-config ()
+    "Regenerate `idiig/davmail-properties-file'.
+  No secret lives in this file: Office 365 auth happens through the
+  O365Interactive browser popup, and davmail caches the refresh token
+  itself, so it is safe to always overwrite this file."
+    (with-temp-file idiig/davmail-properties-file
+      (insert "davmail.server=true\n")
+      (insert "davmail.mode=O365EWS\n")
+      (insert "davmail.authentication=O365Interactive\n")
+      (insert "davmail.url=https://outlook.office365.com/EWS/Exchange.asmx\n")
+      (insert (format "davmail.imapPort=%d\n" idiig/davmail-imap-port))
+      (insert (format "davmail.smtpPort=%d\n" idiig/davmail-smtp-port))
+      ;; Only accept connections from this machine.
+      (insert "davmail.allowRemote=false\n")
+      (insert "davmail.disableUpdateCheck=true\n")))
+
+  (defun idiig/davmail-running-p ()
+    "Return non-nil if something already listens on `idiig/davmail-imap-port'.
+  Probed by TCP connection rather than the Emacs process list: davmail
+  is meant to outlive any single Emacs session, so a process-list check
+  would miss an instance a previous session left running and try to
+  start a second one competing for the same port."
+    (let ((probe (ignore-errors
+                   (open-network-stream "davmail-probe" nil
+                                        "localhost" idiig/davmail-imap-port))))
+      (when probe
+        (delete-process probe)
+        t)))
+
+  (defun idiig/davmail-ensure-running ()
+    "Start the davmail gateway unless it is already running.
+  The first IMAP/SMTP connection after startup triggers davmail's
+  O365Interactive browser login; later connections reuse the cached
+  refresh token, so this does not prompt again every time."
+    (unless (idiig/davmail-running-p)
+      (idiig/davmail-ensure-config)
+      (start-process idiig/davmail-process-name "*davmail*"
+                      "${pkgs.davmail}/bin/davmail" idiig/davmail-properties-file)))
+#+end_src
+
+**** 账号与本地目录
+=idiig/mail-directory= （ =~/mails/= ）统一存放本地状态，
+=elmo-localdir-folder-path= / =elmo-msgdb-directory= 都指过去。核心是
+一张 =idiig/mail-accounts= 数据表，每个账号一条：IMAP/SMTP 的
+host/port、走不走 TLS、sops 里登录用户名/密码/显示地址对应的 key、
+以及后面用来识别账号的 folder 匹配正则。下面几节（订阅 folders、密
+码、身份切换）都从这张表生成，不重复写 3 遍账号信息。
+
+SDF 的登录用户名和邮件地址不是同一个字符串（ =user= vs
+=user@sdf.org= ），所以表里 =:login-key= （登录用）和 =:from-key=
+（ =From= 头用）分开两个 sops key；Gmail/Hotmail 这两个值相同，直接
+复用同一个 key。Hotmail 条目的端口直接引用上一节的
+=idiig/davmail-imap-port= / =idiig/davmail-smtp-port=，不重复写常量。
+#+begin_src emacs-lisp
+  (defvar idiig/mail-directory (expand-file-name "~/mails/")
+    "Local root for all Wanderlust state: message cache, signature file,
+  folder subscription list.  Deliberately not synced across machines via
+  git -- IMAP is the source of truth, so each machine just rebuilds its
+  own local cache from the server.")
+
+  (unless (file-directory-p idiig/mail-directory)
+    (make-directory idiig/mail-directory t))
+
+  (with-eval-after-load 'wl
+    (setq elmo-localdir-folder-path idiig/mail-directory)
+    (setq elmo-msgdb-directory (expand-file-name ".elmo" idiig/mail-directory)))
+
+  (defvar idiig/mail-accounts
+    `((sdf
+       :petname "SDF"
+       :imap-host "mx.sdf.org" :imap-port 993 :imap-tls t
+       :smtp-host "mx.sdf.org" :smtp-port 587 :smtp-connection-type starttls
+       :login-key "mail_sdf_user" :from-key "mail_sdf_address"
+       :password-key "mail_sdf_password"
+       :folder-match "@mx\\.sdf\\.org")
+      (gmail
+       :petname "Gmail"
+       :imap-host "imap.gmail.com" :imap-port 993 :imap-tls t
+       :smtp-host "smtp.gmail.com" :smtp-port 587 :smtp-connection-type starttls
+       :login-key "mail_gmail_user" :from-key "mail_gmail_user"
+       :password-key "mail_gmail_app_password"
+       :folder-match "@imap\\.gmail\\.com")
+      (hotmail
+       :petname "Hotmail"
+       :imap-host "localhost" :imap-port ,idiig/davmail-imap-port :imap-tls nil
+       :smtp-host "localhost" :smtp-port ,idiig/davmail-smtp-port
+       :smtp-connection-type nil
+       :login-key "mail_hotmail_user" :from-key "mail_hotmail_user"
+       :password-key "mail_hotmail_local_password"
+       :folder-match "@localhost"))
+    "The 3 mail accounts this config manages: SDF, Gmail, Hotmail.
+  Each entry is (NAME . PLIST); every other section below (folders
+  file, auth-source bridge, wl-draft-config-alist) reads this table
+  instead of repeating the same host/port/key info three times.
+
+  :login-key and :from-key point at sops keys (see
+  `idiig/get-sops-secret-value').  They differ for SDF, whose IMAP
+  login is a bare username while the From address needs the full
+  \"user@sdf.org\" form; for Gmail/Hotmail the login name already is
+  the address, so both keys point at the same sops entry.")
+
+  (idiig/sops-register-keys
+   '(("mail_sdf_user" . "SDF IMAP/SMTP login username, no @domain")
+     ("mail_sdf_password" . "SDF password")
+     ("mail_sdf_address" . "SDF full email address, e.g. user@sdf.org")
+     ("mail_gmail_user" . "Gmail full address, used for both login and From")
+     ("mail_gmail_app_password" . "Gmail App Password (Google Account -> Security -> 2-Step Verification -> App passwords; needs 2FA enabled)")
+     ("mail_hotmail_user" . "Hotmail/Outlook.com full address, used for both login and From")
+     ("mail_hotmail_local_password" . "Arbitrary local password for the davmail IMAP/SMTP handshake -- NOT your real Microsoft password")))
+#+end_src
+
+**** 订阅 folders
+从 =idiig/mail-accounts= 生成 =wl-folders-file= （放在
+=~/mails/.folders= ）的内容，每个账号一行，用 elmo 的
+=%INBOX:user/clear@host:port!= 语法把连接信息整个编码进 folder 名里
+（SDF、Gmail 走 TLS 加 =/clear@...!= ，Hotmail 走本地 davmail 不需要
+TLS 后缀）。只在文件不存在时写一次，写完之后就是用户自己维护的文件
+（加子文件夹、改名随意），不会被覆盖。
+#+begin_src emacs-lisp
+  (with-eval-after-load 'wl
+    (setq wl-folders-file (expand-file-name ".folders" idiig/mail-directory)))
+
+  (defun idiig/mail-account-folder-line (account)
+    "One `wl-folders-file' line for ACCOUNT, an entry of `idiig/mail-accounts'."
+    (let* ((plist (cdr account))
+           (user (idiig/get-sops-secret-value (plist-get plist :login-key)))
+           (tls (plist-get plist :imap-tls)))
+      (format "  %%INBOX:%s%s@%s:%d%s \"%s\"\n"
+              user
+              (if tls "/clear" "")
+              (plist-get plist :imap-host)
+              (plist-get plist :imap-port)
+              (if tls "!" "")
+              (plist-get plist :petname))))
+
+  (defun idiig/mail-folders-setup ()
+    "Bootstrap `wl-folders-file' from `idiig/mail-accounts' if it does
+  not exist yet.  Only runs once: after that this is a normal dotfile
+  the user is free to edit by hand (add sub-folders, rename petnames,
+  reorder, ...) without it being clobbered on the next Emacs start."
+    (interactive)
+    (unless (file-exists-p wl-folders-file)
+      (with-temp-file wl-folders-file
+        (dolist (account idiig/mail-accounts)
+          (insert (idiig/mail-account-folder-line account))))))
+#+end_src
+
+**** 密码 (=auth-source= 桥接)
+Wanderlust 的密码存取（=elmo-passwd.el=）支持把
+=elmo-passwd-storage-type= 设成 ='auth-source= ，这样它会用标准的
+=auth-source-search :host :port :user= 去查——已经对着 elmo 源码确认
+过这个调用形式，也对着 =auth-source.el= 源码确认过 =auth-sources=
+是每次 =auth-source-search= 调用时现查现解析的，没有额外的、动态绑定
+影响不到的缓存。做法是运行期生成一个 0600 权限的临时 netrc 文件（内
+容来自 sops），塞进 =auth-sources= ，对 3 个账号的 IMAP/SMTP 各查一次
+把结果传给 auth-source 自己的缓存，然后立刻删除临时文件——明文密码
+只在磁盘上停留很短时间。
+
+=auth-source-search= 自己会按 host/port/user 缓存查询结果，所以这个
+"预热"函数只需要在本次 Emacs 会话里成功跑过一次；用一个 =idiig/=
+变量记一下，避免每次打开 =wl= 都重新解密 6 次 sops key、重新写一遍临
+时文件。
+#+begin_src emacs-lisp
+  (with-eval-after-load 'wl
+    (setq elmo-passwd-storage-type 'auth-source))
+
+  (defun idiig/mail-account-netrc-lines (account)
+    "netrc lines for ACCOUNT's IMAP and SMTP credentials, read from sops."
+    (let* ((plist (cdr account))
+           (user (idiig/get-sops-secret-value (plist-get plist :login-key)))
+           (password (idiig/get-sops-secret-value (plist-get plist :password-key))))
+      (list (format "machine %s login %s port %d password %s\n"
+                    (plist-get plist :imap-host) user
+                    (plist-get plist :imap-port) password)
+            (format "machine %s login %s port %d password %s\n"
+                    (plist-get plist :smtp-host) user
+                    (plist-get plist :smtp-port) password))))
+
+  (defvar idiig/mail-auth-source-warmed nil
+    "Non-nil once `idiig/mail-auth-source-warm-cache' has populated
+  auth-source's in-memory cache for this Emacs session.")
+
+  (defun idiig/mail-auth-source-warm-cache ()
+    "Feed `idiig/mail-accounts' IMAP/SMTP credentials into auth-source.
+  `elmo-passwd-storage-type' is `auth-source', so elmo looks up passwords
+  via `auth-source-search' keyed by :host/:port/:user (see
+  `elmo-passwd-get' in elmo-passwd.el).  Bridge that to sops by writing
+  a short-lived 0600 netrc file, letting auth-source read and cache one
+  search per account/protocol, then deleting the file -- plaintext
+  only touches disk for as long as that takes.
+
+  Only runs once per session: `auth-source-search' caches its own
+  results by (host port user), so calling this again would just cost 6
+  more sops subprocess calls for no benefit."
+    (unless idiig/mail-auth-source-warmed
+      (require 'auth-source)
+      (let ((netrc-file (make-temp-file "wl-authinfo-")))
+        (unwind-protect
+            (progn
+              (set-file-modes netrc-file #o600)
+              (with-temp-file netrc-file
+                (dolist (account idiig/mail-accounts)
+                  (dolist (line (idiig/mail-account-netrc-lines account))
+                    (insert line))))
+              (let ((auth-sources (cons netrc-file auth-sources)))
+                (dolist (account idiig/mail-accounts)
+                  (let* ((plist (cdr account))
+                         (user (idiig/get-sops-secret-value
+                                (plist-get plist :login-key))))
+                    (auth-source-search :host (plist-get plist :imap-host)
+                                         :port (number-to-string
+                                                (plist-get plist :imap-port))
+                                         :user user :require '(:secret) :create t)
+                    (auth-source-search :host (plist-get plist :smtp-host)
+                                         :port (number-to-string
+                                                (plist-get plist :smtp-port))
+                                         :user user :require '(:secret) :create t)))))
+          (delete-file netrc-file)))
+      (setq idiig/mail-auth-source-warmed t)))
+#+end_src
+
+**** 身份切换（多账号 From / SMTP）
+=wl-draft-config-alist= 的官方语法是「条件 + (header-or-var . value)
+列表」，条件可以是 =(string-match REGEXP wl-draft-parent-folder)= ——
+=wl-draft-parent-folder= 是撰写邮件时所在的 folder 名，而 folder 名本
+身就带了 host（因为上面 folders 那节把连接信息编进了 folder 名），
+所以直接拿账号表里的 host 生成匹配正则即可，不需要额外维护一份"这
+个 folder 属于哪个账号"的映射。命中后覆盖 ="From"= 以及
+=wl-smtp-posting-server/-port/-user/-authenticate-type/-connection-type=。
+从 =idiig/mail-accounts= 循环生成 3 条，不手写。
+
+对着 =wl-draft.el= 源码确认过一个细节：条件和 value 都是 *没被求值
+的* Lisp form，Wanderlust 自己在真正撰写邮件、命中某条规则时才会
+=eval= 它们（官方手册的示例也是直接 =quote= 一整个 alist，不是
+反引号拼值）。所以生成这张表的时候，="From"= /
+=wl-smtp-posting-user= 对应的值故意保留成
+=(idiig/get-sops-secret-value ...)= 这样的字面 form，而不是在构造表
+的时候就求值成字符串——sops 密钥要留到真正写信那一刻才解密，不用在
+=wl-draft-config-alist= 一 setq 的时候就全部解开。反引号只用来把账号
+表里的 host/port 这些*非密钥*字段拼进去。
+#+begin_src emacs-lisp
+  (defun idiig/mail-account-draft-config (account)
+    "One `wl-draft-config-alist' entry for ACCOUNT.
+  The condition and the sops-backed values are left as unevaluated Lisp
+  forms on purpose: `wl-draft-config-exec' evals them itself, only when
+  a draft actually matches, so secrets stay encrypted until the moment
+  a message is really being composed."
+    (let ((plist (cdr account)))
+      `((string-match ,(plist-get plist :folder-match) wl-draft-parent-folder)
+        ("From" . (idiig/get-sops-secret-value ,(plist-get plist :from-key)))
+        (wl-smtp-posting-server . ,(plist-get plist :smtp-host))
+        (wl-smtp-posting-port . ,(plist-get plist :smtp-port))
+        (wl-smtp-posting-user
+         . (idiig/get-sops-secret-value ,(plist-get plist :login-key)))
+        (wl-smtp-authenticate-type . "plain")
+        (wl-smtp-connection-type . ,(plist-get plist :smtp-connection-type)))))
+
+  (with-eval-after-load 'wl
+    (setq wl-draft-config-alist
+          (mapcar #'idiig/mail-account-draft-config idiig/mail-accounts)))
+#+end_src
+
+**** 签名与外观
+=~/mails/.signature= 不存在时写一个占位符 (=-- \n=)，指给 Emacs 内
+置的 =mail-signature-file= （*不是* =wl-signature-file-name= ——我一开
+始猜错了变量名，已经对着 wanderlust 源码确认过 Wanderlust 自己没定
+义这个变量，实际走的是 =insert-signature= 用到的 Emacs 内置变量）。
+
+签名不自动插入——没设 =mail-signature= 也没挂 hook 强制插入，纯粹是
+按需的：Wanderlust 默认把 =wl-draft-insert-signature= 挂在菜单栏/工
+具栏，但没给快捷键，这里补一个 =C-c C-w= （跟 Gnus message-mode 插入
+签名的默认键一致），写信时想带就按一下，不按就不带。
+
+外观只加一条：常驻显示 folder 面板 (=wl-stay-folder-window=)，3 个
+账号切来切去的时候不用每次都重新展开。
+#+begin_src emacs-lisp
+  (defvar idiig/mail-signature-file
+    (expand-file-name ".signature" idiig/mail-directory))
+
+  (defun idiig/mail-signature-setup ()
+    "Write a minimal placeholder at `idiig/mail-signature-file' if it
+  doesn't exist yet.  Only runs once: the real content is the user's to
+  edit by hand afterwards."
+    (interactive)
+    (unless (file-exists-p idiig/mail-signature-file)
+      (with-temp-file idiig/mail-signature-file
+        (insert "-- \n"))))
+
+  (setq mail-signature-file idiig/mail-signature-file)
+
+  (with-eval-after-load 'wl
+    (setq wl-stay-folder-window t)
+    (define-key wl-draft-mode-map (kbd "C-c C-w") #'wl-draft-insert-signature))
+#+end_src
+
+**** 入口与启动
+=use-package wl= 用 =:commands (wl wl-draft wl-user-agent-compose)=
+惰性加载；=:init= 里按官方手册（=doc/wl.texi= ）的写法设
+=mail-user-agent= + =define-mail-user-agent=，让 =C-x m= 能唤出
+Wanderlust——单独设 =mail-user-agent= 没用，必须配合
+=define-mail-user-agent= 把 =wl-user-agent= 这个符号真正注册进去。
+=:config= 结尾用 =advice-add 'wl :before= 挂一个 =idiig/wl-bootstrap=，
+每次打开 =wl= 之前把前面几节的 setup 函数（davmail、folders、签名、
+auth-source 缓存）都跑一遍——各自都是幂等操作，重复跑无副作用。
+#+begin_src emacs-lisp
+  (defun idiig/wl-bootstrap ()
+    "Prepare everything Wanderlust needs before opening: start the
+  davmail gateway, bootstrap `wl-folders-file' and the signature file
+  if missing, and warm the auth-source password cache.  Runs before
+  every `wl' call via advice; each step no-ops once already done, so
+  repeating this on every call is cheap."
+    (idiig/davmail-ensure-running)
+    (idiig/mail-folders-setup)
+    (idiig/mail-signature-setup)
+    (idiig/mail-auth-source-warm-cache))
+
+  (use-package wl
+    :commands (wl wl-draft wl-user-agent-compose)
+    :init
+    (setq mail-user-agent 'wl-user-agent)
+    (define-mail-user-agent 'wl-user-agent
+      'wl-user-agent-compose 'wl-draft-send 'wl-draft-kill 'mail-send-hook)
+    :config
+    (advice-add 'wl :before #'idiig/wl-bootstrap))
+#+end_src
+
+*** 待办：填 secrets.yaml
+代码部分到此写完了，实际能用之前还差一步：跑
+=M-x idiig/sops-secrets-setup=。7 个 key（=mail_sdf_user=、
+=mail_sdf_password=、=mail_sdf_address=、=mail_gmail_user=、
+=mail_gmail_app_password=、=mail_hotmail_user=、
+=mail_hotmail_local_password= ）已经在「账号与本地目录」那节通过
+=idiig/sops-register-keys= 注册过，缺失的会被自动填上
+=TODO: <说明>= 占位符再打开编辑器，不用凭记忆手打 key 名或去翻这份
+文件找说明。
+
+Hotmail 那个账号第一次真正连接（第一次 =wl= 打开 Hotmail 的 folder）
+时，davmail 会弹浏览器窗口走 Microsoft 的 OAuth2 登录，跟上面这些
+sops key 无关，是单独的一次性步骤。
 ** 文档写作
 :PROPERTIES:
 :header-args: :noweb-ref ecfg
@@ -3768,6 +4196,9 @@ method=notifications/cancelled, params=(:requestId 0 :reason McpError:
 MCP error -32001: Request timed out)
 
 #+begin_src emacs-lisp
+  (idiig/sops-register-keys
+   '(("gh_pat_mcp" . "GitHub Personal Access Token for the MCP github server")))
+
   (use-package mcp
     :after gptel
     :custom
