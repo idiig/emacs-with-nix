@@ -1939,6 +1939,123 @@ minibuffer的检索]]。
               (executable-find "nushell")
               (executable-find "bash"))))
 #+end_src
+** 密钥管理 (=sops=)
+从 SOPS 加密的 YAML 文件中安全地获取密钥值，避免把 API tokens、密码等
+敏感信息明文写死在这份配置里。任何需要密钥的功能（AI 相关的 MCP、邮
+件账号等）都复用这里的 =idiig/get-sops-secret-value=。
+*** 依赖
+:PROPERTIES:
+:header-args: :noweb-ref epkgs
+:END:
+- =with-editor= ：让 =sops= 调用的 =$EDITOR= 转发回当前 Emacs 里编辑，而不是
+  弹一个独立终端
+#+begin_src nix
+  with-editor
+#+end_src
+*** 外部依赖
+:PROPERTIES:
+:header-args: :noweb-ref deps
+:END:
+#+begin_src nix
+  sops
+  	yq-go
+  	age
+#+end_src
+*** 配置
+:PROPERTIES:
+:header-args: :noweb-ref ecfg
+:END:
+#+begin_src emacs-lisp
+  (defvar idiig/sops-secrets-file (expand-file-name "~/.config/secrets.yaml")
+    "Default path to the SOPS-encrypted secrets file.")
+
+  (defvar idiig/sops-age-key-file (expand-file-name "~/.config/sops/age/keys.txt")
+    "Path to the age private key used to decrypt `idiig/sops-secrets-file'.")
+
+  (defvar idiig/sops-config-file (expand-file-name "~/.config/.sops.yaml")
+    "Path to the sops creation-rules file that grants `idiig/sops-age-key-file'
+access to `idiig/sops-secrets-file'.")
+
+  (defun idiig/get-sops-secret-value	 (key &optional path)
+    "Get secret value from SOPS-encrypted file.
+  KEY is the key to lookup in the YAML file.
+  PATH is the path to the secrets file, defaulting to `idiig/sops-secrets-file'.
+
+  If the secrets file doesn't exist, display a helpful message with setup instructions."
+    (let ((secrets-file (expand-file-name (or path idiig/sops-secrets-file)))
+          ;; sops has no implicit "check ~/.config/sops/age/" fallback of its
+          ;; own; without this it only looks at $SOPS_AGE_KEY_FILE, $SOPS_AGE_KEY,
+          ;; $SOPS_AGE_KEY_CMD or the default SSH key, and decryption fails
+          ;; with "no identity matched any of the recipients".
+          (process-environment
+           (cons (format "SOPS_AGE_KEY_FILE=%s" idiig/sops-age-key-file)
+                 process-environment)))
+      (if (file-exists-p secrets-file)
+          (let ((result (string-trim
+                         (shell-command-to-string
+  			(format "${pkgs.sops}/bin/sops -d %s | ${pkgs.yq-go}/bin/yq -r '.%s'"
+  				(shell-quote-argument secrets-file)
+  				key)))))
+            (if (or (string-empty-p result)
+                    (string= result "null"))
+                (error "Key '%s' not found in %s" key secrets-file)
+              result))
+        (error "Secrets file not found: %s.  Run M-x idiig/sops-secrets-setup to bootstrap it"
+               secrets-file))))
+
+  (defun idiig/sops-secrets-setup (&optional path)
+    "Bootstrap the SOPS-encrypted secrets file used by `idiig/get-sops-secret-value'.
+PATH defaults to `idiig/sops-secrets-file'.
+
+Generates an age key at `idiig/sops-age-key-file' if missing, writes a
+matching `idiig/sops-config-file' creation rule if missing, then opens
+PATH with sops for interactive editing (sops creates it from a starter
+template the first time)."
+    (interactive)
+    (let* ((secrets-file (expand-file-name (or path idiig/sops-secrets-file)))
+           (age-key-file idiig/sops-age-key-file)
+           (sops-config idiig/sops-config-file))
+      (unless (file-exists-p age-key-file)
+        (make-directory (file-name-directory age-key-file) t)
+        (unless (zerop (shell-command (format "${pkgs.age}/bin/age-keygen -o %s"
+                                               (shell-quote-argument age-key-file))))
+          (error "idiig/sops-secrets-setup: age-keygen failed, see *Shell Command Output*"))
+        (message "idiig/sops-secrets-setup: generated age key at %s" age-key-file))
+      (let ((public-key (string-trim
+                          (shell-command-to-string
+                           (format "grep 'public key:' %s | cut -d: -f2 | tr -d ' '"
+                                   (shell-quote-argument age-key-file))))))
+        (unless (string-prefix-p "age1" public-key)
+          (error "idiig/sops-secrets-setup: could not read an age public key from %s (got %S)"
+                 age-key-file public-key))
+        ;; (Re)write .sops.yaml whenever it doesn't already contain this key,
+        ;; so a stale or half-written config from a previous failed run gets
+        ;; healed instead of silently reused forever.
+        (unless (and (file-exists-p sops-config)
+                     (with-temp-buffer
+                       (insert-file-contents sops-config)
+                       (search-forward public-key nil t)))
+          (with-temp-file sops-config
+            (insert (format "creation_rules:\n  - path_regex: %s$\n    age: %s\n"
+                             (regexp-quote (file-name-nondirectory secrets-file))
+                             public-key)))
+          (message "idiig/sops-secrets-setup: wrote %s" sops-config)))
+      ;; sops shells out to $EDITOR for interactive editing; use `with-editor'
+      ;; (already pulled in by magit) so the edit happens in this Emacs
+      ;; instead of needing a separate terminal editor.
+      (require 'with-editor)
+      ;; sops looks for .sops.yaml by walking up from the *current working
+      ;; directory*, not from the target file's directory, so without this
+      ;; it fails with "config file not found" unless invoked from
+      ;; ~/.config already. Re-editing an existing file also needs to
+      ;; decrypt it first, which needs SOPS_AGE_KEY_FILE (see
+      ;; idiig/get-sops-secret-value for why sops won't find it on its own).
+      (let ((default-directory (file-name-directory secrets-file))
+            (process-environment
+             (cons (format "SOPS_AGE_KEY_FILE=%s" age-key-file) process-environment)))
+        (with-editor-async-shell-command (format "${pkgs.sops}/bin/sops %s"
+                                                   (shell-quote-argument secrets-file))))))
+#+end_src
 ** 邮件
 *** 依赖
 :PROPERTIES:
@@ -1948,6 +2065,35 @@ minibuffer的检索]]。
   wanderlust
 #+end_src
 *** TODO 配置
+:PROPERTIES:
+:header-args: :noweb-ref ecfg
+:END:
+账号相关的敏感信息（用户名、密码等）不直接写死在这份配置里，参照
+[[*密钥管理 (=sops=)][=idiig/get-sops-secret-value=]] 从 SOPS 加密的
+=~/.config/secrets.yaml= 中按需读取。
+**** TODO 入口与启动
+- 设 =mail-user-agent= 为 =wl-user-agent=，让 =C-x m= 走 Wanderlust 撰写
+  邮件
+- =use-package wl :commands (wl wl-draft)= 惰性加载，避免拖慢启动
+**** TODO 收发服务器 (IMAP / SMTP)
+- 收信：=elmo-imap4-default-server= / =-user= / =-authenticate-type= /
+  =-port= / =-stream-type=
+- 发信：=wl-smtp-posting-server= / =-posting-port= /
+  =-authenticate-type= / =-connection-type=
+- 用户名、密码通过 =idiig/get-sops-secret-value= 从 =secrets.yaml=
+  读取，配置文件里不出现明文
+**** TODO 本地目录与订阅 folders
+- =elmo-localdir-folder-path= 指定本地缓存/归档根目录（默认
+  =~/Mail=）
+- =wl-folders-file=（默认 =~/.folders=）用 elmo 的前缀语法订阅文件
+  夹，如 =%inbox= 表示 IMAP，=+inbox= 表示本地 MH 目录
+- 是否要把 =~/.folders= 也纳入这份 Nix 配置一起管理，多机同步时再
+  决定
+**** TODO 签名与外观
+- =wl-signature-file-name= 指定签名文件
+- =wl-stay-folder-window= / =wl-folder-window-width= 控制目录树的显
+  示与宽度
+- =wl-summary-weekday-name-lang= 等摘要显示细节
 ** 文档写作
 :PROPERTIES:
 :header-args: :noweb-ref ecfg
@@ -3572,113 +3718,6 @@ org-modeのHTMLエクスポート時にソースブロックのシンタック�
   org-modern
 #+end_src
 ** AI辅助功能
-*** API config
-**** 依赖
-:PROPERTIES:
-:header-args: :noweb-ref epkgs
-:END:
-- =with-editor= ：让 =sops= 调用的 =$EDITOR= 转发回当前 Emacs 里编辑，而不是
-  弹一个独立终端
-#+begin_src nix
-  with-editor
-#+end_src
-**** 外部依赖
-:PROPERTIES:
-:header-args: :noweb-ref deps
-:END:
-#+begin_src nix
-  sops
-  	yq-go
-  	age
-#+end_src
-**** 配置
-:PROPERTIES:
-:header-args: :noweb-ref ecfg
-:END:
-从 SOPS 加密的 YAML 文件中安全地获取密钥值。核心功能：从加密的配置文件
-中读取敏感信息（如 API tokens、密码等），避免在代码中硬编码明文密钥。
-#+begin_src emacs-lisp
-  (defun idiig/get-sops-secret-value	 (key &optional path)
-    "Get secret value from SOPS-encrypted file.
-  KEY is the key to lookup in the YAML file.
-  PATH is the path to the secrets file (default: ~/.config/secrets.yaml).
-
-  If the secrets file doesn't exist, display a helpful message with setup instructions."
-    (let ((secrets-file (expand-file-name (or path "~/.config/secrets.yaml")))
-          ;; sops has no implicit "check ~/.config/sops/age/" fallback of its
-          ;; own; without this it only looks at $SOPS_AGE_KEY_FILE, $SOPS_AGE_KEY,
-          ;; $SOPS_AGE_KEY_CMD or the default SSH key, and decryption fails
-          ;; with "no identity matched any of the recipients".
-          (process-environment
-           (cons (format "SOPS_AGE_KEY_FILE=%s"
-                         (expand-file-name "~/.config/sops/age/keys.txt"))
-                 process-environment)))
-      (if (file-exists-p secrets-file)
-          (let ((result (string-trim
-                         (shell-command-to-string
-  			(format "${pkgs.sops}/bin/sops -d %s | ${pkgs.yq-go}/bin/yq -r '.%s'"
-  				(shell-quote-argument secrets-file)
-  				key)))))
-            (if (or (string-empty-p result)
-                    (string= result "null"))
-                (error "Key '%s' not found in %s" key secrets-file)
-              result))
-        (error "Secrets file not found: %s.  Run M-x idiig/sops-secrets-setup to bootstrap it"
-               secrets-file))))
-
-  (defun idiig/sops-secrets-setup (&optional path)
-    "Bootstrap the SOPS-encrypted secrets file used by `idiig/get-sops-secret-value'.
-PATH defaults to ~/.config/secrets.yaml.
-
-Generates an age key under ~/.config/sops/age/keys.txt if missing,
-writes a matching ~/.config/.sops.yaml creation rule if missing, then
-opens PATH with sops for interactive editing (sops creates it from a
-starter template the first time)."
-    (interactive)
-    (let* ((secrets-file (expand-file-name (or path "~/.config/secrets.yaml")))
-           (age-key-file (expand-file-name "~/.config/sops/age/keys.txt"))
-           (sops-config (expand-file-name "~/.config/.sops.yaml")))
-      (unless (file-exists-p age-key-file)
-        (make-directory (file-name-directory age-key-file) t)
-        (unless (zerop (shell-command (format "${pkgs.age}/bin/age-keygen -o %s"
-                                               (shell-quote-argument age-key-file))))
-          (error "idiig/sops-secrets-setup: age-keygen failed, see *Shell Command Output*"))
-        (message "idiig/sops-secrets-setup: generated age key at %s" age-key-file))
-      (let ((public-key (string-trim
-                          (shell-command-to-string
-                           (format "grep 'public key:' %s | cut -d: -f2 | tr -d ' '"
-                                   (shell-quote-argument age-key-file))))))
-        (unless (string-prefix-p "age1" public-key)
-          (error "idiig/sops-secrets-setup: could not read an age public key from %s (got %S)"
-                 age-key-file public-key))
-        ;; (Re)write .sops.yaml whenever it doesn't already contain this key,
-        ;; so a stale or half-written config from a previous failed run gets
-        ;; healed instead of silently reused forever.
-        (unless (and (file-exists-p sops-config)
-                     (with-temp-buffer
-                       (insert-file-contents sops-config)
-                       (search-forward public-key nil t)))
-          (with-temp-file sops-config
-            (insert (format "creation_rules:\n  - path_regex: %s$\n    age: %s\n"
-                             (regexp-quote (file-name-nondirectory secrets-file))
-                             public-key)))
-          (message "idiig/sops-secrets-setup: wrote %s" sops-config)))
-      ;; sops shells out to $EDITOR for interactive editing; use `with-editor'
-      ;; (already pulled in by magit) so the edit happens in this Emacs
-      ;; instead of needing a separate terminal editor.
-      (require 'with-editor)
-      ;; sops looks for .sops.yaml by walking up from the *current working
-      ;; directory*, not from the target file's directory, so without this
-      ;; it fails with "config file not found" unless invoked from
-      ;; ~/.config already. Re-editing an existing file also needs to
-      ;; decrypt it first, which needs SOPS_AGE_KEY_FILE (see
-      ;; idiig/get-sops-secret-value for why sops won't find it on its own).
-      (let ((default-directory (file-name-directory secrets-file))
-            (process-environment
-             (cons (format "SOPS_AGE_KEY_FILE=%s" age-key-file) process-environment)))
-        (with-editor-async-shell-command (format "${pkgs.sops}/bin/sops %s"
-                                                   (shell-quote-argument secrets-file))))))
-#+end_src
 *** Copilot
 **** 依赖
 :PROPERTIES:

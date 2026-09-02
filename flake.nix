@@ -1010,6 +1010,95 @@
 	            (or (executable-find "zsh")
 	                (executable-find "nushell")
 	                (executable-find "bash"))))
+	      (defvar idiig/sops-secrets-file (expand-file-name "~/.config/secrets.yaml")
+	        "Default path to the SOPS-encrypted secrets file.")
+	    
+	      (defvar idiig/sops-age-key-file (expand-file-name "~/.config/sops/age/keys.txt")
+	        "Path to the age private key used to decrypt `idiig/sops-secrets-file'.")
+	    
+	      (defvar idiig/sops-config-file (expand-file-name "~/.config/.sops.yaml")
+	        "Path to the sops creation-rules file that grants `idiig/sops-age-key-file'
+	    access to `idiig/sops-secrets-file'.")
+	    
+	      (defun idiig/get-sops-secret-value	 (key &optional path)
+	        "Get secret value from SOPS-encrypted file.
+	      KEY is the key to lookup in the YAML file.
+	      PATH is the path to the secrets file, defaulting to `idiig/sops-secrets-file'.
+	    
+	      If the secrets file doesn't exist, display a helpful message with setup instructions."
+	        (let ((secrets-file (expand-file-name (or path idiig/sops-secrets-file)))
+	              ;; sops has no implicit "check ~/.config/sops/age/" fallback of its
+	              ;; own; without this it only looks at $SOPS_AGE_KEY_FILE, $SOPS_AGE_KEY,
+	              ;; $SOPS_AGE_KEY_CMD or the default SSH key, and decryption fails
+	              ;; with "no identity matched any of the recipients".
+	              (process-environment
+	               (cons (format "SOPS_AGE_KEY_FILE=%s" idiig/sops-age-key-file)
+	                     process-environment)))
+	          (if (file-exists-p secrets-file)
+	              (let ((result (string-trim
+	                             (shell-command-to-string
+	      			(format "${pkgs.sops}/bin/sops -d %s | ${pkgs.yq-go}/bin/yq -r '.%s'"
+	      				(shell-quote-argument secrets-file)
+	      				key)))))
+	                (if (or (string-empty-p result)
+	                        (string= result "null"))
+	                    (error "Key '%s' not found in %s" key secrets-file)
+	                  result))
+	            (error "Secrets file not found: %s.  Run M-x idiig/sops-secrets-setup to bootstrap it"
+	                   secrets-file))))
+	    
+	      (defun idiig/sops-secrets-setup (&optional path)
+	        "Bootstrap the SOPS-encrypted secrets file used by `idiig/get-sops-secret-value'.
+	    PATH defaults to `idiig/sops-secrets-file'.
+	    
+	    Generates an age key at `idiig/sops-age-key-file' if missing, writes a
+	    matching `idiig/sops-config-file' creation rule if missing, then opens
+	    PATH with sops for interactive editing (sops creates it from a starter
+	    template the first time)."
+	        (interactive)
+	        (let* ((secrets-file (expand-file-name (or path idiig/sops-secrets-file)))
+	               (age-key-file idiig/sops-age-key-file)
+	               (sops-config idiig/sops-config-file))
+	          (unless (file-exists-p age-key-file)
+	            (make-directory (file-name-directory age-key-file) t)
+	            (unless (zerop (shell-command (format "${pkgs.age}/bin/age-keygen -o %s"
+	                                                   (shell-quote-argument age-key-file))))
+	              (error "idiig/sops-secrets-setup: age-keygen failed, see *Shell Command Output*"))
+	            (message "idiig/sops-secrets-setup: generated age key at %s" age-key-file))
+	          (let ((public-key (string-trim
+	                              (shell-command-to-string
+	                               (format "grep 'public key:' %s | cut -d: -f2 | tr -d ' '"
+	                                       (shell-quote-argument age-key-file))))))
+	            (unless (string-prefix-p "age1" public-key)
+	              (error "idiig/sops-secrets-setup: could not read an age public key from %s (got %S)"
+	                     age-key-file public-key))
+	            ;; (Re)write .sops.yaml whenever it doesn't already contain this key,
+	            ;; so a stale or half-written config from a previous failed run gets
+	            ;; healed instead of silently reused forever.
+	            (unless (and (file-exists-p sops-config)
+	                         (with-temp-buffer
+	                           (insert-file-contents sops-config)
+	                           (search-forward public-key nil t)))
+	              (with-temp-file sops-config
+	                (insert (format "creation_rules:\n  - path_regex: %s$\n    age: %s\n"
+	                                 (regexp-quote (file-name-nondirectory secrets-file))
+	                                 public-key)))
+	              (message "idiig/sops-secrets-setup: wrote %s" sops-config)))
+	          ;; sops shells out to $EDITOR for interactive editing; use `with-editor'
+	          ;; (already pulled in by magit) so the edit happens in this Emacs
+	          ;; instead of needing a separate terminal editor.
+	          (require 'with-editor)
+	          ;; sops looks for .sops.yaml by walking up from the *current working
+	          ;; directory*, not from the target file's directory, so without this
+	          ;; it fails with "config file not found" unless invoked from
+	          ;; ~/.config already. Re-editing an existing file also needs to
+	          ;; decrypt it first, which needs SOPS_AGE_KEY_FILE (see
+	          ;; idiig/get-sops-secret-value for why sops won't find it on its own).
+	          (let ((default-directory (file-name-directory secrets-file))
+	                (process-environment
+	                 (cons (format "SOPS_AGE_KEY_FILE=%s" age-key-file) process-environment)))
+	            (with-editor-async-shell-command (format "${pkgs.sops}/bin/sops %s"
+	                                                       (shell-quote-argument secrets-file))))))
 	    (defvar idiig/writing-environment-list '("\\.org\\'"
 	                                             "\\.md\\'"
 	                                             "\\.qmd\\'"
@@ -1770,86 +1859,6 @@
 	      :commands (dslide-deck-develop dslide-deck-start)
 	      :custom
 	      (dslide-breadcrumb-separator " » "))
-	      (defun idiig/get-sops-secret-value	 (key &optional path)
-	        "Get secret value from SOPS-encrypted file.
-	      KEY is the key to lookup in the YAML file.
-	      PATH is the path to the secrets file (default: ~/.config/secrets.yaml).
-	    
-	      If the secrets file doesn't exist, display a helpful message with setup instructions."
-	        (let ((secrets-file (expand-file-name (or path "~/.config/secrets.yaml")))
-	              ;; sops has no implicit "check ~/.config/sops/age/" fallback of its
-	              ;; own; without this it only looks at $SOPS_AGE_KEY_FILE, $SOPS_AGE_KEY,
-	              ;; $SOPS_AGE_KEY_CMD or the default SSH key, and decryption fails
-	              ;; with "no identity matched any of the recipients".
-	              (process-environment
-	               (cons (format "SOPS_AGE_KEY_FILE=%s"
-	                             (expand-file-name "~/.config/sops/age/keys.txt"))
-	                     process-environment)))
-	          (if (file-exists-p secrets-file)
-	              (let ((result (string-trim
-	                             (shell-command-to-string
-	      			(format "${pkgs.sops}/bin/sops -d %s | ${pkgs.yq-go}/bin/yq -r '.%s'"
-	      				(shell-quote-argument secrets-file)
-	      				key)))))
-	                (if (or (string-empty-p result)
-	                        (string= result "null"))
-	                    (error "Key '%s' not found in %s" key secrets-file)
-	                  result))
-	            (error "Secrets file not found: %s.  Run M-x idiig/sops-secrets-setup to bootstrap it"
-	                   secrets-file))))
-	    
-	      (defun idiig/sops-secrets-setup (&optional path)
-	        "Bootstrap the SOPS-encrypted secrets file used by `idiig/get-sops-secret-value'.
-	    PATH defaults to ~/.config/secrets.yaml.
-	    
-	    Generates an age key under ~/.config/sops/age/keys.txt if missing,
-	    writes a matching ~/.config/.sops.yaml creation rule if missing, then
-	    opens PATH with sops for interactive editing (sops creates it from a
-	    starter template the first time)."
-	        (interactive)
-	        (let* ((secrets-file (expand-file-name (or path "~/.config/secrets.yaml")))
-	               (age-key-file (expand-file-name "~/.config/sops/age/keys.txt"))
-	               (sops-config (expand-file-name "~/.config/.sops.yaml")))
-	          (unless (file-exists-p age-key-file)
-	            (make-directory (file-name-directory age-key-file) t)
-	            (unless (zerop (shell-command (format "${pkgs.age}/bin/age-keygen -o %s"
-	                                                   (shell-quote-argument age-key-file))))
-	              (error "idiig/sops-secrets-setup: age-keygen failed, see *Shell Command Output*"))
-	            (message "idiig/sops-secrets-setup: generated age key at %s" age-key-file))
-	          (let ((public-key (string-trim
-	                              (shell-command-to-string
-	                               (format "grep 'public key:' %s | cut -d: -f2 | tr -d ' '"
-	                                       (shell-quote-argument age-key-file))))))
-	            (unless (string-prefix-p "age1" public-key)
-	              (error "idiig/sops-secrets-setup: could not read an age public key from %s (got %S)"
-	                     age-key-file public-key))
-	            ;; (Re)write .sops.yaml whenever it doesn't already contain this key,
-	            ;; so a stale or half-written config from a previous failed run gets
-	            ;; healed instead of silently reused forever.
-	            (unless (and (file-exists-p sops-config)
-	                         (with-temp-buffer
-	                           (insert-file-contents sops-config)
-	                           (search-forward public-key nil t)))
-	              (with-temp-file sops-config
-	                (insert (format "creation_rules:\n  - path_regex: %s$\n    age: %s\n"
-	                                 (regexp-quote (file-name-nondirectory secrets-file))
-	                                 public-key)))
-	              (message "idiig/sops-secrets-setup: wrote %s" sops-config)))
-	          ;; sops shells out to $EDITOR for interactive editing; use `with-editor'
-	          ;; (already pulled in by magit) so the edit happens in this Emacs
-	          ;; instead of needing a separate terminal editor.
-	          (require 'with-editor)
-	          ;; sops looks for .sops.yaml by walking up from the *current working
-	          ;; directory*, not from the target file's directory, so without this
-	          ;; it fails with "config file not found" unless invoked from
-	          ;; ~/.config already. Re-editing an existing file also needs to
-	          ;; decrypt it first, which needs SOPS_AGE_KEY_FILE (see
-	          ;; idiig/get-sops-secret-value for why sops won't find it on its own).
-	          (let ((default-directory (file-name-directory secrets-file))
-	                (process-environment
-	                 (cons (format "SOPS_AGE_KEY_FILE=%s" age-key-file) process-environment)))
-	            (with-editor-async-shell-command (format "${pkgs.sops}/bin/sops %s"
-	                                                       (shell-quote-argument secrets-file))))))
 	    (use-package copilot
 	      :config
 	      (define-key copilot-completion-map (kbd "<tab>") 'copilot-accept-completion)
@@ -2173,6 +2182,7 @@
               pyim-basedict
             magit
             tramp-rpc
+            with-editor
             wanderlust
             spacious-padding
               writeroom-mode
@@ -2218,7 +2228,6 @@
             org-present
             dslide
             org-modern
-            with-editor
             copilot
             mcp
             gptel
@@ -2238,6 +2247,9 @@
               fd
             cmigemo
             git
+            sops
+            	yq-go
+            	age
             universal-ctags
             direnv
             nixd
@@ -2255,9 +2267,6 @@
             vscode-langservers-extracted
             plantuml
             graphviz
-            sops
-            	yq-go
-            	age
             nodejs
               uv
               python313
