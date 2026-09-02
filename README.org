@@ -2284,7 +2284,7 @@ SDF 的登录用户名和邮件地址不是同一个字符串（ =user= vs
   own local cache from the server.")
 
   (unless (file-directory-p idiig/mail-directory)
-    (make-directory idiig/mail-directory t))
+    (make-directory idiig/mail-directory nil))
 
   (with-eval-after-load 'wl
     (setq elmo-localdir-folder-path idiig/mail-directory)
@@ -2348,7 +2348,7 @@ SDF 的登录用户名和邮件地址不是同一个字符串（ =user= vs
 =%INBOX:"user"/clear@host:port!= 语法把连接信息整个编码进 folder 名
 里（SDF、Gmail 走 TLS 加 =/clear@...!= ，Hotmail 走本地 davmail 不需
 要 TLS 后缀）。用户名一定要用双引号包起来——Gmail/Hotmail 的登录名本
-身就是完整邮箱地址，也带 =@=，跟分隔 user/host 的那个 =@= 撞在一起会
+身就是完整邮箱地址，也带 =@= ，跟分隔 user/host 的那个 =@= 撞在一起会
 解析错乱，实测（见下面 =idiig/mail-account-folder-line= 的 docstring）
 不加引号直接导致 elmo 连不上；SDF 的用户名没有 =@= 所以当时看不出问
 题。只在文件不存在时写一次，写完之后就是用户自己维护的文件（加子文
@@ -2471,27 +2471,27 @@ Wanderlust 的密码存取（=elmo-passwd.el=）支持把
 所以直接拿账号表里的 host 生成匹配正则即可，不需要额外维护一份"这
 个 folder 属于哪个账号"的映射。命中后覆盖 ="From"= 、
 =wl-smtp-posting-server/-port/-user/-authenticate-type/-connection-type=
-以及 =wl-local-domain=/=wl-message-id-domain=（避免生成的 Message-ID
+以及 =wl-local-domain=/=wl-message-id-domain= （避免生成的 Message-ID
 带出本机 hostname）。从 =idiig/mail-accounts= 循环生成 3 条，不手写。
 
 但 =wl-draft-parent-folder= 只有在从某个账号的 folder 里按 =w=
 回信/写信时才有值——直接 =C-x m= 撰写新邮件时它是 nil，上面 3 条规
 则一条都不会命中，From/SMTP 就没人设置。参照
 [[https://github.com/LdBeth/Emacs-for-Noobs/blob/master/WanderLust.org][这份参考文档]]
-的做法，把同一份 override 列表也生成一份 =wl-template-alist=，撰写
+的做法，把同一份 override 列表也生成一份 =wl-template-alist= ，撰写
 新邮件时按 =C-c C-j= （=wl-template-select=，Wanderlust 自带绑定）手
 动选一个账号，效果和自动匹配完全一样——两张表背后是同一个
 =idiig/mail-account-overrides= ，不用维护两份。
 
-对着 =wl-draft.el= 源码确认过一个细节：条件和 value 都是 *没被求值
-的* Lisp form，Wanderlust 自己在真正撰写邮件、命中某条规则（或者手
+对着 =wl-draft.el= 源码确认过一个细节：条件和 value 都是没被求值
+的 Lisp form，Wanderlust 自己在真正撰写邮件、命中某条规则（或者手
 动 =C-c C-j= 选模板）时才会 =eval= 它们（官方手册的示例也是直接
 =quote= 一整个 alist，不是反引号拼值）。所以生成这张表的时候，
 ="From"= / =wl-smtp-posting-user= 对应的值故意保留成
 =(idiig/get-sops-secret-value ...)= 这样的字面 form，而不是在构造表
 的时候就求值成字符串——sops 密钥要留到真正写信那一刻才解密，不用在
 =wl-draft-config-alist= 一 setq 的时候就全部解开。反引号只用来把账号
-表里的 host/port 这些*非密钥*字段拼进去。
+表里的 host/port 这些非密钥字段拼进去。
 #+begin_src emacs-lisp
   (defun idiig/mail-account-overrides (account)
     "The (FIELD . VALUE) override list for ACCOUNT, shared by

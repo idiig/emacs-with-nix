@@ -1246,7 +1246,7 @@
 	    own local cache from the server.")
 	    
 	    (unless (file-directory-p idiig/mail-directory)
-	      (make-directory idiig/mail-directory t))
+	      (make-directory idiig/mail-directory nil))
 	    
 	    (with-eval-after-load 'wl
 	      (setq elmo-localdir-folder-path idiig/mail-directory)

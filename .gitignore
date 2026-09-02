@@ -13,3 +13,4 @@ result/*
 /.emacs-lsp-paths
 *.org#
 /.agent-shell/
+/davmail.log
