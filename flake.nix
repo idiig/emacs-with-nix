@@ -1888,31 +1888,78 @@
 	      :hook
 	      (after-init . (lambda () (run-with-idle-timer 1 nil #'mcp-hub-get-all-tool)))
 	      (gptel-mode . gptel-mcp-connect))
-	    (use-package gptel
-	      :commands (gptel-mode
-	    	     gptel-chat
-	    	     gptel-complete
-	    	     gptel-menu
-	    	     gptel-fn-complete
-	    	     gptel-magit-install)
-	      :hook (org-mode . (lambda ()
-	                          (when (and buffer-file-name
-	                                     (string-match-p "\\.ai\\.org\\'" buffer-file-name))
-	                            (gptel-mode 1))))
-	      :custom
-	      (gptel-model 'claude-sonnet-4.5)
-	      (gptel-default-mode 'org-mode)
-	      (gptel-use-curl t)
-	      (gptel-use-tools t)
-	      (gptel-confirm-tool-calls 'always)
-	      (gptel-include-tool-results 'auto)
-	      :config
-	      (require 'gptel-integrations)
-	      (require 'gptel-org)
-	      (setq gptel--system-message
-	            (concat gptel--system-message " Make sure to use Chinese language. Note org-mode markup symbols need spaces with CJK characters including CJK symbols, such as ，。、「」 etc.."))
-	      (setq gptel-backend
-	            (gptel-make-gh-copilot "Copilot" :stream t)))
+	      (use-package gptel
+	        :commands (gptel-mode
+	      	     gptel-chat
+	      	     gptel-complete
+	      	     gptel-menu
+	      	     gptel-fn-complete
+	      	     gptel-magit-install)
+	        :hook (org-mode . (lambda ()
+	                            (when (and buffer-file-name
+	                                       (string-match-p "\\.ai\\.org\\'" buffer-file-name))
+	                              (gptel-mode 1))))
+	        :custom
+	        (gptel-default-mode 'org-mode)
+	        (gptel-use-curl t)
+	        (gptel-use-tools t)
+	        (gptel-confirm-tool-calls 'always)
+	        (gptel-include-tool-results 'auto)
+	        :config
+	        (require 'gptel-integrations)
+	        (require 'gptel-org)
+	        (require 'url)
+	        (setq gptel--system-message
+	              (concat gptel--system-message " Make sure to use Chinese language. Note org-mode markup symbols need spaces with CJK characters including CJK symbols, such as ，。、「」 etc.."))
+	        (setq gptel-backend
+	              (gptel-make-gh-copilot "Copilot" :stream t))
+	    
+	        (defun idiig/gptel-gh-select-model (&optional backend)
+	          "Prompt to pick a Copilot model from the live, entitled model
+	    list (queried from Copilot's /models endpoint), and set
+	    `gptel-model' to the selection.  BACKEND defaults to
+	    `gptel-backend'.
+	    
+	    Unlike a hand-written or gptel's built-in static model list,
+	    this reflects what Copilot actually currently enables for this
+	    account (`model_picker_enabled'), which drifts as Copilot
+	    renames/retires models.  Called once automatically at the end
+	    of gptel's `:config' (so `gptel-model' is never left at nil),
+	    and can be re-run any time with \\[idiig/gptel-gh-select-model]."
+	          (interactive)
+	          (let* ((backend (or backend gptel-backend))
+	                 (gptel-backend backend))
+	            (unless (gptel--gh-p backend)
+	              (user-error "Not a GitHub Copilot backend"))
+	            (gptel--gh-auth)
+	            (let* ((token (plist-get (gptel--gh-token backend) :token))
+	                   (url-request-method "GET")
+	                   (url-request-extra-headers
+	                    `(("Authorization" . ,(concat "Bearer " token))
+	                      ("openai-intent" . "conversation-panel")
+	                      ("copilot-integration-id" . "vscode-chat")
+	                      ("editor-version" . ,(concat "emacs/" emacs-version))))
+	                   (url (concat (gptel-backend-protocol backend) "://"
+	                                (gptel-backend-host backend) "/models"))
+	                   (buf (url-retrieve-synchronously url t t 10)))
+	              (unless buf (user-error "Failed to reach Copilot /models endpoint"))
+	              (unwind-protect
+	                  (with-current-buffer buf
+	                    (goto-char (point-min))
+	                    (re-search-forward "^$" nil t)
+	                    (let* ((data (json-parse-buffer :object-type 'plist :array-type 'list))
+	                           (enabled (seq-filter
+	                                     (lambda (m) (eq (plist-get m :model_picker_enabled) t))
+	                                     (plist-get data :data)))
+	                           (ids (mapcar (lambda (m) (plist-get m :id)) enabled))
+	                           (choice (completing-read "Copilot model: " ids nil t)))
+	                      (setf (gptel-backend-models backend)
+	                            (gptel--process-models (mapcar #'intern ids)))
+	                      (setq gptel-model (intern choice))
+	                      (message "gptel-model -> %s" choice)))
+	                (kill-buffer buf)))))
+	    
+	        (idiig/gptel-gh-select-model))
 	    (use-package gptel-magit
 	      :commands gptel-magit-generate-message
 	      :hook (magit-mode . gptel-magit-install))
