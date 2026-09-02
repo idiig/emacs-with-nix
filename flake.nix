@@ -372,7 +372,7 @@
 	                   (funcall fn))))))
 	    (use-package completion-preview
 	      :demand t
-	      :diminish t
+	      :diminish completion-preview-mode
 	      :bind
 	      ( :map completion-preview-active-mode-map
 	        ("M-i" . completion-preview-insert-word)
@@ -1776,11 +1776,19 @@
 	      PATH is the path to the secrets file (default: ~/.config/secrets.yaml).
 	    
 	      If the secrets file doesn't exist, display a helpful message with setup instructions."
-	        (let ((secrets-file (expand-file-name (or path "~/.config/secrets.yaml"))))
+	        (let ((secrets-file (expand-file-name (or path "~/.config/secrets.yaml")))
+	              ;; sops has no implicit "check ~/.config/sops/age/" fallback of its
+	              ;; own; without this it only looks at $SOPS_AGE_KEY_FILE, $SOPS_AGE_KEY,
+	              ;; $SOPS_AGE_KEY_CMD or the default SSH key, and decryption fails
+	              ;; with "no identity matched any of the recipients".
+	              (process-environment
+	               (cons (format "SOPS_AGE_KEY_FILE=%s"
+	                             (expand-file-name "~/.config/sops/age/keys.txt"))
+	                     process-environment)))
 	          (if (file-exists-p secrets-file)
 	              (let ((result (string-trim
 	                             (shell-command-to-string
-	      			(format "${pkgs.sops}/bin/sops -d %s | ${pkgs.yq-go}/bin/yq -r '.%s'" 
+	      			(format "${pkgs.sops}/bin/sops -d %s | ${pkgs.yq-go}/bin/yq -r '.%s'"
 	      				(shell-quote-argument secrets-file)
 	      				key)))))
 	                (if (or (string-empty-p result)
@@ -1834,8 +1842,12 @@
 	          ;; sops looks for .sops.yaml by walking up from the *current working
 	          ;; directory*, not from the target file's directory, so without this
 	          ;; it fails with "config file not found" unless invoked from
-	          ;; ~/.config already.
-	          (let ((default-directory (file-name-directory secrets-file)))
+	          ;; ~/.config already. Re-editing an existing file also needs to
+	          ;; decrypt it first, which needs SOPS_AGE_KEY_FILE (see
+	          ;; idiig/get-sops-secret-value for why sops won't find it on its own).
+	          (let ((default-directory (file-name-directory secrets-file))
+	                (process-environment
+	                 (cons (format "SOPS_AGE_KEY_FILE=%s" age-key-file) process-environment)))
 	            (with-editor-async-shell-command (format "${pkgs.sops}/bin/sops %s"
 	                                                       (shell-quote-argument secrets-file))))))
 	    (use-package copilot
@@ -1887,18 +1899,6 @@
 	                          (when (and buffer-file-name
 	                                     (string-match-p "\\.ai\\.org\\'" buffer-file-name))
 	                            (gptel-mode 1))))
-	      :init
-	      (defvar idiig/copilot-model-list
-	        '(gpt-5-codex
-	          claude-sonnet-4.5
-	          claude-sonnet-4
-	          claude-opus-4.1
-	          gpt-5-mini
-	          gpt-5
-	          grok-code-fast-1
-	          gemini-2.5-pro
-	          raptor-mini)
-	        "List of AI models available for Copilot.")
 	      :custom
 	      (gptel-model 'claude-sonnet-4.5)
 	      (gptel-default-mode 'org-mode)
@@ -1909,16 +1909,12 @@
 	      :config
 	      (require 'gptel-integrations)
 	      (require 'gptel-org)
-	      (setq gptel--system-message 
+	      (setq gptel--system-message
 	            (concat gptel--system-message " Make sure to use Chinese language. Note org-mode markup symbols need spaces with CJK characters including CJK symbols, such as ，。、「」 etc.."))
-	      (setq gptel-backend 
-	            (gptel-make-gh-copilot "Copilot"
-	                                   :stream t
-	                                   :models idiig/copilot-model-list)))
+	      (setq gptel-backend
+	            (gptel-make-gh-copilot "Copilot" :stream t)))
 	    (use-package gptel-magit
 	      :commands gptel-magit-generate-message
-	      :custom
-	      (gptel-magit-model 'grok-code-fast-1)
 	      :hook (magit-mode . gptel-magit-install))
 	    (use-package agent-shell
 	      :demand t

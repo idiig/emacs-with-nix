@@ -844,7 +844,7 @@ Emacs 30+ 自带的功能，输入时以浅色文字内联预览排在第一位�
 #+begin_src emacs-lisp
   (use-package completion-preview
     :demand t
-    :diminish t
+    :diminish completion-preview-mode
     :bind
     ( :map completion-preview-active-mode-map
       ("M-i" . completion-preview-insert-word)
@@ -3604,11 +3604,19 @@ org-modeのHTMLエクスポート時にソースブロックのシンタック�
   PATH is the path to the secrets file (default: ~/.config/secrets.yaml).
 
   If the secrets file doesn't exist, display a helpful message with setup instructions."
-    (let ((secrets-file (expand-file-name (or path "~/.config/secrets.yaml"))))
+    (let ((secrets-file (expand-file-name (or path "~/.config/secrets.yaml")))
+          ;; sops has no implicit "check ~/.config/sops/age/" fallback of its
+          ;; own; without this it only looks at $SOPS_AGE_KEY_FILE, $SOPS_AGE_KEY,
+          ;; $SOPS_AGE_KEY_CMD or the default SSH key, and decryption fails
+          ;; with "no identity matched any of the recipients".
+          (process-environment
+           (cons (format "SOPS_AGE_KEY_FILE=%s"
+                         (expand-file-name "~/.config/sops/age/keys.txt"))
+                 process-environment)))
       (if (file-exists-p secrets-file)
           (let ((result (string-trim
                          (shell-command-to-string
-  			(format "${pkgs.sops}/bin/sops -d %s | ${pkgs.yq-go}/bin/yq -r '.%s'" 
+  			(format "${pkgs.sops}/bin/sops -d %s | ${pkgs.yq-go}/bin/yq -r '.%s'"
   				(shell-quote-argument secrets-file)
   				key)))))
             (if (or (string-empty-p result)
@@ -3662,8 +3670,12 @@ starter template the first time)."
       ;; sops looks for .sops.yaml by walking up from the *current working
       ;; directory*, not from the target file's directory, so without this
       ;; it fails with "config file not found" unless invoked from
-      ;; ~/.config already.
-      (let ((default-directory (file-name-directory secrets-file)))
+      ;; ~/.config already. Re-editing an existing file also needs to
+      ;; decrypt it first, which needs SOPS_AGE_KEY_FILE (see
+      ;; idiig/get-sops-secret-value for why sops won't find it on its own).
+      (let ((default-directory (file-name-directory secrets-file))
+            (process-environment
+             (cons (format "SOPS_AGE_KEY_FILE=%s" age-key-file) process-environment)))
         (with-editor-async-shell-command (format "${pkgs.sops}/bin/sops %s"
                                                    (shell-quote-argument secrets-file))))))
 #+end_src
@@ -3765,11 +3777,12 @@ MCP error -32001: Request timed out)
 
 - =:commands= :: 声明延迟加载的命令，包括对话、补全、菜单等功能
 - =:hook= :: 自动为以 =.ai.org= 结尾的 org 文件启用 gptel-mode
-- =:init= :: 定义可用的 AI 模型列表，包括 GPT、Claude、Grok 等多个模型
 - =:custom= :: 设置默认使用 Claude Sonnet 4.5 模型，org-mode 作为默认模
   式，启用 curl 和工具调用功能
 - =:config= :: 加载集成模块，配置系统消息使用中文，设置后端为 GitHub
-  Copilot 并启用流式传输
+  Copilot 并启用流式传输。可用模型列表不再手动维护，交给
+  =gptel-make-gh-copilot= 的默认值（即 gptel 内置并随包更新的
+  =gptel--gh-models= ）
 
 #+begin_src emacs-lisp
   (use-package gptel
@@ -3783,18 +3796,6 @@ MCP error -32001: Request timed out)
                         (when (and buffer-file-name
                                    (string-match-p "\\.ai\\.org\\'" buffer-file-name))
                           (gptel-mode 1))))
-    :init
-    (defvar idiig/copilot-model-list
-      '(gpt-5-codex
-        claude-sonnet-4.5
-        claude-sonnet-4
-        claude-opus-4.1
-        gpt-5-mini
-        gpt-5
-        grok-code-fast-1
-        gemini-2.5-pro
-        raptor-mini)
-      "List of AI models available for Copilot.")
     :custom
     (gptel-model 'claude-sonnet-4.5)
     (gptel-default-mode 'org-mode)
@@ -3805,22 +3806,18 @@ MCP error -32001: Request timed out)
     :config
     (require 'gptel-integrations)
     (require 'gptel-org)
-    (setq gptel--system-message 
+    (setq gptel--system-message
           (concat gptel--system-message " Make sure to use Chinese language. Note org-mode markup symbols need spaces with CJK characters including CJK symbols, such as ，。、「」 etc.."))
-    (setq gptel-backend 
-          (gptel-make-gh-copilot "Copilot"
-                                 :stream t
-                                 :models idiig/copilot-model-list)))
+    (setq gptel-backend
+          (gptel-make-gh-copilot "Copilot" :stream t)))
 #+end_src
 ***** =magit= 统合
 这是一个 gptel-magit 的配置，用于在 Magit 中集成 AI 辅助功能。配置在
-gptel 加载后启动，使用 grok-code-fast-1 模型，并在进入 magit-mode 时自
+gptel 加载后启动，使用 gptel 的默认模型，并在进入 magit-mode 时自
 动安装相关功能。
 #+begin_src emacs-lisp
   (use-package gptel-magit
     :commands gptel-magit-generate-message
-    :custom
-    (gptel-magit-model 'grok-code-fast-1)
     :hook (magit-mode . gptel-magit-install))
 #+end_src
 *** Agent shell
@@ -3871,8 +3868,6 @@ JSON-RPC 连接外部 =eca= server，提供聊天、代码补全、上下文管�
   (use-package eca
     :commands (eca eca-transient-menu))
 #+end_src
-
-
 ** 模态编辑 (=meow=)
 *** 依赖
 :PROPERTIES:
