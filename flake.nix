@@ -1246,7 +1246,7 @@
 	    own local cache from the server.")
 	    
 	    (unless (file-directory-p idiig/mail-directory)
-	      (make-directory idiig/mail-directory nil))
+	      (make-directory idiig/mail-directory t))
 	    
 	    (with-eval-after-load 'wl
 	      (setq elmo-localdir-folder-path idiig/mail-directory)
@@ -1442,7 +1442,7 @@
 	    (setq mail-signature-file idiig/mail-signature-file)
 	    
 	    (with-eval-after-load 'wl
-	      (setq wl-stay-folder-window t)
+	      (setq wl-stay-folder-window nil)
 	      (define-key wl-draft-mode-map (kbd "C-c C-w") #'wl-draft-insert-signature)
 	      (setq wl-message-ignored-field-list '("."))
 	      (setq wl-message-visible-field-list

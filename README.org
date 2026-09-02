@@ -2179,8 +2179,6 @@ IMAP/SMTP）。账号的用户名/密码都存在 SOPS 里，通过
 :PROPERTIES:
 :header-args: :noweb-ref ecfg
 :END:
-下面按依赖顺序拆成几节，=davmail= 网关要放在最前面，因为「账号」那
-一节的 Hotmail 条目要引用它的本地端口。
 
 **** Outlook (=davmail= 网关)
 生成 =davmail.properties=（=davmail.server=true= + =O365EWS= +
@@ -2284,7 +2282,7 @@ SDF 的登录用户名和邮件地址不是同一个字符串（ =user= vs
   own local cache from the server.")
 
   (unless (file-directory-p idiig/mail-directory)
-    (make-directory idiig/mail-directory nil))
+    (make-directory idiig/mail-directory t))
 
   (with-eval-after-load 'wl
     (setq elmo-localdir-folder-path idiig/mail-directory)
@@ -2542,7 +2540,7 @@ Wanderlust 的密码存取（=elmo-passwd.el=）支持把
 具栏，但没给快捷键，这里补一个 =C-c C-w= （跟 Gnus message-mode 插入
 签名的默认键一致），写信时想带就按一下，不按就不带。
 
-外观加两条：常驻显示 folder 面板 (=wl-stay-folder-window=)，3 个账号
+外观加两条：不常驻显示 folder 面板 (=wl-stay-folder-window=)，3 个账号
 切来切去的时候不用每次都重新展开；阅读邮件时只显示常用的几个头
 (=wl-message-visible-field-list=)，其余（=Received=、各种
 =X-=、DKIM/SPF 相关头之类）用 =wl-message-ignored-field-list= 设成
@@ -2565,7 +2563,7 @@ Wanderlust 的密码存取（=elmo-passwd.el=）支持把
   (setq mail-signature-file idiig/mail-signature-file)
 
   (with-eval-after-load 'wl
-    (setq wl-stay-folder-window t)
+    (setq wl-stay-folder-window nil)
     (define-key wl-draft-mode-map (kbd "C-c C-w") #'wl-draft-insert-signature)
     (setq wl-message-ignored-field-list '("."))
     (setq wl-message-visible-field-list
