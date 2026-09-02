@@ -2138,8 +2138,14 @@ IMAP/SMTP）。账号的用户名/密码都存在 SOPS 里，通过
 :PROPERTIES:
 :header-args: :noweb-ref epkgs
 :END:
+- =org-mime= ：在 org-mode 里写邮件正文，转成 HTML 邮件发送
+- =bbdb= ：地址簿，撰写邮件时补全联系人，自带 =bbdb-wl.el= 桥接
+  Wanderlust，不用额外找 =lsdb=（参考文档用的 =lsdb= 没进
+  nixpkgs，=bbdb= 有）
 #+begin_src nix
   wanderlust
+  org-mime
+  bbdb
 #+end_src
 *** 外部依赖
 :PROPERTIES:
@@ -2257,14 +2263,16 @@ SDF 的登录用户名和邮件地址不是同一个字符串（ =user= vs
        :smtp-host "mx.sdf.org" :smtp-port 587 :smtp-connection-type starttls
        :login-key "mail_sdf_user" :from-key "mail_sdf_address"
        :password-key "mail_sdf_password"
-       :folder-match "@mx\\.sdf\\.org")
+       :folder-match "@mx\\.sdf\\.org"
+       :message-id-domain "sdf.org")
       (gmail
        :petname "Gmail"
        :imap-host "imap.gmail.com" :imap-port 993 :imap-tls t
        :smtp-host "smtp.gmail.com" :smtp-port 587 :smtp-connection-type starttls
        :login-key "mail_gmail_user" :from-key "mail_gmail_user"
        :password-key "mail_gmail_app_password"
-       :folder-match "@imap\\.gmail\\.com")
+       :folder-match "@imap\\.gmail\\.com"
+       :message-id-domain "gmail.com")
       (hotmail
        :petname "Hotmail"
        :imap-host "localhost" :imap-port ,idiig/davmail-imap-port :imap-tls nil
@@ -2272,17 +2280,23 @@ SDF 的登录用户名和邮件地址不是同一个字符串（ =user= vs
        :smtp-connection-type nil
        :login-key "mail_hotmail_user" :from-key "mail_hotmail_user"
        :password-key "mail_hotmail_local_password"
-       :folder-match "@localhost"))
+       :folder-match "@localhost"
+       :message-id-domain "outlook.com"))
     "The 3 mail accounts this config manages: SDF, Gmail, Hotmail.
   Each entry is (NAME . PLIST); every other section below (folders
-  file, auth-source bridge, wl-draft-config-alist) reads this table
-  instead of repeating the same host/port/key info three times.
+  file, auth-source bridge, wl-draft-config-alist/wl-template-alist)
+  reads this table instead of repeating the same host/port/key info
+  three times.
 
   :login-key and :from-key point at sops keys (see
   `idiig/get-sops-secret-value').  They differ for SDF, whose IMAP
   login is a bare username while the From address needs the full
   \"user@sdf.org\" form; for Gmail/Hotmail the login name already is
-  the address, so both keys point at the same sops entry.")
+  the address, so both keys point at the same sops entry.
+
+  :message-id-domain only affects the generated Message-ID header, not
+  routing, so it doesn't need to exactly match the From domain -- it's
+  there so outgoing mail doesn't leak this machine's hostname.")
 
   (idiig/sops-register-keys
    '(("mail_sdf_user" . "SDF IMAP/SMTP login username, no @domain")
@@ -2410,39 +2424,66 @@ Wanderlust 的密码存取（=elmo-passwd.el=）支持把
 =wl-draft-parent-folder= 是撰写邮件时所在的 folder 名，而 folder 名本
 身就带了 host（因为上面 folders 那节把连接信息编进了 folder 名），
 所以直接拿账号表里的 host 生成匹配正则即可，不需要额外维护一份"这
-个 folder 属于哪个账号"的映射。命中后覆盖 ="From"= 以及
-=wl-smtp-posting-server/-port/-user/-authenticate-type/-connection-type=。
-从 =idiig/mail-accounts= 循环生成 3 条，不手写。
+个 folder 属于哪个账号"的映射。命中后覆盖 ="From"= 、
+=wl-smtp-posting-server/-port/-user/-authenticate-type/-connection-type=
+以及 =wl-local-domain=/=wl-message-id-domain=（避免生成的 Message-ID
+带出本机 hostname）。从 =idiig/mail-accounts= 循环生成 3 条，不手写。
+
+但 =wl-draft-parent-folder= 只有在从某个账号的 folder 里按 =w=
+回信/写信时才有值——直接 =C-x m= 撰写新邮件时它是 nil，上面 3 条规
+则一条都不会命中，From/SMTP 就没人设置。参照
+[[https://github.com/LdBeth/Emacs-for-Noobs/blob/master/WanderLust.org][这份参考文档]]
+的做法，把同一份 override 列表也生成一份 =wl-template-alist=，撰写
+新邮件时按 =C-c C-j= （=wl-template-select=，Wanderlust 自带绑定）手
+动选一个账号，效果和自动匹配完全一样——两张表背后是同一个
+=idiig/mail-account-overrides= ，不用维护两份。
 
 对着 =wl-draft.el= 源码确认过一个细节：条件和 value 都是 *没被求值
-的* Lisp form，Wanderlust 自己在真正撰写邮件、命中某条规则时才会
-=eval= 它们（官方手册的示例也是直接 =quote= 一整个 alist，不是
-反引号拼值）。所以生成这张表的时候，="From"= /
-=wl-smtp-posting-user= 对应的值故意保留成
+的* Lisp form，Wanderlust 自己在真正撰写邮件、命中某条规则（或者手
+动 =C-c C-j= 选模板）时才会 =eval= 它们（官方手册的示例也是直接
+=quote= 一整个 alist，不是反引号拼值）。所以生成这张表的时候，
+="From"= / =wl-smtp-posting-user= 对应的值故意保留成
 =(idiig/get-sops-secret-value ...)= 这样的字面 form，而不是在构造表
 的时候就求值成字符串——sops 密钥要留到真正写信那一刻才解密，不用在
 =wl-draft-config-alist= 一 setq 的时候就全部解开。反引号只用来把账号
 表里的 host/port 这些*非密钥*字段拼进去。
 #+begin_src emacs-lisp
-  (defun idiig/mail-account-draft-config (account)
-    "One `wl-draft-config-alist' entry for ACCOUNT.
-  The condition and the sops-backed values are left as unevaluated Lisp
-  forms on purpose: `wl-draft-config-exec' evals them itself, only when
-  a draft actually matches, so secrets stay encrypted until the moment
-  a message is really being composed."
+  (defun idiig/mail-account-overrides (account)
+    "The (FIELD . VALUE) override list for ACCOUNT, shared by
+  `wl-draft-config-alist' (auto, matched by folder) and
+  `wl-template-alist' (manual, via `wl-template-select'/`C-c C-j').
+  The sops-backed values are left as unevaluated Lisp forms on purpose:
+  `wl-draft-config-exec' evals them itself, only when a draft actually
+  applies this entry, so secrets stay encrypted until the moment a
+  message is really being composed."
     (let ((plist (cdr account)))
-      `((string-match ,(plist-get plist :folder-match) wl-draft-parent-folder)
-        ("From" . (idiig/get-sops-secret-value ,(plist-get plist :from-key)))
+      `(("From" . (idiig/get-sops-secret-value ,(plist-get plist :from-key)))
         (wl-smtp-posting-server . ,(plist-get plist :smtp-host))
         (wl-smtp-posting-port . ,(plist-get plist :smtp-port))
         (wl-smtp-posting-user
          . (idiig/get-sops-secret-value ,(plist-get plist :login-key)))
         (wl-smtp-authenticate-type . "plain")
-        (wl-smtp-connection-type . ,(plist-get plist :smtp-connection-type)))))
+        (wl-smtp-connection-type . ,(plist-get plist :smtp-connection-type))
+        (wl-local-domain . ,(plist-get plist :message-id-domain))
+        (wl-message-id-domain . ,(plist-get plist :message-id-domain)))))
+
+  (defun idiig/mail-account-draft-config (account)
+    "One `wl-draft-config-alist' entry for ACCOUNT: matches by folder."
+    (cons `(string-match ,(plist-get (cdr account) :folder-match)
+                          wl-draft-parent-folder)
+          (idiig/mail-account-overrides account)))
+
+  (defun idiig/mail-account-template (account)
+    "One `wl-template-alist' entry for ACCOUNT, selectable by name via
+  `wl-template-select' (`C-c C-j')."
+    (cons (plist-get (cdr account) :petname)
+          (idiig/mail-account-overrides account)))
 
   (with-eval-after-load 'wl
     (setq wl-draft-config-alist
-          (mapcar #'idiig/mail-account-draft-config idiig/mail-accounts)))
+          (mapcar #'idiig/mail-account-draft-config idiig/mail-accounts))
+    (setq wl-template-alist
+          (mapcar #'idiig/mail-account-template idiig/mail-accounts)))
 #+end_src
 
 **** 签名与外观
@@ -2456,8 +2497,13 @@ Wanderlust 的密码存取（=elmo-passwd.el=）支持把
 具栏，但没给快捷键，这里补一个 =C-c C-w= （跟 Gnus message-mode 插入
 签名的默认键一致），写信时想带就按一下，不按就不带。
 
-外观只加一条：常驻显示 folder 面板 (=wl-stay-folder-window=)，3 个
-账号切来切去的时候不用每次都重新展开。
+外观加两条：常驻显示 folder 面板 (=wl-stay-folder-window=)，3 个账号
+切来切去的时候不用每次都重新展开；阅读邮件时只显示常用的几个头
+(=wl-message-visible-field-list=)，其余（=Received=、各种
+=X-=、DKIM/SPF 相关头之类）用 =wl-message-ignored-field-list= 设成
+匹配一切的正则 (="."=) 先全部隐藏，=visible= 里列的再放出来——这是
+=wl-message-ignored-field-list= 文档里写明的标准用法，=visible=
+优先于 =ignored=。
 #+begin_src emacs-lisp
   (defvar idiig/mail-signature-file
     (expand-file-name ".signature" idiig/mail-directory))
@@ -2475,9 +2521,58 @@ Wanderlust 的密码存取（=elmo-passwd.el=）支持把
 
   (with-eval-after-load 'wl
     (setq wl-stay-folder-window t)
-    (define-key wl-draft-mode-map (kbd "C-c C-w") #'wl-draft-insert-signature))
+    (define-key wl-draft-mode-map (kbd "C-c C-w") #'wl-draft-insert-signature)
+    (setq wl-message-ignored-field-list '("."))
+    (setq wl-message-visible-field-list
+          '("^\\(To\\|Cc\\):"
+            "^Subject:"
+            "^\\(From\\|Reply-To\\):"
+            "^Date:")))
 #+end_src
 
+**** HTML 邮件 (=org-mime=)
+在 org-mode 里写好邮件内容，=M-x org-mime-org-buffer-htmlize= 转成一
+封 HTML/纯文本双格式的邮件草稿。=org-mime-library= 要设成 ='semi=
+——这个变量控制 =org-mime= 生成 MIME 内容时用哪套底层框架，
+=org-mime.el= 源码里明确写着 ='semi= 就是给 Wanderlust/SEMI 这类老牌
+MUA 用的，默认值 ='mml= 是给 =message-mode= 用的，两者生成的 MIME
+标记格式不兼容。查过 =org-mime-compose= 的实现，它内部会调用
+=message-goto-body=/=message-goto-to= 这两个 Gnus 函数——名字上看着
+像绑死了 =message-mode=，但两者的函数体只是按 =mail-header-separator=
+文本查找位置，并不检查 =major-mode=，用在 =wl-draft-mode=（继承自
+=mail-mode=，用的是同一套 header-separator 约定）里没问题。
+#+begin_src emacs-lisp
+  (use-package org-mime
+    :commands (org-mime-org-buffer-htmlize)
+    :init
+    (setq org-mime-library 'semi))
+#+end_src
+**** PGP (=EasyPG=)
+Emacs 内置的 EasyPG（=epa=/=epg=）就能当 GPG 前端，不用额外装包。这
+里只加一条：把 =epa-pinentry-mode= 设成 ='loopback=，避免 GPG 想弹一
+个独立的 pinentry 对话框要密码、但 Emacs 场景下根本没有对应的 TTY/GUI
+上下文，导致操作卡住或报 =Inappropriate ioctl for device=。
+Wanderlust/SEMI 自己那套 MIME 菜单（=C-c C-x= 前缀）就能调用 GPG 签
+名/加密，具体到哪个子命令因为没有可靠的第一手资料就不在这里瞎写
+了，用得到时 =C-c C-x C-h= 看菜单最准。
+#+begin_src emacs-lisp
+  (setq epa-pinentry-mode 'loopback)
+#+end_src
+**** 地址簿 (=bbdb=)
+参考文档用的是 =lsdb=，但那个包没进 nixpkgs，=bbdb= 有而且更主流，
+两者定位一样。=bbdb= 自带 =bbdb-wl.el= 这个桥接文件（不用额外找第三
+方包），=bbdb-insinuate-wl= 是官方入口：在 =wl-summary-mode= 里给
+=:=/=;= 绑上查看/编辑发件人联系人，在 =wl-draft-mode= 里给
+=M-;=/=M-TAB= 绑上 =bbdb-complete-mail= 补全地址（跟参考文档里
+=lsdb-complete-name= 绑 =M-TAB= 是同一个思路，键位都不用改）。用
+=:after wl= 是因为 =bbdb-insinuate-wl= 要往 =wl-summary-mode-map=/
+=wl-draft-mode-map= 里插键，这两个 keymap 得等 wl 加载完才存在。
+#+begin_src emacs-lisp
+  (use-package bbdb
+    :after wl
+    :config
+    (bbdb-insinuate-wl))
+#+end_src
 **** 入口与启动
 =use-package wl= 用 =:commands (wl wl-draft wl-user-agent-compose)=
 惰性加载；=:init= 里按官方手册（=doc/wl.texi= ）的写法设

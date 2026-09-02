@@ -1235,14 +1235,16 @@
 	         :smtp-host "mx.sdf.org" :smtp-port 587 :smtp-connection-type starttls
 	         :login-key "mail_sdf_user" :from-key "mail_sdf_address"
 	         :password-key "mail_sdf_password"
-	         :folder-match "@mx\\.sdf\\.org")
+	         :folder-match "@mx\\.sdf\\.org"
+	         :message-id-domain "sdf.org")
 	        (gmail
 	         :petname "Gmail"
 	         :imap-host "imap.gmail.com" :imap-port 993 :imap-tls t
 	         :smtp-host "smtp.gmail.com" :smtp-port 587 :smtp-connection-type starttls
 	         :login-key "mail_gmail_user" :from-key "mail_gmail_user"
 	         :password-key "mail_gmail_app_password"
-	         :folder-match "@imap\\.gmail\\.com")
+	         :folder-match "@imap\\.gmail\\.com"
+	         :message-id-domain "gmail.com")
 	        (hotmail
 	         :petname "Hotmail"
 	         :imap-host "localhost" :imap-port ,idiig/davmail-imap-port :imap-tls nil
@@ -1250,17 +1252,23 @@
 	         :smtp-connection-type nil
 	         :login-key "mail_hotmail_user" :from-key "mail_hotmail_user"
 	         :password-key "mail_hotmail_local_password"
-	         :folder-match "@localhost"))
+	         :folder-match "@localhost"
+	         :message-id-domain "outlook.com"))
 	      "The 3 mail accounts this config manages: SDF, Gmail, Hotmail.
 	    Each entry is (NAME . PLIST); every other section below (folders
-	    file, auth-source bridge, wl-draft-config-alist) reads this table
-	    instead of repeating the same host/port/key info three times.
+	    file, auth-source bridge, wl-draft-config-alist/wl-template-alist)
+	    reads this table instead of repeating the same host/port/key info
+	    three times.
 	    
 	    :login-key and :from-key point at sops keys (see
 	    `idiig/get-sops-secret-value').  They differ for SDF, whose IMAP
 	    login is a bare username while the From address needs the full
 	    \"user@sdf.org\" form; for Gmail/Hotmail the login name already is
-	    the address, so both keys point at the same sops entry.")
+	    the address, so both keys point at the same sops entry.
+	    
+	    :message-id-domain only affects the generated Message-ID header, not
+	    routing, so it doesn't need to exactly match the From domain -- it's
+	    there so outgoing mail doesn't leak this machine's hostname.")
 	    
 	    (idiig/sops-register-keys
 	     '(("mail_sdf_user" . "SDF IMAP/SMTP login username, no @domain")
@@ -1352,25 +1360,42 @@
 	                                           :user user :require '(:secret) :create t)))))
 	            (delete-file netrc-file)))
 	        (setq idiig/mail-auth-source-warmed t)))
-	    (defun idiig/mail-account-draft-config (account)
-	      "One `wl-draft-config-alist' entry for ACCOUNT.
-	    The condition and the sops-backed values are left as unevaluated Lisp
-	    forms on purpose: `wl-draft-config-exec' evals them itself, only when
-	    a draft actually matches, so secrets stay encrypted until the moment
-	    a message is really being composed."
+	    (defun idiig/mail-account-overrides (account)
+	      "The (FIELD . VALUE) override list for ACCOUNT, shared by
+	    `wl-draft-config-alist' (auto, matched by folder) and
+	    `wl-template-alist' (manual, via `wl-template-select'/`C-c C-j').
+	    The sops-backed values are left as unevaluated Lisp forms on purpose:
+	    `wl-draft-config-exec' evals them itself, only when a draft actually
+	    applies this entry, so secrets stay encrypted until the moment a
+	    message is really being composed."
 	      (let ((plist (cdr account)))
-	        `((string-match ,(plist-get plist :folder-match) wl-draft-parent-folder)
-	          ("From" . (idiig/get-sops-secret-value ,(plist-get plist :from-key)))
+	        `(("From" . (idiig/get-sops-secret-value ,(plist-get plist :from-key)))
 	          (wl-smtp-posting-server . ,(plist-get plist :smtp-host))
 	          (wl-smtp-posting-port . ,(plist-get plist :smtp-port))
 	          (wl-smtp-posting-user
 	           . (idiig/get-sops-secret-value ,(plist-get plist :login-key)))
 	          (wl-smtp-authenticate-type . "plain")
-	          (wl-smtp-connection-type . ,(plist-get plist :smtp-connection-type)))))
+	          (wl-smtp-connection-type . ,(plist-get plist :smtp-connection-type))
+	          (wl-local-domain . ,(plist-get plist :message-id-domain))
+	          (wl-message-id-domain . ,(plist-get plist :message-id-domain)))))
+	    
+	    (defun idiig/mail-account-draft-config (account)
+	      "One `wl-draft-config-alist' entry for ACCOUNT: matches by folder."
+	      (cons `(string-match ,(plist-get (cdr account) :folder-match)
+	                            wl-draft-parent-folder)
+	            (idiig/mail-account-overrides account)))
+	    
+	    (defun idiig/mail-account-template (account)
+	      "One `wl-template-alist' entry for ACCOUNT, selectable by name via
+	    `wl-template-select' (`C-c C-j')."
+	      (cons (plist-get (cdr account) :petname)
+	            (idiig/mail-account-overrides account)))
 	    
 	    (with-eval-after-load 'wl
 	      (setq wl-draft-config-alist
-	            (mapcar #'idiig/mail-account-draft-config idiig/mail-accounts)))
+	            (mapcar #'idiig/mail-account-draft-config idiig/mail-accounts))
+	      (setq wl-template-alist
+	            (mapcar #'idiig/mail-account-template idiig/mail-accounts)))
 	    (defvar idiig/mail-signature-file
 	      (expand-file-name ".signature" idiig/mail-directory))
 	    
@@ -1387,7 +1412,22 @@
 	    
 	    (with-eval-after-load 'wl
 	      (setq wl-stay-folder-window t)
-	      (define-key wl-draft-mode-map (kbd "C-c C-w") #'wl-draft-insert-signature))
+	      (define-key wl-draft-mode-map (kbd "C-c C-w") #'wl-draft-insert-signature)
+	      (setq wl-message-ignored-field-list '("."))
+	      (setq wl-message-visible-field-list
+	            '("^\\(To\\|Cc\\):"
+	              "^Subject:"
+	              "^\\(From\\|Reply-To\\):"
+	              "^Date:")))
+	    (use-package org-mime
+	      :commands (org-mime-org-buffer-htmlize)
+	      :init
+	      (setq org-mime-library 'semi))
+	    (setq epa-pinentry-mode 'loopback)
+	    (use-package bbdb
+	      :after wl
+	      :config
+	      (bbdb-insinuate-wl))
 	    (defun idiig/wl-bootstrap ()
 	      "Prepare everything Wanderlust needs before opening: start the
 	    davmail gateway, bootstrap `wl-folders-file' and the signature file
@@ -2495,6 +2535,8 @@
             tramp-rpc
             with-editor
             wanderlust
+            org-mime
+            bbdb
             spacious-padding
               writeroom-mode
             (lsp-bridge.override {
