@@ -844,6 +844,7 @@ Emacs 30+ 自带的功能，输入时以浅色文字内联预览排在第一位�
 #+begin_src emacs-lisp
   (use-package completion-preview
     :demand t
+    :diminish t
     :bind
     ( :map completion-preview-active-mode-map
       ("M-i" . completion-preview-insert-word)
@@ -1643,11 +1644,18 @@ minibuffer的检索]]。
 :header-args: :noweb-ref ecfg
 :END:
 ***** 基础配置
+=C-\= 默认绑定的是 =toggle-input-method=，会不看情况直接切到
+=default-input-method=（或者被其他 mode，比如 dyalog-mode，临时改掉的
+那个输入法）。改绑成 =set-input-method=，每次都跳出所有已注册输入法的
+列表（配合 vertico）来选，默认候选还是 =pyim=，直接 RET 就等价于原来的
+行为，但想切别的输入法时不用先关再开。
 #+begin_src emacs-lisp
   (use-package pyim
     :diminish pyim-isearch-mode
     :commands
-    (toggle-input-method)
+    (toggle-input-method set-input-method)
+    :bind
+    ("C-\\" . set-input-method)
     :custom
     (default-input-method "pyim")
     (pyim-dcache-directory (concat user-emacs-directory "pyim/dcache"))
@@ -2918,15 +2926,35 @@ Emacs 层面的按键映射，不需要真的装 GNU APL 解释器。
 :PROPERTIES:
 :header-args: :noweb-ref ecfg
 :END:
-默认前缀键是 =.=（可自定义 =gnu-apl-key-prefix=），比如 =.i= 输入 =⍳=、=.r=
-输入 =⍴=，具体对应表在 =gnu-apl-symbols.el= 里。用 =C-\= 手动切换开关；这
-里额外在进入 =dyalog-mode= 时默认打开。
+默认前缀键是 =.=（可自定义 =gnu-apl-key-prefix=），比如 =.i= 输入 =⍳= 、 =.r=
+输入 =⍴=，具体对应表在 =gnu-apl-symbols.el= 里；进入 =dyalog-mode= 时默认打
+开这个输入法，其他 buffer 里怎么切换输入法看 pyim 那节。
+
+两个坑：
+- =.dyalog= 是 =dyalog-mode= 自己认定的后缀，没有歧义。但 =.apl= 这个后缀
+  在 Dyalog 和 GNU APL 之间是共用的（=gnu-apl-mode= 的 autoload 直接把
+  =.apl= 注册给了自己），打开时分不清该进哪个 mode，所以这里改成打开
+  =.apl= 时弹出来问一下选哪个方言，而不是猜。
+- 进入 =dyalog-mode= 时不能用 =set-input-method=——它会顺带把
+  =default-input-method= 这个全局变量也改成 "APL-Z"，导致你切回别的
+  buffer 后 =C-\= 变成切换 APL 输入法而不是 pyim。要用只影响当前 buffer
+  的 =activate-input-method=。
 #+begin_src emacs-lisp
   (use-package gnu-apl-mode
     :demand t)
 
+  (defun idiig/apl-mode-dispatch ()
+    "`.apl' 后缀在 Dyalog 和 GNU APL 之间语义不明确，打开时问一下选哪个方言。"
+    (if (string= (completing-read "APL dialect: " '("Dyalog" "GNU APL")
+                                   nil t nil nil "Dyalog")
+                 "Dyalog")
+        (dyalog-mode)
+      (gnu-apl-mode)))
+
+  (add-to-list 'auto-mode-alist '("\\.apl\\'" . idiig/apl-mode-dispatch))
+
   (add-hook 'dyalog-mode-hook
-            (lambda () (set-input-method "APL-Z")))
+            (lambda () (activate-input-method "APL-Z")))
 #+end_src
 ** Org相关配置
 *** Org本体

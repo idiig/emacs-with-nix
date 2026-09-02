@@ -372,6 +372,7 @@
 	                   (funcall fn))))))
 	    (use-package completion-preview
 	      :demand t
+	      :diminish t
 	      :bind
 	      ( :map completion-preview-active-mode-map
 	        ("M-i" . completion-preview-insert-word)
@@ -868,7 +869,9 @@
 	    (use-package pyim
 	      :diminish pyim-isearch-mode
 	      :commands
-	      (toggle-input-method)
+	      (toggle-input-method set-input-method)
+	      :bind
+	      ("C-\\" . set-input-method)
 	      :custom
 	      (default-input-method "pyim")
 	      (pyim-dcache-directory (concat user-emacs-directory "pyim/dcache"))
@@ -1358,8 +1361,18 @@
 	    (use-package gnu-apl-mode
 	      :demand t)
 	    
+	    (defun idiig/apl-mode-dispatch ()
+	      "`.apl' 后缀在 Dyalog 和 GNU APL 之间语义不明确，打开时问一下选哪个方言。"
+	      (if (string= (completing-read "APL dialect: " '("Dyalog" "GNU APL")
+	                                     nil t nil nil "Dyalog")
+	                   "Dyalog")
+	          (dyalog-mode)
+	        (gnu-apl-mode)))
+	    
+	    (add-to-list 'auto-mode-alist '("\\.apl\\'" . idiig/apl-mode-dispatch))
+	    
 	    (add-hook 'dyalog-mode-hook
-	              (lambda () (set-input-method "APL-Z")))
+	              (lambda () (activate-input-method "APL-Z")))
 	    (add-hook 'org-mode-hook 'idiig/run-prog-mode-hooks)
 	    (defun idiig/load-org-babel-languages ()
 	      "根据 `idiig/language-list` 启用 `org-babel` 语言。"
