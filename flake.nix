@@ -1190,95 +1190,111 @@
 	                                                       (shell-quote-argument secrets-file))))))
 	    (require 'oauth2)
 	    (require 'sasl-xoauth2)
-	    (require 'url-util) ; url-parse-query-string
+	      (require 'url-util) ; url-parse-query-string
 	    
-	    (defvar idiig/oauth2-localhost-redirect-port 18787
-	      "Loopback port `idiig/oauth2-localhost-request-authorization' binds
-	    to receive the OAuth redirect.  Must match the port baked into the
-	    redirect-uri in `sasl-xoauth2-host-url-table' below, and must also be
-	    registered as an additional Redirect URI
-	    (http://localhost:PORT) under the app's \"Mobile and desktop
-	    applications\" platform in Azure Portal -- alongside the existing
-	    nativeclient one, not instead of it.")
+	      (defvar idiig/oauth2-localhost-redirect-port 18787
+	        "Loopback port `idiig/oauth2-localhost-request-authorization' binds
+	      to receive the OAuth redirect.  Must match the port baked into the
+	      redirect-uri in `sasl-xoauth2-host-url-table' below, and must also be
+	      registered as an additional Redirect URI
+	      (http://localhost:PORT) under the app's \"Mobile and desktop
+	      applications\" platform in Azure Portal -- alongside the existing
+	      nativeclient one, not instead of it.")
 	    
-	    (defvar idiig/oauth2-localhost-redirect-timeout 300
-	      "Seconds to wait for the browser to deliver the OAuth redirect to
-	    the local listener before giving up.")
+	      (defvar idiig/oauth2-localhost-redirect-timeout 300
+	        "Seconds to wait for the browser to deliver the OAuth redirect to
+	      the local listener before giving up.")
 	    
-	    (defun idiig/oauth2-localhost-request-authorization
-	        (auth-url client-id &optional scope state redirect-uri user-name code-verifier)
-	      "Override for `oauth2-request-authorization' (same argument order)
-	    that receives the authorization code via a one-shot local HTTP
-	    listener instead of asking the user to copy/paste a code off a web
-	    page -- see the prose above for why the nativeclient copy/paste flow
-	    turned out not to be reliable.
-	    REDIRECT-URI must already be \"http://localhost:PORT\" with PORT
-	    matching `idiig/oauth2-localhost-redirect-port': this function binds
-	    to that exact port and otherwise uses REDIRECT-URI completely
-	    unchanged when building the authorization URL, so that the same
-	    string oauth2.el threads through to the later token-exchange call
-	    (see `oauth2-auth') still matches what Microsoft issued the code
-	    against."
-	      (let* (code received-state
-	             (proc (make-network-process
-	                   :name "idiig-oauth2-localhost-redirect"
-	                   :service idiig/oauth2-localhost-redirect-port
-	                   :host 'local
-	                   :family 'ipv4
-	                   :server t
-	                   :filter
-	                   (lambda (conn chunk)
-	                     ;; Buffers across filter calls instead of assuming
-	                     ;; the whole request line arrives in one read --
-	                     ;; and logs every chunk to *Messages*, so a silent
-	                     ;; hang (connection established, nothing parsed) is
-	                     ;; diagnosable instead of just looking stuck.
-	                     (let* ((buf (concat (process-get conn 'idiig-buffer) chunk))
-	                            (matched (string-match "\\`GET /?\\?\\([^ ]*\\) HTTP/" buf))
-	                            ;; Captured immediately after string-match, before
-	                            ;; any other regex-using call (message/split-string
-	                            ;; below) can clobber the global match data that
-	                            ;; match-string depends on.
-	                            (query (and matched (match-string 1 buf))))
-	                       (process-put conn 'idiig-buffer buf)
-	                       (message "idiig/oauth2-localhost: +%d bytes (%d total), request-line matched=%s, first line: %S"
-	                                (length chunk) (length buf) (if matched "yes" "no")
-	                                (car (split-string buf "\r\n")))
-	                       (when matched
-	                         (let ((params (url-parse-query-string query)))
-	                           (setq code (cadr (assoc "code" params)))
-	                           (setq received-state (cadr (assoc "state" params))))
-	                         (message "idiig/oauth2-localhost: parsed code length=%s, state=%S"
-	                                  (if code (number-to-string (length code)) "NIL -- no code param found")
-	                                  received-state)
-	                         (process-send-string
-	                          conn (concat "HTTP/1.1 200 OK\r\n"
-	                                       "Content-Type: text/html; charset=utf-8\r\n"
-	                                       "Connection: close\r\n\r\n"
-	                                       "<html><body>Authorized -- you can close this "
-	                                       "tab and go back to Emacs.</body></html>"))
-	                         (delete-process conn)))))))
-	        (unwind-protect
-	            (progn
-	              (browse-url (oauth2--build-authorization-request-url
-	                           auth-url client-id redirect-uri scope state
-	                           user-name code-verifier))
-	              (let ((deadline (+ (float-time) idiig/oauth2-localhost-redirect-timeout)))
-	                (while (and (not code) (< (float-time) deadline))
-	                  (accept-process-output nil 1)))
-	              (cond
-	               ((not code)
-	                (error "Timed out waiting for the OAuth redirect on localhost:%d"
-	                       idiig/oauth2-localhost-redirect-port))
-	               ((not (equal received-state state))
-	                (error "OAuth state mismatch on localhost redirect: got %S, expected %S"
-	                       received-state state))
-	               (t code)))
-	          (delete-process proc))))
+	      (defun idiig/oauth2-localhost-request-authorization
+	          (auth-url client-id &optional scope state redirect-uri user-name code-verifier)
+	        "Override for `oauth2-request-authorization' (same argument order)
+	      that receives the authorization code via a one-shot local HTTP
+	      listener instead of asking the user to copy/paste a code off a web
+	      page -- see the prose above for why the nativeclient copy/paste flow
+	      turned out not to be reliable.
+	      REDIRECT-URI must already be \"http://localhost:PORT\" with PORT
+	      matching `idiig/oauth2-localhost-redirect-port': this function binds
+	      to that exact port and otherwise uses REDIRECT-URI completely
+	      unchanged when building the authorization URL, so that the same
+	      string oauth2.el threads through to the later token-exchange call
+	      (see `oauth2-auth') still matches what Microsoft issued the code
+	      against."
+	        (let* (code received-state
+	               (proc (make-network-process
+	                     :name "idiig-oauth2-localhost-redirect"
+	                     :service idiig/oauth2-localhost-redirect-port
+	                     :host 'local
+	                     :family 'ipv4
+	                     :server t
+	                     :filter
+	                     (lambda (conn chunk)
+	                       ;; Buffers across filter calls instead of assuming
+	                       ;; the whole request line arrives in one read --
+	                       ;; and logs every chunk to *Messages*, so a silent
+	                       ;; hang (connection established, nothing parsed) is
+	                       ;; diagnosable instead of just looking stuck.
+	                       (let* ((buf (concat (process-get conn 'idiig-buffer) chunk))
+	                              (matched (string-match "\\`GET /?\\?\\([^ ]*\\) HTTP/" buf))
+	                              ;; Captured immediately after string-match, before
+	                              ;; any other regex-using call (message/split-string
+	                              ;; below) can clobber the global match data that
+	                              ;; match-string depends on.
+	                              (query (and matched (match-string 1 buf))))
+	                         (process-put conn 'idiig-buffer buf)
+	                         (message "idiig/oauth2-localhost: +%d bytes (%d total), request-line matched=%s, first line: %S"
+	                                  (length chunk) (length buf) (if matched "yes" "no")
+	                                  (car (split-string buf "\r\n")))
+	                         (when matched
+	                           (let ((params (url-parse-query-string query)))
+	                             (setq code (cadr (assoc "code" params)))
+	                             (setq received-state (cadr (assoc "state" params))))
+	                           (message "idiig/oauth2-localhost: parsed code length=%s, state=%S"
+	                                    (if code (number-to-string (length code)) "NIL -- no code param found")
+	                                    received-state)
+	                           (process-send-string
+	                            conn (concat "HTTP/1.1 200 OK\r\n"
+	                                         "Content-Type: text/html; charset=utf-8\r\n"
+	                                         "Connection: close\r\n\r\n"
+	                                         "<html><body>Authorized -- you can close this "
+	                                         "tab and go back to Emacs.</body></html>"))
+	                           (delete-process conn)))))))
+	          (unwind-protect
+	              (progn
+	                (browse-url (oauth2--build-authorization-request-url
+	                             auth-url client-id redirect-uri scope state
+	                             user-name code-verifier))
+	                (let ((deadline (+ (float-time) idiig/oauth2-localhost-redirect-timeout)))
+	                  (while (and (not code) (< (float-time) deadline))
+	                    (accept-process-output nil 1)))
+	                (cond
+	                 ((not code)
+	                  (error "Timed out waiting for the OAuth redirect on localhost:%d"
+	                         idiig/oauth2-localhost-redirect-port))
+	                 ((not (equal received-state state))
+	                  (error "OAuth state mismatch on localhost redirect: got %S, expected %S"
+	                         received-state state))
+	                 (t code)))
+	            (delete-process proc))))
 	    
-	    (with-eval-after-load 'oauth2
-	      (advice-add 'oauth2-request-authorization :override
-	                  #'idiig/oauth2-localhost-request-authorization))
+	      (with-eval-after-load 'oauth2
+	        (advice-add 'oauth2-request-authorization :override
+	                    #'idiig/oauth2-localhost-request-authorization))
+	    
+	      (defun idiig/oauth2-auth-and-store-force-pkce
+	          (orig-fn auth-url token-url scope client-id client-secret
+	                   &optional redirect-uri state user-name host-name _use-pkce)
+	        "Force `oauth2-auth-and-store' to always use PKCE.
+	    `sasl-xoauth2-response' calls `oauth2-auth-and-store' without a
+	    USE-PKCE argument, so it always falls back to no PKCE.  PKCE is what
+	    protects the authorization code exchanged over the loopback redirect
+	    above from being usable by anything else that raced us for
+	    localhost:PORT, so it's worth forcing on even though our own code
+	    already threads CODE-VERIFIER through unconditionally."
+	        (funcall orig-fn auth-url token-url scope client-id client-secret
+	                 redirect-uri state user-name host-name t))
+	      (with-eval-after-load 'oauth2
+	        (advice-add 'oauth2-auth-and-store :around
+	                    #'idiig/oauth2-auth-and-store-force-pkce))
 	    (defvar idiig/mail-directory (expand-file-name "~/mails/")
 	      "Local root for all Wanderlust state: message cache, signature file,
 	    folder subscription list.  Deliberately not synced across machines via

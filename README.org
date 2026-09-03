@@ -2318,6 +2318,22 @@ URI 都更直观。下面这个端口需要额外去 Azure Portal → Authentica
   (with-eval-after-load 'oauth2
     (advice-add 'oauth2-request-authorization :override
                 #'idiig/oauth2-localhost-request-authorization))
+
+  (defun idiig/oauth2-auth-and-store-force-pkce
+      (orig-fn auth-url token-url scope client-id client-secret
+               &optional redirect-uri state user-name host-name _use-pkce)
+    "Force `oauth2-auth-and-store' to always use PKCE.
+`sasl-xoauth2-response' calls `oauth2-auth-and-store' without a
+USE-PKCE argument, so it always falls back to no PKCE.  PKCE is what
+protects the authorization code exchanged over the loopback redirect
+above from being usable by anything else that raced us for
+localhost:PORT, so it's worth forcing on even though our own code
+already threads CODE-VERIFIER through unconditionally."
+    (funcall orig-fn auth-url token-url scope client-id client-secret
+             redirect-uri state user-name host-name t))
+  (with-eval-after-load 'oauth2
+    (advice-add 'oauth2-auth-and-store :around
+                #'idiig/oauth2-auth-and-store-force-pkce))
 #+end_src
 
 **** 账号与本地目录
