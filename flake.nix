@@ -1456,7 +1456,9 @@
 	    
 	    ;; Overrides sasl-xoauth2's own "\\.outlook\\.com$"/"\\.office365\\.com$"
 	    ;; defaults (retired endpoint / missing redirect-uri, see prose above)
-	    ;; with one entry that matches our exact Hotmail IMAP host.  Uses the
+	    ;; with one entry that matches both our Hotmail IMAP and SMTP hosts
+	    ;; (wl-smtp-authenticate-type needs SMTP to resolve here too, or
+	    ;; sasl-xoauth2 falls back to prompting interactively).  Uses the
 	    ;; /consumers/ authorize+token endpoints, not /common/: an app
 	    ;; registered from a personal Microsoft account gets auto-provisioned
 	    ;; into a real (if invisible) organizational tenant, and /common/
@@ -1484,7 +1486,7 @@
 	    ;; nativeclient copy/paste flow isn't reliable and what this
 	    ;; alternative depends on.
 	    (add-to-list 'sasl-xoauth2-host-url-table
-	                 `("^outlook\\.office365\\.com$"
+	                 `("^\\(outlook\\.office365\\.com\\|smtp-mail\\.outlook\\.com\\)$"
 	                   "https://login.microsoftonline.com/consumers/oauth2/v2.0/authorize"
 	                   "https://login.microsoftonline.com/consumers/oauth2/v2.0/token"
 	                   "https://outlook.office.com/IMAP.AccessAsUser.All https://outlook.office.com/SMTP.Send offline_access"
@@ -1505,7 +1507,7 @@
 	    `idiig/mail-auth-source-warm-cache'."
 	      (unless idiig/sasl-xoauth2-client-id-warmed
 	        (add-to-list 'sasl-xoauth2-host-user-id-table
-	                     (list "^outlook\\.office365\\.com$"
+	                     (list "^\\(outlook\\.office365\\.com\\|smtp-mail\\.outlook\\.com\\)$"
 	                           (regexp-quote (idiig/get-sops-secret-value "mail_hotmail_user"))
 	                           (idiig/get-sops-secret-value "mail_hotmail_oauth_client_id")
 	                           ""))
@@ -1712,7 +1714,21 @@
 	    parent folder (`C-x m', or any other entry point that does not pass
 	    `wl-draft-create-buffer' a folder to reply/forward from).  Otherwise
 	    the draft would sit with the bare default from `wl-from' until the
-	    user remembers to press `C-c C-j' themselves."
+	    user remembers to press `C-c C-j' themselves.
+	    Hung on `wl-mail-setup-hook', not a `wl-draft-create-buffer' advice:
+	    confirmed against source that `wl-draft-create-buffer' only creates
+	    an *empty* buffer -- the actual header skeleton (From/To/Subject/
+	    User-Agent) gets written afterward, by `wl-draft'/`wl-draft-reply' et
+	    al, which both run `wl-mail-setup-hook' only once that skeleton is
+	    already in place.  Applying our override earlier, into an empty
+	    buffer, made `wl-draft-replace-field' fail to find an existing
+	    \"From:\" to replace and fall back to appending a second one --
+	    confirmed the hard way: sent under the wrong identity while a
+	    correct-looking second \"From:\" sat further down, unused, and
+	    Exchange rejected the send with SendAsDenied.  `wl-user-agent-compose'
+	    always calls `wl-draft' via `call-interactively' specifically so
+	    hooks like this one see `called-interactively-p' as true, so this
+	    fires reliably for `C-x m' too, not just replies."
 	        (when (string-empty-p wl-draft-parent-folder)
 	          (wl-template-select)))
 	    
@@ -1722,8 +1738,7 @@
 	        (setq wl-template-alist
 	              (mapcar #'idiig/mail-account-template idiig/mail-accounts))
 	        (setq wl-template-visible-select nil)
-	        (advice-add 'wl-draft-create-buffer :after
-	                    #'idiig/wl-draft-maybe-select-account)
+	        (add-hook 'wl-mail-setup-hook #'idiig/wl-draft-maybe-select-account)
 	        (setq wl-dispose-folder-alist
 	              (delq nil
 	                    (mapcar (lambda (account)
@@ -1734,6 +1749,31 @@
 	                                         (car account)
 	                                         (plist-get plist :trash-folder))))))
 	                            idiig/mail-accounts))))
+	    
+	      (defun idiig/wl-template-apply-strict (orig-fn name)
+	        "Guard `wl-template-apply' against silently no-op'ing.
+	    `wl-template-select' builds its `completing-read' prompt (used
+	    because `wl-template-visible-select' is nil above, for typed
+	    filtering instead of n/p paging) without REQUIRE-MATCH, so typing a
+	    name that doesn't exactly match a petname's case -- e.g. \"hotmail\"
+	    instead of \"Hotmail\" -- resolves to nothing: `wl-template-apply'
+	    just returns nil with no error, and the draft silently keeps Emacs's
+	    bare `user-mail-address' as From (confirmed the hard way: sent as
+	    the wrong identity and got SendAsDenied back from Exchange).  Falls
+	    back to a case-insensitive match first, and only if that also fails,
+	    errors loudly instead of silently sending under the wrong identity."
+	        (unless (or (string-empty-p name) (assoc name wl-template-alist))
+	          (setq name
+	                (or (car (seq-find (lambda (entry)
+	                                      (string-equal (downcase (car entry))
+	                                                    (downcase name)))
+	                                    wl-template-alist))
+	                    (user-error "No mail template matches %S -- choices are %s"
+	                                name (mapconcat #'car wl-template-alist ", ")))))
+	        (funcall orig-fn name))
+	      (with-eval-after-load 'wl-template
+	        (advice-add 'wl-template-apply :around
+	                    #'idiig/wl-template-apply-strict))
 	    (defvar idiig/mail-signature-file
 	      (expand-file-name ".signature" idiig/mail-directory))
 	    
