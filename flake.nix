@@ -1190,96 +1190,94 @@
 	                                                       (shell-quote-argument secrets-file))))))
 	    (require 'oauth2)
 	    (require 'sasl-xoauth2)
-	      (require 'url-util) ; url-parse-query-string
+	    (require 'url-util) ; url-parse-query-string
 	    
-	      (defvar idiig/oauth2-localhost-redirect-port 18787
-	        "Loopback port `idiig/oauth2-localhost-request-authorization' binds
-	      to receive the OAuth redirect.  Must match the port baked into the
-	      redirect-uri in `sasl-xoauth2-host-url-table' below, and must also be
-	      registered as an additional Redirect URI
-	      (http://localhost:PORT) under the app's \"Mobile and desktop
-	      applications\" platform in Azure Portal -- alongside the existing
-	      nativeclient one, not instead of it.")
+	    (defvar idiig/oauth2-localhost-redirect-port 18787
+	      "Loopback port `idiig/oauth2-localhost-request-authorization' binds
+	    to receive the OAuth redirect.  Must match the port baked into the
+	    redirect-uri in `sasl-xoauth2-host-url-table' below, and must also be
+	    registered as an additional Redirect URI
+	    (http://localhost:PORT) under the app's \"Mobile and desktop
+	    applications\" platform in Azure Portal -- alongside the existing
+	    nativeclient one, not instead of it.")
 	    
-	      (defvar idiig/oauth2-localhost-redirect-timeout 300
-	        "Seconds to wait for the browser to deliver the OAuth redirect to
-	      the local listener before giving up.")
+	    (defvar idiig/oauth2-localhost-redirect-timeout 300
+	      "Seconds to wait for the browser to deliver the OAuth redirect to
+	    the local listener before giving up.")
+	    (defun idiig/oauth2-localhost-request-authorization
+	        (auth-url client-id &optional scope state redirect-uri user-name code-verifier)
+	      "Override for `oauth2-request-authorization' (same argument order)
+	    that receives the authorization code via a one-shot local HTTP
+	    listener instead of asking the user to copy/paste a code off a web
+	    page -- see the prose above for why the nativeclient copy/paste flow
+	    turned out not to be reliable.
+	    REDIRECT-URI must already be \"http://localhost:PORT\" with PORT
+	    matching `idiig/oauth2-localhost-redirect-port': this function binds
+	    to that exact port and otherwise uses REDIRECT-URI completely
+	    unchanged when building the authorization URL, so that the same
+	    string oauth2.el threads through to the later token-exchange call
+	    (see `oauth2-auth') still matches what Microsoft issued the code
+	    against."
+	      (let* (code received-state
+	             (proc (make-network-process
+	                   :name "idiig-oauth2-localhost-redirect"
+	                   :service idiig/oauth2-localhost-redirect-port
+	                   :host 'local
+	                   :family 'ipv4
+	                   :server t
+	                   :filter
+	                   (lambda (conn chunk)
+	                     ;; Buffers across filter calls instead of assuming
+	                     ;; the whole request line arrives in one read --
+	                     ;; and logs every chunk to *Messages*, so a silent
+	                     ;; hang (connection established, nothing parsed) is
+	                     ;; diagnosable instead of just looking stuck.
+	                     (let* ((buf (concat (process-get conn 'idiig-buffer) chunk))
+	                            (matched (string-match "\\`GET /?\\?\\([^ ]*\\) HTTP/" buf))
+	                            ;; Captured immediately after string-match, before
+	                            ;; any other regex-using call (message/split-string
+	                            ;; below) can clobber the global match data that
+	                            ;; match-string depends on.
+	                            (query (and matched (match-string 1 buf))))
+	                       (process-put conn 'idiig-buffer buf)
+	                       (message "idiig/oauth2-localhost: +%d bytes (%d total), request-line matched=%s, first line: %S"
+	                                (length chunk) (length buf) (if matched "yes" "no")
+	                                (car (split-string buf "\r\n")))
+	                       (when matched
+	                         (let ((params (url-parse-query-string query)))
+	                           (setq code (cadr (assoc "code" params)))
+	                           (setq received-state (cadr (assoc "state" params))))
+	                         (message "idiig/oauth2-localhost: parsed code length=%s, state=%S"
+	                                  (if code (number-to-string (length code)) "NIL -- no code param found")
+	                                  received-state)
+	                         (process-send-string
+	                          conn (concat "HTTP/1.1 200 OK\r\n"
+	                                       "Content-Type: text/html; charset=utf-8\r\n"
+	                                       "Connection: close\r\n\r\n"
+	                                       "<html><body>Authorized -- you can close this "
+	                                       "tab and go back to Emacs.</body></html>"))
+	                         (delete-process conn)))))))
+	        (unwind-protect
+	            (progn
+	              (browse-url (oauth2--build-authorization-request-url
+	                           auth-url client-id redirect-uri scope state
+	                           user-name code-verifier))
+	              (let ((deadline (+ (float-time) idiig/oauth2-localhost-redirect-timeout)))
+	                (while (and (not code) (< (float-time) deadline))
+	                  (accept-process-output nil 1)))
+	              (cond
+	               ((not code)
+	                (error "Timed out waiting for the OAuth redirect on localhost:%d"
+	                       idiig/oauth2-localhost-redirect-port))
+	               ((not (equal received-state state))
+	                (error "OAuth state mismatch on localhost redirect: got %S, expected %S"
+	                       received-state state))
+	               (t code)))
+	          (delete-process proc))))
 	    
-	      (defun idiig/oauth2-localhost-request-authorization
-	          (auth-url client-id &optional scope state redirect-uri user-name code-verifier)
-	        "Override for `oauth2-request-authorization' (same argument order)
-	      that receives the authorization code via a one-shot local HTTP
-	      listener instead of asking the user to copy/paste a code off a web
-	      page -- see the prose above for why the nativeclient copy/paste flow
-	      turned out not to be reliable.
-	      REDIRECT-URI must already be \"http://localhost:PORT\" with PORT
-	      matching `idiig/oauth2-localhost-redirect-port': this function binds
-	      to that exact port and otherwise uses REDIRECT-URI completely
-	      unchanged when building the authorization URL, so that the same
-	      string oauth2.el threads through to the later token-exchange call
-	      (see `oauth2-auth') still matches what Microsoft issued the code
-	      against."
-	        (let* (code received-state
-	               (proc (make-network-process
-	                     :name "idiig-oauth2-localhost-redirect"
-	                     :service idiig/oauth2-localhost-redirect-port
-	                     :host 'local
-	                     :family 'ipv4
-	                     :server t
-	                     :filter
-	                     (lambda (conn chunk)
-	                       ;; Buffers across filter calls instead of assuming
-	                       ;; the whole request line arrives in one read --
-	                       ;; and logs every chunk to *Messages*, so a silent
-	                       ;; hang (connection established, nothing parsed) is
-	                       ;; diagnosable instead of just looking stuck.
-	                       (let* ((buf (concat (process-get conn 'idiig-buffer) chunk))
-	                              (matched (string-match "\\`GET /?\\?\\([^ ]*\\) HTTP/" buf))
-	                              ;; Captured immediately after string-match, before
-	                              ;; any other regex-using call (message/split-string
-	                              ;; below) can clobber the global match data that
-	                              ;; match-string depends on.
-	                              (query (and matched (match-string 1 buf))))
-	                         (process-put conn 'idiig-buffer buf)
-	                         (message "idiig/oauth2-localhost: +%d bytes (%d total), request-line matched=%s, first line: %S"
-	                                  (length chunk) (length buf) (if matched "yes" "no")
-	                                  (car (split-string buf "\r\n")))
-	                         (when matched
-	                           (let ((params (url-parse-query-string query)))
-	                             (setq code (cadr (assoc "code" params)))
-	                             (setq received-state (cadr (assoc "state" params))))
-	                           (message "idiig/oauth2-localhost: parsed code length=%s, state=%S"
-	                                    (if code (number-to-string (length code)) "NIL -- no code param found")
-	                                    received-state)
-	                           (process-send-string
-	                            conn (concat "HTTP/1.1 200 OK\r\n"
-	                                         "Content-Type: text/html; charset=utf-8\r\n"
-	                                         "Connection: close\r\n\r\n"
-	                                         "<html><body>Authorized -- you can close this "
-	                                         "tab and go back to Emacs.</body></html>"))
-	                           (delete-process conn)))))))
-	          (unwind-protect
-	              (progn
-	                (browse-url (oauth2--build-authorization-request-url
-	                             auth-url client-id redirect-uri scope state
-	                             user-name code-verifier))
-	                (let ((deadline (+ (float-time) idiig/oauth2-localhost-redirect-timeout)))
-	                  (while (and (not code) (< (float-time) deadline))
-	                    (accept-process-output nil 1)))
-	                (cond
-	                 ((not code)
-	                  (error "Timed out waiting for the OAuth redirect on localhost:%d"
-	                         idiig/oauth2-localhost-redirect-port))
-	                 ((not (equal received-state state))
-	                  (error "OAuth state mismatch on localhost redirect: got %S, expected %S"
-	                         received-state state))
-	                 (t code)))
-	            (delete-process proc))))
-	    
-	      (with-eval-after-load 'oauth2
-	        (advice-add 'oauth2-request-authorization :override
-	                    #'idiig/oauth2-localhost-request-authorization))
-	    
+	    (with-eval-after-load 'oauth2
+	      (advice-add 'oauth2-request-authorization :override
+	                  #'idiig/oauth2-localhost-request-authorization))
 	      (defun idiig/oauth2-auth-and-store-force-pkce
 	          (orig-fn auth-url token-url scope client-id client-secret
 	                   &optional redirect-uri state user-name host-name _use-pkce)
@@ -1307,7 +1305,6 @@
 	    (with-eval-after-load 'wl
 	      (setq elmo-localdir-folder-path idiig/mail-directory)
 	      (setq elmo-msgdb-directory (expand-file-name ".elmo" idiig/mail-directory)))
-	    
 	    (defvar idiig/mail-accounts
 	      `((sdf
 	         :petname "SDF"
@@ -1392,7 +1389,6 @@
 	    routing, so deleting a message in any of these 3 accounts' folders
 	    refiles it into that same account's own remote Trash instead of one
 	    shared `wl-trash-folder'.")
-	    
 	    (idiig/sops-register-keys
 	     '(("mail_sdf_user" . "SDF IMAP/SMTP login username, no @domain")
 	       ("mail_sdf_password" . "SDF password")
@@ -1412,7 +1408,6 @@
 	    (set-file-modes idiig/sasl-xoauth2-token-directory #o700)
 	    
 	    (setq sasl-xoauth2-token-directory idiig/sasl-xoauth2-token-directory)
-	    
 	    (defun idiig/oauth2-update-plstore-plain (plstore token)
 	      "Override for `oauth2--update-plstore' (same arguments) that
 	    stores TOKEN as a plain, unencrypted plstore entry instead of
@@ -1454,12 +1449,14 @@
 	      (advice-add 'oauth2--update-plstore :override
 	                  #'idiig/oauth2-update-plstore-plain))
 	    
-	    ;; Overrides sasl-xoauth2's own "\\.outlook\\.com$"/"\\.office365\\.com$"
-	    ;; defaults (retired endpoint / missing redirect-uri, see prose above)
-	    ;; with one entry that matches both our Hotmail IMAP and SMTP hosts
-	    ;; (wl-smtp-authenticate-type needs SMTP to resolve here too, or
-	    ;; sasl-xoauth2 falls back to prompting interactively).  Uses the
-	    ;; /consumers/ authorize+token endpoints, not /common/: an app
+	    ;; sasl-xoauth2's own built-in "\\.outlook\\.com$"/"\\.office365\\.com$"
+	    ;; defaults don't work: the former points at a retired endpoint, the
+	    ;; latter has no redirect-uri and uses /common/ instead of
+	    ;; /consumers/.  Overridden below with one entry that matches both
+	    ;; our Hotmail IMAP and SMTP hosts (wl-smtp-authenticate-type needs
+	    ;; SMTP to resolve here too, or sasl-xoauth2 falls back to prompting
+	    ;; interactively).  Uses the /consumers/ authorize+token endpoints,
+	    ;; not /common/: an app
 	    ;; registered from a personal Microsoft account gets auto-provisioned
 	    ;; into a real (if invisible) organizational tenant, and /common/
 	    ;; tries to resolve that tenant context first -- since the personal
@@ -1491,7 +1488,6 @@
 	                   "https://login.microsoftonline.com/consumers/oauth2/v2.0/token"
 	                   "https://outlook.office.com/IMAP.AccessAsUser.All https://outlook.office.com/SMTP.Send offline_access"
 	                   ,(format "http://localhost:%d" idiig/oauth2-localhost-redirect-port)))
-	    
 	    (defvar idiig/sasl-xoauth2-client-id-warmed nil
 	      "Non-nil once the Hotmail entry has been added to
 	    `sasl-xoauth2-host-user-id-table' for this Emacs session.")
@@ -1512,9 +1508,8 @@
 	                           (idiig/get-sops-secret-value "mail_hotmail_oauth_client_id")
 	                           ""))
 	        (setq idiig/sasl-xoauth2-client-id-warmed t)))
-	      (with-eval-after-load 'wl
-	        (setq wl-folders-file (expand-file-name ".folders" idiig/mail-directory)))
-	    
+	    (with-eval-after-load 'wl
+	      (setq wl-folders-file (expand-file-name ".folders" idiig/mail-directory)))
 	      (defun idiig/mail-account-connection-suffix (plist)
 	        "The \"user\"/auth@host:port! suffix shared by every folder line
 	    for an account described by PLIST.
@@ -1539,7 +1534,6 @@
 	                  (plist-get plist :imap-host)
 	                  (plist-get plist :imap-port)
 	                  (if tls "!" ""))))
-	    
 	      (defun idiig/mail-account-folder-spec (account-name mailbox)
 	        "Full elmo folder-spec string for MAILBOX under the connection
 	    settings of the `idiig/mail-accounts' entry named ACCOUNT-NAME.
@@ -1593,7 +1587,6 @@
 	      (defun idiig/mail-account-smtp-password-key (plist)
 	        "The sops key for ACCOUNT's SMTP password; see `idiig/mail-account-smtp-login-key'."
 	        (or (plist-get plist :smtp-password-key) (plist-get plist :password-key)))
-	    
 	      (defun idiig/mail-account-password-auth-p (plist)
 	        "Non-nil when ACCOUNT authenticates with a password rather than
 	    XOAUTH2.  XOAUTH2 accounts have no :password-key at all -- their
@@ -1618,51 +1611,50 @@
 	                    (format "machine %s login %s port %d password %s\n"
 	                            (plist-get plist :smtp-host) smtp-user
 	                            (plist-get plist :smtp-port) smtp-password))))))
+	    (defvar idiig/mail-auth-source-warmed nil
+	      "Non-nil once `idiig/mail-auth-source-warm-cache' has populated
+	    auth-source's in-memory cache for this Emacs session.")
 	    
-	      (defvar idiig/mail-auth-source-warmed nil
-	        "Non-nil once `idiig/mail-auth-source-warm-cache' has populated
-	      auth-source's in-memory cache for this Emacs session.")
+	    (defun idiig/mail-auth-source-warm-cache ()
+	      "Feed `idiig/mail-accounts' IMAP/SMTP credentials into auth-source.
+	    `elmo-passwd-storage-type' is `auth-source', so elmo looks up passwords
+	    via `auth-source-search' keyed by :host/:port/:user (see
+	    `elmo-passwd-get' in elmo-passwd.el).  Bridge that to sops by writing
+	    a short-lived 0600 netrc file, letting auth-source read and cache one
+	    search per account/protocol, then deleting the file -- plaintext
+	    only touches disk for as long as that takes.
 	    
-	      (defun idiig/mail-auth-source-warm-cache ()
-	        "Feed `idiig/mail-accounts' IMAP/SMTP credentials into auth-source.
-	      `elmo-passwd-storage-type' is `auth-source', so elmo looks up passwords
-	      via `auth-source-search' keyed by :host/:port/:user (see
-	      `elmo-passwd-get' in elmo-passwd.el).  Bridge that to sops by writing
-	      a short-lived 0600 netrc file, letting auth-source read and cache one
-	      search per account/protocol, then deleting the file -- plaintext
-	      only touches disk for as long as that takes.
-	    
-	      Only runs once per session: `auth-source-search' caches its own
-	      results by (host port user), so calling this again would just cost 6
-	      more sops subprocess calls for no benefit."
-	        (unless idiig/mail-auth-source-warmed
-	          (require 'auth-source)
-	          (let ((netrc-file (make-temp-file "wl-authinfo-")))
-	            (unwind-protect
-	                (progn
-	                  (set-file-modes netrc-file #o600)
-	                  (with-temp-file netrc-file
-	                    (dolist (account idiig/mail-accounts)
-	                      (dolist (line (idiig/mail-account-netrc-lines account))
-	                        (insert line))))
-	                  (let ((auth-sources (cons netrc-file auth-sources)))
-	                    (dolist (account idiig/mail-accounts)
-	                      (let ((plist (cdr account)))
-	                        (when (idiig/mail-account-password-auth-p plist)
-	                          (let* ((imap-user (idiig/get-sops-secret-value
-	                                             (plist-get plist :login-key)))
-	                                 (smtp-user (idiig/get-sops-secret-value
-	                                             (idiig/mail-account-smtp-login-key plist))))
-	                            (auth-source-search :host (plist-get plist :imap-host)
-	                                                 :port (number-to-string
-	                                                        (plist-get plist :imap-port))
-	                                                 :user imap-user :require '(:secret) :create t)
-	                            (auth-source-search :host (plist-get plist :smtp-host)
-	                                                 :port (number-to-string
-	                                                        (plist-get plist :smtp-port))
-	                                                 :user smtp-user :require '(:secret) :create t)))))))
-	              (delete-file netrc-file)))
-	          (setq idiig/mail-auth-source-warmed t)))
+	    Only runs once per session: `auth-source-search' caches its own
+	    results by (host port user), so calling this again would just cost 6
+	    more sops subprocess calls for no benefit."
+	      (unless idiig/mail-auth-source-warmed
+	        (require 'auth-source)
+	        (let ((netrc-file (make-temp-file "wl-authinfo-")))
+	          (unwind-protect
+	              (progn
+	                (set-file-modes netrc-file #o600)
+	                (with-temp-file netrc-file
+	                  (dolist (account idiig/mail-accounts)
+	                    (dolist (line (idiig/mail-account-netrc-lines account))
+	                      (insert line))))
+	                (let ((auth-sources (cons netrc-file auth-sources)))
+	                  (dolist (account idiig/mail-accounts)
+	                    (let ((plist (cdr account)))
+	                      (when (idiig/mail-account-password-auth-p plist)
+	                        (let* ((imap-user (idiig/get-sops-secret-value
+	                                           (plist-get plist :login-key)))
+	                               (smtp-user (idiig/get-sops-secret-value
+	                                           (idiig/mail-account-smtp-login-key plist))))
+	                          (auth-source-search :host (plist-get plist :imap-host)
+	                                               :port (number-to-string
+	                                                      (plist-get plist :imap-port))
+	                                               :user imap-user :require '(:secret) :create t)
+	                          (auth-source-search :host (plist-get plist :smtp-host)
+	                                               :port (number-to-string
+	                                                      (plist-get plist :smtp-port))
+	                                               :user smtp-user :require '(:secret) :create t)))))))
+	            (delete-file netrc-file)))
+	        (setq idiig/mail-auth-source-warmed t)))
 	      (defun idiig/mail-format-from (name-key address-key)
 	        "Build an RFC 5322 \"Name <addr>\" From value from two sops keys.
 	    Kept as a named function (rather than inlined into the
@@ -1696,19 +1688,17 @@
 	            (wl-smtp-connection-type . ,(plist-get plist :smtp-connection-type))
 	            (wl-local-domain . ,(plist-get plist :message-id-domain))
 	            (wl-message-id-domain . ,(plist-get plist :message-id-domain)))))
+	    (defun idiig/mail-account-draft-config (account)
+	      "One `wl-draft-config-alist' entry for ACCOUNT: matches by folder."
+	      (cons `(string-match ,(plist-get (cdr account) :folder-match)
+	                            wl-draft-parent-folder)
+	            (idiig/mail-account-overrides account)))
 	    
-	      (defun idiig/mail-account-draft-config (account)
-	        "One `wl-draft-config-alist' entry for ACCOUNT: matches by folder."
-	        (cons `(string-match ,(plist-get (cdr account) :folder-match)
-	                              wl-draft-parent-folder)
-	              (idiig/mail-account-overrides account)))
-	    
-	      (defun idiig/mail-account-template (account)
-	        "One `wl-template-alist' entry for ACCOUNT, selectable by name via
-	      `wl-template-select' (`C-c C-j')."
-	        (cons (plist-get (cdr account) :petname)
-	              (idiig/mail-account-overrides account)))
-	    
+	    (defun idiig/mail-account-template (account)
+	      "One `wl-template-alist' entry for ACCOUNT, selectable by name via
+	    `wl-template-select' (`C-c C-j')."
+	      (cons (plist-get (cdr account) :petname)
+	            (idiig/mail-account-overrides account)))
 	      (defun idiig/wl-draft-maybe-select-account (&rest _)
 	        "Prompt for an account via `wl-template-select' when a draft has no
 	    parent folder (`C-x m', or any other entry point that does not pass
@@ -1731,25 +1721,23 @@
 	    fires reliably for `C-x m' too, not just replies."
 	        (when (string-empty-p wl-draft-parent-folder)
 	          (wl-template-select)))
-	    
-	      (with-eval-after-load 'wl
-	        (setq wl-draft-config-alist
-	              (mapcar #'idiig/mail-account-draft-config idiig/mail-accounts))
-	        (setq wl-template-alist
-	              (mapcar #'idiig/mail-account-template idiig/mail-accounts))
-	        (setq wl-template-visible-select nil)
-	        (add-hook 'wl-mail-setup-hook #'idiig/wl-draft-maybe-select-account)
-	        (setq wl-dispose-folder-alist
-	              (delq nil
-	                    (mapcar (lambda (account)
-	                              (let ((plist (cdr account)))
-	                                (when (plist-get plist :trash-folder)
-	                                  (cons (plist-get plist :folder-match)
-	                                        (idiig/mail-account-folder-spec
-	                                         (car account)
-	                                         (plist-get plist :trash-folder))))))
-	                            idiig/mail-accounts))))
-	    
+	    (with-eval-after-load 'wl
+	      (setq wl-draft-config-alist
+	            (mapcar #'idiig/mail-account-draft-config idiig/mail-accounts))
+	      (setq wl-template-alist
+	            (mapcar #'idiig/mail-account-template idiig/mail-accounts))
+	      (setq wl-template-visible-select nil)
+	      (add-hook 'wl-mail-setup-hook #'idiig/wl-draft-maybe-select-account)
+	      (setq wl-dispose-folder-alist
+	            (delq nil
+	                  (mapcar (lambda (account)
+	                            (let ((plist (cdr account)))
+	                              (when (plist-get plist :trash-folder)
+	                                (cons (plist-get plist :folder-match)
+	                                      (idiig/mail-account-folder-spec
+	                                       (car account)
+	                                       (plist-get plist :trash-folder))))))
+	                          idiig/mail-accounts))))
 	      (defun idiig/wl-template-apply-strict (orig-fn name)
 	        "Guard `wl-template-apply' against silently no-op'ing.
 	    `wl-template-select' builds its `completing-read' prompt (used
@@ -1787,7 +1775,6 @@
 	          (insert "-- \n"))))
 	    
 	    (setq mail-signature-file idiig/mail-signature-file)
-	    
 	    (with-eval-after-load 'wl
 	      (setq wl-stay-folder-window nil)
 	      (define-key wl-draft-mode-map (kbd "C-c C-w") #'wl-draft-insert-signature)
@@ -1819,7 +1806,6 @@
 	      (idiig/mail-signature-setup)
 	      (idiig/mail-auth-source-warm-cache)
 	      (idiig/sasl-xoauth2-ensure-hotmail-client-id))
-	    
 	    (use-package wl
 	      :commands (wl wl-draft wl-user-agent-compose)
 	      :init

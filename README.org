@@ -2195,39 +2195,19 @@ Microsoft 认证，不再经过本地网关）。账号的用户名/密码/OAuth
 #+end_src
 
 **** 本地 HTTP 回调接管授权（绕开 =nativeclient=）
-=oauth2.el= 自带的授权流程是「打开浏览器 → 弹 minibuffer 让你把浏览
-器上显示的 code 手动抄回来」，配合 =redirect_uri=
-=https://login.microsoftonline.com/common/oauth2/nativeclient= 这个
-微软保留地址使用——命中后微软本该渲染一个静态页面明文显示 code 供人
-工抄写。但实测这个页面并不可靠：登录同意之后，浏览器会先短暂经过带
-=code=...&state=...= 的 =nativeclient= 地址，然后很快自动跳到
-=https://login.microsoftonline.com/common/wrongplace=，显示 "You
-have reached the wrong page"，人工根本来不及在页面消失前把 code 抄
-下来——但那次授权其实是成功的（Microsoft 账号那边会收到"新应用已连
-接"的通知邮件，重新查看 App registrations 也能看到已经拿到过一次
-token），只是这个静态展示页面本身不稳定，不是账号、密码、scope 或
-XOAUTH2 本身的问题。
+=oauth2.el= 默认走「打开浏览器 → 让你把 code 手动抄回 minibuffer」，
+配合微软保留地址 =.../common/oauth2/nativeclient= 展示 code 供抄写。
+实测这个展示页面不可靠：同意登录后浏览器会先短暂经过带 code 的
+=nativeclient= 地址，很快又自动跳到 =.../common/wrongplace=，人工来
+不及抄——但授权本身其实成功了（有"新应用已连接"通知邮件为证），只是
+展示页面不稳定。
 
-解法是不依赖这个展示页面，让 Emacs 自己起一个一次性的本地 HTTP 服务
-接住浏览器的回调：把 =redirect_uri= 换成 =http://localhost:PORT=
-（微软对这种「loopback 回调」的 public client 是支持的，不需要额外
-的 client secret），=oauth2-request-authorization= 收到重定向请求时
-直接从查询串里读 =code=，不用人工在浏览器和 Emacs 之间倒手。因为
-=oauth2-auth=/=oauth2-auth-and-store= 内部会把同一个 =redirect-uri=
-参数原样传给「发起授权请求」和「拿 code 换 token」这两步（对着
-=oauth2.el= 源码确认过：两次调用用的是同一个变量，不是分别构造
-的），只要我们的替代实现收到什么 =redirect-uri= 就老老实实拿它去监
-听、不自己另外瞎造一个，整条链路上 redirect_uri 就能保持一致，不会
-触发 OAuth2 规范要求的「授权请求和换 token 请求的 redirect_uri 必须
-一致」这条校验。
-
-用固定端口而不是每次随机选一个：微软虽然也支持不指定端口的
-=http://localhost=（运行时不管实际监听在哪个端口都认），但用固定端
-口不用依赖这个稍微冷门的行为，配置和 Azure Portal 里要填的重定向
-URI 都更直观。下面这个端口需要额外去 Azure Portal → Authentication
-→ "Mobile and desktop applications" 平台下加一条
-=http://localhost:PORT=（跟已有的 =nativeclient= 那条并存就行，不用
-删）。
+解法：让 Emacs 自己起一个一次性本地 HTTP 服务接住回调，
+=redirect_uri= 换成 =http://localhost:PORT=（微软支持这种 loopback
+public client，不需要 client secret）。固定端口而不是随机选：配置和
+Azure Portal 里要填的重定向 URI 都更直观，需要额外去 Azure Portal →
+Authentication → "Mobile and desktop applications" 平台下加一条
+=http://localhost:PORT=（跟已有的 =nativeclient= 那条并存，不用删）。
 #+begin_src emacs-lisp
   (require 'url-util) ; url-parse-query-string
 
@@ -2243,7 +2223,14 @@ URI 都更直观。下面这个端口需要额外去 Azure Portal → Authentica
   (defvar idiig/oauth2-localhost-redirect-timeout 300
     "Seconds to wait for the browser to deliver the OAuth redirect to
   the local listener before giving up.")
+#+end_src
 
+=oauth2-auth=/=oauth2-auth-and-store= 内部把同一个 =redirect-uri= 原
+样传给「发起授权」和「换 token」两步（对着源码确认过是同一个变量，
+不是分别构造），所以我们的替代实现收到什么 =redirect-uri= 就照原样
+拿去监听，不自己另造一个，链路上就能保持一致，不会触发 OAuth2 规范
+要求的一致性校验。
+#+begin_src emacs-lisp
   (defun idiig/oauth2-localhost-request-authorization
       (auth-url client-id &optional scope state redirect-uri user-name code-verifier)
     "Override for `oauth2-request-authorization' (same argument order)
@@ -2318,7 +2305,12 @@ URI 都更直观。下面这个端口需要额外去 Azure Portal → Authentica
   (with-eval-after-load 'oauth2
     (advice-add 'oauth2-request-authorization :override
                 #'idiig/oauth2-localhost-request-authorization))
+#+end_src
 
+=sasl-xoauth2-response= 调用 =oauth2-auth-and-store= 时不传
+=use-pkce=，永远退回不开 PKCE 的默认值，这里用 advice 强制打开——
+PKCE 能防止别的本地进程抢先绑定同一个端口、截获这条授权码。
+#+begin_src emacs-lisp
   (defun idiig/oauth2-auth-and-store-force-pkce
       (orig-fn auth-url token-url scope client-id client-secret
                &optional redirect-uri state user-name host-name _use-pkce)
@@ -2337,56 +2329,9 @@ already threads CODE-VERIFIER through unconditionally."
 #+end_src
 
 **** 账号与本地目录
-=idiig/mail-directory= （ =~/mails/= ）统一存放本地状态，
-=elmo-localdir-folder-path= / =elmo-msgdb-directory= 都指过去。核心是
-一张 =idiig/mail-accounts= 数据表，每个账号一条：IMAP/SMTP 的
-host/port、走不走 TLS、IMAP/SMTP 各自的认证方式（
-=:imap-auth-type=/=:smtp-auth-type=）、sops 里登录用户名/密码/显示
-地址对应的 key、以及后面用来识别账号的 folder 匹配正则。下面几节
-（订阅 folders、密码、身份切换）都从这张表生成，不重复写 3 遍账号信
-息。
-
-=:imap-auth-type= 是 ELMO 折叠进 folder-spec =/AUTH= 段的那个 symbol
-（见下面「订阅 folders」一节），=:smtp-auth-type= 是 FLIM =smtp.el=
-认的 SASL 机制名字符串，两者词汇表不一样，不能共用一个字段：SDF/Gmail
-密码认证对应 =:imap-auth-type clear=（ELMO 内置的明文 LOGIN，走
-=elmo-imap4-clear-login=，不是走通用 SASL 分支）+
-=:smtp-auth-type "plain"=（SASL PLAIN 机制，由 =sasl-plain.el=
-提供）；Hotmail 统一是 =:imap-auth-type xoauth2= +
-=:smtp-auth-type "xoauth2"=，两边都落到 =sasl-xoauth2= 注册的
-=XOAUTH2= 机制上，不需要真的存密码。
-
-=:imap-auth-type= 故意没写成 =:imap-auth-type 'clear=（带 quote）：
-整张 =idiig/mail-accounts= 表是一个 backquote 表达式，backquote 里的
-裸 symbol 本来就是字面数据，不会被求值，加一个 quote 反而会让这个字
-段的值变成 =(quote clear)= 这个两元素的列表，而不是 symbol
-=clear= 本身——=idiig/mail-account-connection-suffix= 是直接
-=(plist-get plist :imap-auth-type)= 取出来就当 symbol 用
-（=(symbol-name auth)=），不会再 eval 一次，加了 quote 就会在这里报
-=Wrong type argument: symbolp, 'clear= 。这跟下面 =:smtp-auth-type=/
-=:smtp-connection-type= 不是一回事：那两个字段的值会经过
-=idiig/mail-account-overrides= 里 =,(plist-get plist ...)= 这层
-unquote，塞进 =wl-draft-config-alist=/=wl-template-alist= 里等真正
-撰写邮件时才被 =wl-draft-config-exec= eval 一次，所以 =:smtp-connection-type=
-必须留着 quote（=eval= 一次 =(quote starttls)= 才能拿到 symbol
-=starttls=，不加 quote 的话 =eval= 一个裸 symbol 会被当成变量名去查
-值，大概率 void-variable）——两个字段字面上都在用 symbol，但要不要
-quote 完全取决于各自会不会再被 eval 一次。
-
-SDF 的登录用户名和邮件地址不是同一个字符串（ =user= vs
-=user@sdf.org= ），所以表里 =:login-key= （登录用）和 =:from-key=
-（ =From= 头用）分开两个 sops key；Gmail/Hotmail 这两个值相同，直接
-复用同一个 key。
-
-SDF 自己的 SMTP relay 需要 ARPA 验证才能对外发信，这个账号还没有，
-所以 SDF 条目的 =:smtp-host=/=:smtp-port=/=:smtp-connection-type=
-指向 Gmail 的 SMTP，另外用 =:smtp-login-key=/=:smtp-password-key=
-（复用已有的 =mail_gmail_user=/=mail_gmail_app_password=，不新注册
-key）覆盖发信用的登录凭据；=:login-key=/=:password-key= 还是 SDF 自
-己的，继续只用于 IMAP 收信。=:from-key=/=:from-name-key= 不受影响，
-发出去的邮件 From 头仍然是 SDF 地址。这两个 override key 是可选的，
-不设置就退回到跟 IMAP 一样的 =:login-key=/=:password-key=（Gmail/
-Hotmail 目前都是这样）。
+=idiig/mail-directory=（ =~/mails/= ）统一存放本地状态；
+=elmo-localdir-folder-path=/=elmo-msgdb-directory= 都指过去。不做跨
+机器 git 同步——IMAP 是数据源，本地缓存每台机器各自建。
 #+begin_src emacs-lisp
   (defvar idiig/mail-directory (expand-file-name "~/mails/")
     "Local root for all Wanderlust state: message cache, signature file,
@@ -2400,7 +2345,30 @@ Hotmail 目前都是这样）。
   (with-eval-after-load 'wl
     (setq elmo-localdir-folder-path idiig/mail-directory)
     (setq elmo-msgdb-directory (expand-file-name ".elmo" idiig/mail-directory)))
+#+end_src
 
+核心是一张 =idiig/mail-accounts= 数据表，每个账号一条：IMAP/SMTP 的
+host/port、认证方式、sops key、folder 匹配正则。下面几节（订阅
+folders、密码、身份切换）都从这张表生成，不重复写 3 遍。
+
+两个认证字段词汇表不同，不能共用：=:imap-auth-type= 是 ELMO
+folder-spec =/AUTH= 段用的 symbol（=clear=/=xoauth2=），
+=:smtp-auth-type= 是 FLIM =smtp.el= 认的 SASL 机制名字符串
+（="plain"=/="xoauth2"=）。=:imap-auth-type= 故意不带 quote——整张表
+是 backquote 表达式，裸 symbol 本来就是字面数据，加 quote 反而变成
+=(quote clear)= 这个列表，=idiig/mail-account-connection-suffix= 直
+接当 symbol 用会报 =Wrong type argument: symbolp=。=:smtp-connection-type=
+则相反，必须带 quote：它的值要经 =wl-draft-config-exec= 之后再
+=eval= 一次，不加 quote 会被当成变量名去查值。
+
+SDF 登录名和邮件地址不同字符串（=user= vs =user@sdf.org=），
+=:login-key=/=:from-key= 分开两个 key；Gmail/Hotmail 两者相同，直接
+复用。SDF 自己的 SMTP relay 没做 ARPA 验证，发不了信，所以
+=:smtp-host= 等指向 Gmail，另加 =:smtp-login-key=/=:smtp-password-key=
+（复用 =mail_gmail_*=）覆盖发信凭据，收信仍用 SDF 自己的
+=:login-key=/=:password-key=；不设置这两个 override key 时退回到跟
+IMAP 一样（Gmail/Hotmail 就是这样）。
+#+begin_src emacs-lisp
   (defvar idiig/mail-accounts
     `((sdf
        :petname "SDF"
@@ -2485,7 +2453,10 @@ Hotmail 目前都是这样）。
   routing, so deleting a message in any of these 3 accounts' folders
   refiles it into that same account's own remote Trash instead of one
   shared `wl-trash-folder'.")
+#+end_src
 
+对应的 sops key 注册在这里，跟表里的 key 名一一对应：
+#+begin_src emacs-lisp
   (idiig/sops-register-keys
    '(("mail_sdf_user" . "SDF IMAP/SMTP login username, no @domain")
      ("mail_sdf_password" . "SDF password")
@@ -2528,48 +2499,9 @@ XOAUTH2 要先在 Microsoft 那边注册一个 OAuth 应用（
   =mail_hotmail_oauth_client_id=；public client 不需要 client
   secret
 
-=sasl-xoauth2.el= 自带一份 =sasl-xoauth2-host-url-table= 默认值，但两
-条跟 Hotmail 相关的记录都不合适：=\.outlook\.com$= 那条指向已经停用
-的 =login.live.com= 端点（旧 Windows Live/MSA-only OAuth，scope 只
-有 =wl.imap=，不含 SMTP）；=\.office365\.com$= 那条 scope 是对的，但
-一是 redirect-uri 是 =nil=，二是授权/token 端点用的是 =/common/=——
-实测（真实报错）确认 =/common/= 对个人账号会失败：Azure Portal 用个
-人账号登录时会自动给这个账号建一个「默认目录」（一个看不太见但确实
-存在的组织租户，=publisherDomain= 字段能看到类似
-=xxxhotmail.onmicrosoft.com= 这样的名字），应用就注册在这个自动建的
-组织租户下；=/common/= 端点会先按这个组织租户的身份去解析登录请求，
-个人账号又不是这个租户的正式成员，于是报
-=AADSTS500200: Personal Microsoft accounts are not supported for this
-application unless explicitly invited to an organization=——即使
-=signInAudience= 已经是 =AzureADandPersonalMicrosoftAccount=（同时允
-许组织和个人账号）也一样会卡在这一步，因为这是租户路由问题，不是账
-号类型限制问题。换成 =/consumers/= 端点直接跳过组织租户解析，走微软
-专门给纯个人账号（MSA）用的身份系统就没有这个问题。所以这里直接覆
-盖，不依赖内置默认值命中还是不命中。=sasl-xoauth2-host-user-id-table=
-按登录邮箱正则匹配到上面注册的 client-id；token 缓存目录单独放在
-=~/mails/.sasl-xoauth2/=，跟 Wanderlust 其它本地状态放一起，不用
-=oauth2.el= 默认塞进 =user-emacs-directory= 的那份 plstore。这一节要
-放在「账号与本地目录」之后——下面用到的 =idiig/mail-directory= 是那
-一节才定义的，放前面会在加载时报 =Symbol's value as variable is
-void: idiig/mail-directory= 。
-
-拿到 token 之后 =oauth2.el= 默认用 =plstore= 存到磁盘，而 =plstore-save=
-只要发现有「secret」字段就无条件调用 GPG 加密——=oauth2-auth-and-store=
-第一次拿到 token 存盘是这样，后面 =oauth2-refresh-access= 每次刷新
-access token 存盘也是这样，不是只有第一次配置才会碰到。这台机器上没
-装 =gpg=（=which gpg= 直接找不到），实测（真实授权流程）确认这个
-情况下不是像 batch 模式那样直接报错，而是在交互式 Emacs 里卡住不
-动——大概率是 =epa-select-keys= 想弹一个选 GPG 收件人/等密码的界面
-但根本没有地方弹。解法是覆盖 =oauth2--update-plstore= 这一个内部函
-数，把本来放进「secret」字段的内容改放进「public」字段——对着
-=plstore.el= 源码确认过这两种字段读回来的时候会合并进同一个 alist，
-调用方（=oauth2-auth-and-store=/=oauth2-refresh-access= 的缓存命中判
-断）看到的数据完全一样，只是「public」字段存盘时不会触发 GPG 那段
-代码，不用改前后的缓存/刷新逻辑。=~/mails/.sasl-xoauth2/= 目录本身
-私有（这里额外加固成 0700），跟这份配置里其它地方（比如
-sops 解出来的密码桥接用的临时 netrc 文件）对明文凭据的信任级别一
-致，所以直接存明文可以接受，但文件本身还是补一个 0600——=plstore.el=
-自己完全不设文件权限，原本全指望 GPG 兜底机密性。
+Token 缓存目录用「账号与本地目录」一节定义的 =idiig/mail-directory=
+拼路径，单独放在 =~/mails/.sasl-xoauth2/=，不用 =oauth2.el= 默认塞进
+=user-emacs-directory= 的那份 plstore。
 #+begin_src emacs-lisp
   (defvar idiig/sasl-xoauth2-token-directory
     (expand-file-name ".sasl-xoauth2/" idiig/mail-directory))
@@ -2579,7 +2511,17 @@ sops 解出来的密码桥接用的临时 netrc 文件）对明文凭据的信�
   (set-file-modes idiig/sasl-xoauth2-token-directory #o700)
 
   (setq sasl-xoauth2-token-directory idiig/sasl-xoauth2-token-directory)
+#+end_src
 
+拿到 token 后 =oauth2.el= 默认用 =plstore= 存盘，只要有「secret」字
+段就无条件调用 GPG 加密（不只是第一次配置，=oauth2-refresh-access=
+每次刷新 token 也会存一次）。这台机器没装 =gpg=，实测确认交互式
+Emacs 下会卡住不动（=epa-select-keys= 想弹选择框但没地方弹）。解法
+是覆盖 =oauth2--update-plstore=，把内容改放进「public」字段——对着
+=plstore.el= 源码确认过这两种字段读回来会合并进同一个 alist，调用方
+看到的数据完全一样，只是「public」字段不触发 GPG。目录本身已经
+0700，文件再补一个 0600（=plstore.el= 自己不设文件权限）。
+#+begin_src emacs-lisp
   (defun idiig/oauth2-update-plstore-plain (plstore token)
     "Override for `oauth2--update-plstore' (same arguments) that
   stores TOKEN as a plain, unencrypted plstore entry instead of
@@ -2621,12 +2563,14 @@ sops 解出来的密码桥接用的临时 netrc 文件）对明文凭据的信�
     (advice-add 'oauth2--update-plstore :override
                 #'idiig/oauth2-update-plstore-plain))
 
-  ;; Overrides sasl-xoauth2's own "\\.outlook\\.com$"/"\\.office365\\.com$"
-  ;; defaults (retired endpoint / missing redirect-uri, see prose above)
-  ;; with one entry that matches both our Hotmail IMAP and SMTP hosts
-  ;; (wl-smtp-authenticate-type needs SMTP to resolve here too, or
-  ;; sasl-xoauth2 falls back to prompting interactively).  Uses the
-  ;; /consumers/ authorize+token endpoints, not /common/: an app
+  ;; sasl-xoauth2's own built-in "\\.outlook\\.com$"/"\\.office365\\.com$"
+  ;; defaults don't work: the former points at a retired endpoint, the
+  ;; latter has no redirect-uri and uses /common/ instead of
+  ;; /consumers/.  Overridden below with one entry that matches both
+  ;; our Hotmail IMAP and SMTP hosts (wl-smtp-authenticate-type needs
+  ;; SMTP to resolve here too, or sasl-xoauth2 falls back to prompting
+  ;; interactively).  Uses the /consumers/ authorize+token endpoints,
+  ;; not /common/: an app
   ;; registered from a personal Microsoft account gets auto-provisioned
   ;; into a real (if invisible) organizational tenant, and /common/
   ;; tries to resolve that tenant context first -- since the personal
@@ -2658,7 +2602,11 @@ sops 解出来的密码桥接用的临时 netrc 文件）对明文凭据的信�
                  "https://login.microsoftonline.com/consumers/oauth2/v2.0/token"
                  "https://outlook.office.com/IMAP.AccessAsUser.All https://outlook.office.com/SMTP.Send offline_access"
                  ,(format "http://localhost:%d" idiig/oauth2-localhost-redirect-port)))
+#+end_src
 
+client-id 按登录邮箱正则注册进 =sasl-xoauth2-host-user-id-table=，跟
+上面 host-url-table 用同一个正则匹配 IMAP/SMTP 两个主机名。
+#+begin_src emacs-lisp
   (defvar idiig/sasl-xoauth2-client-id-warmed nil
     "Non-nil once the Hotmail entry has been added to
   `sasl-xoauth2-host-user-id-table' for this Emacs session.")
@@ -2682,42 +2630,23 @@ sops 解出来的密码桥接用的临时 netrc 文件）对明文凭据的信�
 #+end_src
 
 **** 订阅 folders
-从 =idiig/mail-accounts= 生成 =wl-folders-file= （放在
-=~/mails/.folders= ）的内容。每个账号一个 group（=PETNAME { ... }=），
-组里第一行是 =INBOX=，后面跟 =:extra-folders= 里列的子文件夹（Sent/
-Drafts/Spam/Trash 之类），每一行都用 elmo 的
-=%"mailbox":"user"/auth@host:port!= 语法把连接信息整个编码进去，其中
-=auth= 段直接来自账号的 =:imap-auth-type=（=clear= 或 =xoauth2=），
-=!= 结尾则单独由 =:imap-tls= 决定——两者是正交的两件事：=auth= 段是
-=elmo-imap4-folder-create= 解析出来、挂到
-=elmo-network-session-auth-internal= 上的登录方式（对着
-=elmo-imap4.el= 源码确认过：非 =clear=/=login= 的值会落到通用 SASL
-分支，把这段字符串大写后去匹配 =sasl-find-mechanism=，=xoauth2= 正好
-命中 =sasl-xoauth2= 注册的 =XOAUTH2= 机制）；=!= 结尾是纯粹的
-=elmo-net-folder-stream-type= 标记，代表这条连接要不要走 SSL/TLS。以
-前 3 个账号 IMAP 全走密码认证，=/clear= 是不是要加恰好跟要不要 TLS
-同步变化，看起来像是同一件事；现在 Hotmail 改用 XOAUTH2 但 IMAP 仍然
-是 993/隐式 TLS，两者不再同步，混在一起判断就会生成错误的 folder
-line，所以分开处理。
-
-两处都要加双引号，不是随便选的：
-- 用户名要引起来——Gmail/Hotmail 的登录名本身就是完整邮箱地址，也带
-  =@= ，跟分隔 user/host 的那个 =@= 撞在一起会解析错乱，实测（见下面
-  =idiig/mail-account-connection-suffix= 的 docstring）不加引号直接
-  导致 elmo 连不上；SDF 的用户名没有 =@= 所以当时看不出问题
-- =mailbox= 名字也要引起来——用真实的 elmo tokenizer 代码（不是凭经
-  验）测过：=%[Gmail]/Sent:user@host:port!= 这种不加引号的写法，
-  =mailbox= 只会解析出 =[Gmail]= ，后面 =/Sent:user@host:port!=
-  整段都解析失败；引号包起来之后 =mailbox= 才能正确取到完整的
-  =[Gmail]/Sent= 。这也是为什么 Sent/Drafts 这些名字里带 =/= 的文件
-  夹必须加引号，纯 =INBOX= 这种不带特殊字符的不加也没事。
-
-只在文件不存在时写一次，写完之后就是用户自己维护的文件（加子文件
-夹、改名随意），不会被覆盖。
+从 =idiig/mail-accounts= 生成 =wl-folders-file=（=~/mails/.folders=）
+的内容，每个账号一个 group，每行用 elmo 的
+=%"mailbox":"user"/auth@host:port!= 语法编码连接信息。只在文件不存
+在时写一次，写完就是用户自己维护的文件，不会被覆盖。
 #+begin_src emacs-lisp
   (with-eval-after-load 'wl
     (setq wl-folders-file (expand-file-name ".folders" idiig/mail-directory)))
+#+end_src
 
+=auth= 段来自 =:imap-auth-type=，=!= 结尾来自 =:imap-tls=，两者正交
+独立：以前 3 个账号密码认证时两者恰好同步变化，容易误以为是一件
+事，现在 Hotmail 用 XOAUTH2 但 IMAP 仍是隐式 TLS，混在一起判断就会
+生成错误的 folder line。用户名和 =mailbox= 名字都要加引号——Gmail/
+Hotmail 登录名本身带 =@=，跟分隔 user/host 的 =@= 撞车会解析错乱；
+=mailbox= 名字里带 =/=（如 =[Gmail]/Sent=）不加引号只会解析出前半
+段，两者都用真实 elmo tokenizer 代码测过。
+#+begin_src emacs-lisp
   (defun idiig/mail-account-connection-suffix (plist)
     "The \"user\"/auth@host:port! suffix shared by every folder line
 for an account described by PLIST.
@@ -2742,7 +2671,12 @@ Hotmail now uses XOAUTH2 while still connecting over implicit TLS on
               (plist-get plist :imap-host)
               (plist-get plist :imap-port)
               (if tls "!" ""))))
+#+end_src
 
+拼出单个 folder 完整 spec 的函数按账号名现查 =idiig/mail-accounts=，
+而不是接收已解出的 plist——这样调用方（比如「身份切换」一节的 Fcc）
+能保持 sops 用户名的懒解密，跟 =idiig/mail-format-from= 同样的思路。
+#+begin_src emacs-lisp
   (defun idiig/mail-account-folder-spec (account-name mailbox)
     "Full elmo folder-spec string for MAILBOX under the connection
 settings of the `idiig/mail-accounts' entry named ACCOUNT-NAME.
@@ -2787,29 +2721,12 @@ mailbox name one token, the same fix as the username's @ problem."
 #+end_src
 
 **** 密码 (=auth-source= 桥接)
-Wanderlust 的密码存取（=elmo-passwd.el=）支持把
-=elmo-passwd-storage-type= 设成 ='auth-source= ，这样它会用标准的
-=auth-source-search :host :port :user= 去查——已经对着 elmo 源码确认
-过这个调用形式，也对着 =auth-source.el= 源码确认过 =auth-sources=
-是每次 =auth-source-search= 调用时现查现解析的，没有额外的、动态绑定
-影响不到的缓存。做法是运行期生成一个 0600 权限的临时 netrc 文件（内
-容来自 sops），塞进 =auth-sources= ，对密码认证账号的 IMAP/SMTP 各查
-一次把结果传给 auth-source 自己的缓存，然后立刻删除临时文件——明文
-密码只在磁盘上停留很短时间。
-
-这套桥接只对 =:imap-auth-type= 是 =clear= 的账号有意义——Hotmail 用
-XOAUTH2，根本没有「密码」这个概念，凭据来自
-=sasl-xoauth2-host-user-id-table=（见前面「Microsoft OAuth 配置」一
-节）和浏览器授权流程，不经过 =elmo-passwd=/=auth-source=。所以这里
-先用 =idiig/mail-account-password-auth-p= 过滤掉它，而不是照样查一个
-不存在的 =:password-key=（那会是 =nil=，传给
-=idiig/get-sops-secret-value= 只会去问 sops 一个叫 =nil= 的字符串
-key，静默拿到空结果，不会报错但也没有意义）。
-
-=auth-source-search= 自己会按 host/port/user 缓存查询结果，所以这个
-"预热"函数只需要在本次 Emacs 会话里成功跑过一次；用一个 =idiig/=
-变量记一下，避免每次打开 =wl= 都重新解密 sops key、重新写一遍临时文
-件。
+=elmo-passwd.el= 支持把 =elmo-passwd-storage-type= 设成
+='auth-source=，这样密码认证账号走标准的 =auth-source-search :host
+:port :user=。做法是运行期生成一个 0600 临时 netrc 文件（内容来自
+sops），塞进 =auth-sources=，对每个密码账号的 IMAP/SMTP 各查一次把
+结果喂进 auth-source 自己的缓存，然后立刻删除临时文件——明文密码只
+在磁盘上停留很短时间。
 #+begin_src emacs-lisp
   (with-eval-after-load 'wl
     (setq elmo-passwd-storage-type 'auth-source))
@@ -2823,7 +2740,13 @@ send through a different account's SMTP server than they receive on."
   (defun idiig/mail-account-smtp-password-key (plist)
     "The sops key for ACCOUNT's SMTP password; see `idiig/mail-account-smtp-login-key'."
     (or (plist-get plist :smtp-password-key) (plist-get plist :password-key)))
+#+end_src
 
+这套桥接只对密码认证的账号有意义——Hotmail 用 XOAUTH2，凭据来自
+=sasl-xoauth2-host-user-id-table= 和浏览器授权流程，不经过
+=auth-source=，所以先过滤掉它，而不是照样去查一个不存在的
+=:password-key=。
+#+begin_src emacs-lisp
   (defun idiig/mail-account-password-auth-p (plist)
     "Non-nil when ACCOUNT authenticates with a password rather than
 XOAUTH2.  XOAUTH2 accounts have no :password-key at all -- their
@@ -2848,7 +2771,12 @@ sops.  Returns nil for XOAUTH2 accounts; see
                 (format "machine %s login %s port %d password %s\n"
                         (plist-get plist :smtp-host) smtp-user
                         (plist-get plist :smtp-port) smtp-password))))))
+#+end_src
 
+=auth-source-search= 自己按 host/port/user 缓存查询结果，这个"预热"
+函数只需要在本次会话里跑一次，用一个变量记一下，避免每次开 =wl= 都
+重新解密 sops key。
+#+begin_src emacs-lisp
   (defvar idiig/mail-auth-source-warmed nil
     "Non-nil once `idiig/mail-auth-source-warm-cache' has populated
   auth-source's in-memory cache for this Emacs session.")
@@ -2896,68 +2824,12 @@ sops.  Returns nil for XOAUTH2 accounts; see
 #+end_src
 
 **** 身份切换（多账号 From / SMTP / Sent / Trash）
-=wl-draft-config-alist= 的官方语法是「条件 + (header-or-var . value)
-列表」，条件可以是 =(string-match REGEXP wl-draft-parent-folder)= ——
-=wl-draft-parent-folder= 是撰写邮件时所在的 folder 名，而 folder 名本
-身就带了 host（因为上面 folders 那节把连接信息编进了 folder 名），
-所以直接拿账号表里的 host 生成匹配正则即可，不需要额外维护一份"这
-个 folder 属于哪个账号"的映射。命中后覆盖 ="From"= 、
-=wl-smtp-posting-server/-port/-user/-authenticate-type/-connection-type=
-以及 =wl-local-domain=/=wl-message-id-domain= （避免生成的 Message-ID
-带出本机 hostname）。从 =idiig/mail-accounts= 循环生成 3 条，不手写。
-
-但 =wl-draft-parent-folder= 只有在从某个账号的 folder 里按 =w=
-回信/写信时才有值——对着 =wl-draft-create-buffer= 源码确认过，直接
-=C-x m= 撰写新邮件时它不是 nil 而是空字符串 =""=（源码注释写得很明
-白：特意留空字符串而不是 nil，就是为了让 =wl-draft-config-alist= 里
-的 =string-match= 不用另外判断 nil），=string-match= 对着空字符串自
-然不会命中任何一条规则，From/SMTP 就没人设置。参照
-[[https://github.com/LdBeth/Emacs-for-Noobs/blob/master/WanderLust.org][这份参考文档]]
-的做法，把同一份 override 列表也生成一份 =wl-template-alist= ，撰写
-新邮件时按 =C-c C-j= （=wl-template-select=，Wanderlust 自带绑定）手
-动选一个账号，效果和自动匹配完全一样——两张表背后是同一个
-=idiig/mail-account-overrides= ，不用维护两份。
-
-=wl-template-visible-select= 默认 =t=，=C-c C-j= 出来的是 =n=/=p= 一
-个个翻的界面；设成 =nil= 之后走 =completing-read=，直接打字过滤候
-选。=wl-draft-parent-folder= 为空字符串（=C-x m= 这种没有来源 folder
-的场景）时，=wl-draft-create-buffer= 返回后立刻自动调用一次
-=wl-template-select= ，不需要手动记得按 =C-c C-j= 。挂在
-=wl-draft-create-buffer= 的 =:after= advice 上，而不是
-=wl-draft-mode-hook= ——=wl-draft-parent-folder= 是在
-=wl-draft-create-buffer= 内部、调用完 =(wl-draft-mode)= 触发
-mode-hook *之后* 才被赋值的，挂在 mode-hook 上读到的还是赋值前的
-默认值，时机不对。
-
-对着 =wl-draft.el= 源码确认过一个细节：条件和 value 都是没被求值
-的 Lisp form，Wanderlust 自己在真正撰写邮件、命中某条规则（或者手
-动 =C-c C-j= 选模板）时才会 =eval= 它们（官方手册的示例也是直接
-=quote= 一整个 alist，不是反引号拼值）。所以生成这张表的时候，
-="From"= / =wl-smtp-posting-user= 对应的值故意保留成
-=(idiig/get-sops-secret-value ...)= 这样的字面 form，而不是在构造表
-的时候就求值成字符串——sops 密钥要留到真正写信那一刻才解密，不用在
-=wl-draft-config-alist= 一 setq 的时候就全部解开。反引号只用来把账号
-表里的 host/port 这些非密钥字段拼进去。
-
-=Fcc= 也走同一套懒加载：账号有 =:sent-folder= 时（SDF 没有，不知道
-它的文件夹结构，不生成这条），往 override 列表里加一条 =("Fcc" .
-(idiig/mail-account-folder-spec ',账号名 ,sent-folder))= ——同样是没
-求值的字面 form，真正发信时才去查 =idiig/mail-accounts= 、拼出完整
-folder spec、解密用户名。发出去的邮件会自动存一份到对应账号自己的
-Sent 文件夹，不是全局共用一个。
-
-Trash 这块不能用同一套机制——=wl-draft-config-alist=/=wl-template-alist=
-只在撰写邮件的 draft buffer 里生效，但"删除邮件"这个动作发生在浏览
-邮件的 summary buffer 里，跟 draft 完全不搭边。Wanderlust 自己另外有
-一个专门管这个的变量 =wl-dispose-folder-alist= ：=(FOLDER-REGEXP .
-POLICY)= 的表，POLICY 是字符串时就代表"删除时改成 refile 到这个文件
-夹"，天然支持"按当前 folder 是谁决定丢到哪个 Trash"，不需要另外挂
-advice。这里唯一的取舍是：=wl-dispose-folder-alist= 是普通变量，没
-有 =wl-draft-config-alist= 那种"命中的时候才 eval"的机制，只能在
-=with-eval-after-load 'wl= 里老老实实 =setq= 一次性算好——意味着有
-=:trash-folder= 的账号（Gmail、Hotmail），它们的登录用户名会在 wl
-加载的时候就解密一次，不再是"真正用到才解密"。用户名不是密码，这个
-折中可以接受。
+=wl-draft-config-alist= 是「条件 + (header-or-var . value) 列表」：
+条件用 =(string-match REGEXP wl-draft-parent-folder)=，folder 名本身
+带 host（folders 那节编进去的），直接拿账号表里的 host 生成正则即可。
+命中后覆盖 From、=wl-smtp-posting-*=、=wl-local-domain=/
+=wl-message-id-domain=（避免 Message-ID 带出本机 hostname）。从
+=idiig/mail-accounts= 循环生成，不手写 3 份。
 #+begin_src emacs-lisp
   (defun idiig/mail-format-from (name-key address-key)
     "Build an RFC 5322 \"Name <addr>\" From value from two sops keys.
@@ -2992,7 +2864,22 @@ moment `wl-draft-config-exec' evals this entry."
         (wl-smtp-connection-type . ,(plist-get plist :smtp-connection-type))
         (wl-local-domain . ,(plist-get plist :message-id-domain))
         (wl-message-id-domain . ,(plist-get plist :message-id-domain)))))
+#+end_src
 
+条件和 value 都是没被求值的 Lisp form，Wanderlust 命中规则（或手动
+=C-c C-j= 选模板）时才 =eval= 它们，所以 sops 密钥留到真正写信那一
+刻才解密，不在 =setq= 这张表的时候就全解开。=Fcc= 同理：账号有
+=:sent-folder= 时才加一条懒加载的 =("Fcc" . (idiig/mail-account-folder-spec
+',账号名 ,sent-folder))=，让发出去的邮件自动存进对应账号自己的 Sent
+文件夹。
+
+Trash 走不了同一套机制——删除邮件发生在 summary buffer，跟 draft 不
+搭边，Wanderlust 为此单独有 =wl-dispose-folder-alist=（=(FOLDER-REGEXP
+. POLICY)=，POLICY 是字符串就代表 refile 到这个文件夹）。这个变量没
+有惰性 eval 机制，只能在 =with-eval-after-load 'wl= 里一次性
+=setq= 算好，意味着有 =:trash-folder= 的账号在 wl 加载时用户名就会
+解密一次——用户名不是密码，可以接受。
+#+begin_src emacs-lisp
   (defun idiig/mail-account-draft-config (account)
     "One `wl-draft-config-alist' entry for ACCOUNT: matches by folder."
     (cons `(string-match ,(plist-get (cdr account) :folder-match)
@@ -3004,7 +2891,15 @@ moment `wl-draft-config-exec' evals this entry."
   `wl-template-select' (`C-c C-j')."
     (cons (plist-get (cdr account) :petname)
           (idiig/mail-account-overrides account)))
+#+end_src
 
+=wl-draft-parent-folder= 只有从账号 folder 里按 =w= 回信/写信时才有
+值，=C-x m= 撰写新邮件时是空字符串（不是 nil），=string-match=
+自然不会命中任何规则。所以同一份 override 列表也生成一份
+=wl-template-alist=，撰写新邮件时用 =C-c C-j=（=wl-template-select=）
+手动选账号，效果跟自动匹配一样。=wl-draft-parent-folder= 为空时，草
+稿准备完成后自动弹一次选择，不用记得手动按。
+#+begin_src emacs-lisp
   (defun idiig/wl-draft-maybe-select-account (&rest _)
     "Prompt for an account via `wl-template-select' when a draft has no
 parent folder (`C-x m', or any other entry point that does not pass
@@ -3027,7 +2922,12 @@ hooks like this one see `called-interactively-p' as true, so this
 fires reliably for `C-x m' too, not just replies."
     (when (string-empty-p wl-draft-parent-folder)
       (wl-template-select)))
+#+end_src
 
+=wl-template-visible-select= 关掉 =n=/=p= 翻页界面，改走
+=completing-read= 直接打字过滤。Trash 用 =wl-dispose-folder-alist=，
+从同一张账号表生成。
+#+begin_src emacs-lisp
   (with-eval-after-load 'wl
     (setq wl-draft-config-alist
           (mapcar #'idiig/mail-account-draft-config idiig/mail-accounts))
@@ -3045,7 +2945,13 @@ fires reliably for `C-x m' too, not just replies."
                                      (car account)
                                      (plist-get plist :trash-folder))))))
                         idiig/mail-accounts))))
+#+end_src
 
+=completing-read= 没有 REQUIRE-MATCH，打错大小写（如 "hotmail" 而不
+是 "Hotmail"）会静默不生效，草稿留着 Emacs 默认 From 却没有任何提
+示——这是实测踩出来的：发出去才发现身份不对，被 Exchange 拒收。补一
+个大小写不敏感的兜底匹配，还是找不到就直接报错。
+#+begin_src emacs-lisp
   (defun idiig/wl-template-apply-strict (orig-fn name)
     "Guard `wl-template-apply' against silently no-op'ing.
 `wl-template-select' builds its `completing-read' prompt (used
@@ -3073,23 +2979,10 @@ errors loudly instead of silently sending under the wrong identity."
 #+end_src
 
 **** 签名与外观
-=~/mails/.signature= 不存在时写一个占位符 (=-- \n=)，指给 Emacs 内
-置的 =mail-signature-file= （*不是* =wl-signature-file-name= ——我一开
-始猜错了变量名，已经对着 wanderlust 源码确认过 Wanderlust 自己没定
-义这个变量，实际走的是 =insert-signature= 用到的 Emacs 内置变量）。
-
-签名不自动插入——没设 =mail-signature= 也没挂 hook 强制插入，纯粹是
-按需的：Wanderlust 默认把 =wl-draft-insert-signature= 挂在菜单栏/工
-具栏，但没给快捷键，这里补一个 =C-c C-w= （跟 Gnus message-mode 插入
-签名的默认键一致），写信时想带就按一下，不按就不带。
-
-外观加两条：不常驻显示 folder 面板 (=wl-stay-folder-window=)，3 个账号
-切来切去的时候不用每次都重新展开；阅读邮件时只显示常用的几个头
-(=wl-message-visible-field-list=)，其余（=Received=、各种
-=X-=、DKIM/SPF 相关头之类）用 =wl-message-ignored-field-list= 设成
-匹配一切的正则 (="."=) 先全部隐藏，=visible= 里列的再放出来——这是
-=wl-message-ignored-field-list= 文档里写明的标准用法，=visible=
-优先于 =ignored=。
+=~/mails/.signature= 不存在时写一个占位符（=-- \n=），指给 Emacs 内
+置的 =mail-signature-file=（*不是* =wl-signature-file-name=——
+Wanderlust 自己没定义这个变量，走的是 =insert-signature= 用到的
+Emacs 内置变量）。不自动插入，补一个 =C-c C-w= 快捷键，想带就按。
 #+begin_src emacs-lisp
   (defvar idiig/mail-signature-file
     (expand-file-name ".signature" idiig/mail-directory))
@@ -3104,7 +2997,13 @@ errors loudly instead of silently sending under the wrong identity."
         (insert "-- \n"))))
 
   (setq mail-signature-file idiig/mail-signature-file)
+#+end_src
 
+外观加两条：不常驻显示 folder 面板，3 个账号切来切去不用每次重新展
+开；阅读邮件只显示常用的几个头，其余用 =wl-message-ignored-field-list=
+设成匹配一切的正则先全部隐藏，=wl-message-visible-field-list= 里列
+的再放出来（=visible= 优先于 =ignored=，是文档里写明的标准用法）。
+#+begin_src emacs-lisp
   (with-eval-after-load 'wl
     (setq wl-stay-folder-window nil)
     (define-key wl-draft-mode-map (kbd "C-c C-w") #'wl-draft-insert-signature)
@@ -3160,20 +3059,9 @@ Wanderlust/SEMI 自己那套 MIME 菜单（=C-c C-x= 前缀）就能调用 GPG �
     (bbdb-insinuate-wl))
 #+end_src
 **** 入口与启动
-=use-package wl= 用 =:commands (wl wl-draft wl-user-agent-compose)=
-惰性加载；=:init= 里按官方手册（=doc/wl.texi= ）的写法设
-=mail-user-agent= + =define-mail-user-agent=，让 =C-x m= 能唤出
-Wanderlust——单独设 =mail-user-agent= 没用，必须配合
-=define-mail-user-agent= 把 =wl-user-agent= 这个符号真正注册进去。
-=:config= 结尾用 =advice-add= 挂 =idiig/wl-bootstrap=，把前面几节的
-setup 函数（folders、签名、auth-source 密码缓存、XOAUTH2 client-id）
-都跑一遍——各自都是幂等操作，重复跑无副作用。挂载点有两个，不是只挂
-=wl= 一个：=wl-draft-create-buffer= 是 =wl=/=wl-draft=/
-=wl-user-agent-compose= （也就是 =C-x m=）共用的撰写邮件入口，只挂
-=wl= 的话，如果这次 Emacs 会话里第一个动作就是直接 =C-x m= 而不是先
-=M-x wl=，=idiig/wl-bootstrap= 根本不会被触发——SMTP 要用的
-auth-source 缓存/XOAUTH2 client-id 都没预热，发信会失败。两处都挂，
-先后顺序不影响（都是幂等的）。
+把前面几节的 setup 函数（folders、签名、auth-source 密码缓存、
+XOAUTH2 client-id）串成一个 bootstrap，各步骤都是幂等操作，重复跑无
+副作用。
 #+begin_src emacs-lisp
   (defun idiig/wl-bootstrap (&rest _args)
     "Prepare everything Wanderlust needs before opening: bootstrap
@@ -3188,7 +3076,15 @@ auth-source 缓存/XOAUTH2 client-id 都没预热，发信会失败。两处都�
     (idiig/mail-signature-setup)
     (idiig/mail-auth-source-warm-cache)
     (idiig/sasl-xoauth2-ensure-hotmail-client-id))
+#+end_src
 
+=use-package wl= 用 =:commands= 惰性加载；=:init= 按官方手册设
+=mail-user-agent= + =define-mail-user-agent=，让 =C-x m= 能唤出
+Wanderlust。bootstrap 挂两个点，不是只挂 =wl=：=wl-draft-create-buffer=
+是 =wl=/=wl-draft=/=wl-user-agent-compose=（=C-x m=）共用的入口，只
+挂 =wl= 的话，会话里第一个动作如果是直接 =C-x m=，auth-source 缓存/
+XOAUTH2 client-id 就没预热，发信会失败。两处顺序不影响，都是幂等的。
+#+begin_src emacs-lisp
   (use-package wl
     :commands (wl wl-draft wl-user-agent-compose)
     :init
