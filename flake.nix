@@ -848,9 +848,10 @@
 	    
 	    (setq migemo-user-dictionary nil)
 	    (setq migemo-regex-dictionary nil)
-	    (when (and migemo-command migemo-dictionary)
-	      (migemo-init)
-	      (message "Migemo initialized with dictionary: %s" migemo-dictionary))
+	    ;; Don't call `migemo-init' here: `migemo-get-pattern' (used by both
+	    ;; the ctrlf and orderless integrations below) calls it lazily on
+	    ;; first use, so the cmigemo process and its dictionary only load
+	    ;; when migemo search is actually invoked, not on every startup.
 	    (with-eval-after-load 'migemo
 	      (with-eval-after-load 'ctrlf
 	        (add-to-list 'ctrlf-style-alist '(migemo-regexp . (:prompt "migemo-regexp"
