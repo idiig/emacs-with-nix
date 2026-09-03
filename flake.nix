@@ -69,7 +69,11 @@
 	    (use-package window
 	      :bind
 	      (([remap enlarge-window] . idiig/smart-adjust-window-size-up)
-	       ([remap shrink-window] . idiig/smart-adjust-window-size-down)
+	       ;; `shrink-window' has no default global binding, so `[remap
+	       ;; shrink-window]' never fires -- bind directly instead.  `C-x M-v'
+	       ;; mirrors `C-x ^' (up) visually (^ points up, v points down);
+	       ;; plain `C-x v' is taken by `vc-prefix-map'.
+	       ("C-x M-v" . idiig/smart-adjust-window-size-down)
 	       ([remap shrink-window-horizontally] . idiig/smart-adjust-window-size-left)
 	       ([remap enlarge-window-horizontally] . idiig/smart-adjust-window-size-right))
 	      
