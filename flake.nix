@@ -1219,8 +1219,8 @@
 	    string oauth2.el threads through to the later token-exchange call
 	    (see `oauth2-auth') still matches what Microsoft issued the code
 	    against."
-	      (let (code received-state
-	            (proc (make-network-process
+	      (let* (code received-state
+	             (proc (make-network-process
 	                   :name "idiig-oauth2-localhost-redirect"
 	                   :service idiig/oauth2-localhost-redirect-port
 	                   :host 'local
@@ -1393,8 +1393,50 @@
 	    
 	    (unless (file-directory-p idiig/sasl-xoauth2-token-directory)
 	      (make-directory idiig/sasl-xoauth2-token-directory t))
+	    (set-file-modes idiig/sasl-xoauth2-token-directory #o700)
 	    
 	    (setq sasl-xoauth2-token-directory idiig/sasl-xoauth2-token-directory)
+	    
+	    (defun idiig/oauth2-update-plstore-plain (plstore token)
+	      "Override for `oauth2--update-plstore' (same arguments) that
+	    stores TOKEN as a plain, unencrypted plstore entry instead of
+	    GPG-encrypting it.  `plstore-save' only shells out to GPG when an
+	    entry has secret keys (see `plstore--insert-buffer' in
+	    plstore.el); the original `oauth2--update-plstore' always puts
+	    :request-cache/:code-verifier/:access-response as secret keys, so
+	    every save -- including the transparent one `oauth2-refresh-access'
+	    performs on every single token refresh, not just the first
+	    save -- needs a working gpg on PATH.  This machine has none:
+	    confirmed via a real attempt, where it turned into a silent hang
+	    inside interactive Emacs (`epa-select-keys' prompting for a
+	    recipient with nowhere to display or answer) rather than the
+	    immediate \"no usable configuration\" error batch mode produced for
+	    the same call.  Putting these fields in the public (unencrypted)
+	    plist instead of the secret one sidesteps GPG entirely -- confirmed
+	    against `plstore-get'/`plstore-put' in plstore.el that this is a
+	    transparent swap: fields land in the same merged alist either way,
+	    and a public-only entry never triggers `plstore--decrypt' on
+	    read -- so the surrounding cache/refresh logic in oauth2.el doesn't
+	    need touching. The token directory is already 0700 and private to
+	    this user, the same trust level already given to the sops-derived
+	    netrc password bridge elsewhere in this config, so storing the
+	    refresh token in plain text here isn't a downgrade -- but the file
+	    itself still gets 0600, since plstore.el itself never sets file
+	    modes (it only ever relied on GPG for confidentiality)."
+	      (plstore-put plstore (oauth2-token-plstore-id token)
+	                   `(:request-cache
+	                     ,(oauth2-token-request-cache token)
+	                     :code-verifier
+	                     ,(oauth2-token-code-verifier token)
+	                     :access-response
+	                     ,(oauth2-token-access-response token))
+	                   nil)
+	      (plstore-save plstore)
+	      (set-file-modes (plstore-get-file plstore) #o600))
+	    
+	    (with-eval-after-load 'oauth2
+	      (advice-add 'oauth2--update-plstore :override
+	                  #'idiig/oauth2-update-plstore-plain))
 	    
 	    ;; Overrides sasl-xoauth2's own "\\.outlook\\.com$"/"\\.office365\\.com$"
 	    ;; defaults (retired endpoint / missing redirect-uri, see prose above)
