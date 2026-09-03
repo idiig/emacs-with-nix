@@ -183,12 +183,12 @@
 	      :config
 	      ;; Apply advice
 	      (advice-add 'idiig/smart-adjust-window-size :around #'idiig/smart-adjust-window-size-advice))
-	    (defadvice split-window-below (after split-window-below-and-switch activate)
+	    (define-advice split-window-below (:after (&rest _) switch-to-new-window)
 	      "切换到新分割的窗口"
 	      (when (called-interactively-p 'any)
 	        (other-window 1)))
 	    
-	    (defadvice split-window-right (after split-window-right-and-switch activate)
+	    (define-advice split-window-right (:after (&rest _) switch-to-new-window)
 	      "切换到新分割的窗口"
 	      (when (called-interactively-p 'any)
 	        (other-window 1)))
@@ -222,8 +222,7 @@
 	                        (make-directory dir t))))))
 	    
 	      ;; 找文件时若无母文档则新建 
-	      (defadvice find-file (before make-directory-maybe
-	                                   (filename &optional wildcards) activate)
+	      (define-advice find-file (:before (filename &optional _wildcards) make-directory-maybe)
 	        "Create parent directory if not exists while visiting file."
 	        (unless (file-exists-p filename)
 	          (let ((dir (file-name-directory filename)))
@@ -485,9 +484,9 @@
 	         ;; Ignore single !
 	         ((equal "!" word) `(orderless-literal . ""))
 	         ;; Prefix and suffix
-	         ((if-let (x (assq (aref word 0) +orderless-dispatch-alist))
+	         ((if-let* ((x (assq (aref word 0) +orderless-dispatch-alist)))
 	              (cons (cdr x) (substring word 1))
-	            (when-let (x (assq (aref word (1- (length word))) +orderless-dispatch-alist))
+	            (when-let* ((x (assq (aref word (1- (length word))) +orderless-dispatch-alist)))
 	              (cons (cdr x) (substring word 0 -1)))))))
 	      
 	      ;; Define orderless style with initialism by default ; add migemo feature for japanese
@@ -650,7 +649,7 @@
 	          (cond
 	           ;; Case 1: No list bounds found, try deleting surrounding sexp
 	           ((null bounds)
-	            (when-let ((sexp-bounds (puni-bounds-of-sexp-around-point)))
+	            (when-let* ((sexp-bounds (puni-bounds-of-sexp-around-point)))
 	              (puni-delete-region (car sexp-bounds) (cdr sexp-bounds) 'kill)))
 	      
 	           ;; Case 2: Point is at end of bounds, try backward kill
