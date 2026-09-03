@@ -2147,8 +2147,9 @@ missing, then opens PATH with sops for interactive editing."
 #+end_src
 ** 邮件
 3 个账号：SDF（用户名密码）、Gmail（App Password）、Hotmail/Outlook.com
-（基础认证已被微软下线，走 =davmail= 网关把 OAuth2 转成本地
-IMAP/SMTP）。账号的用户名/密码都存在 SOPS 里，通过
+（基础认证已被微软下线，Wanderlust/ELMO/FLIM 通过 XOAUTH2 直接对
+Microsoft 认证，不再经过本地网关）。账号的用户名/密码/OAuth 客户端
+信息都存在 SOPS 里，通过
 [[*密钥管理 (=sops=)][=idiig/get-sops-secret-value=]] 读取，配置文件
 本身不出现明文。本地文件（消息缓存、签名、订阅列表）都放在
 =~/mails/= 下面，不做跨机器 git 同步——IMAP 账号天然以服务器为准，
@@ -2161,119 +2162,79 @@ IMAP/SMTP）。账号的用户名/密码都存在 SOPS 里，通过
 - =bbdb= ：地址簿，撰写邮件时补全联系人，自带 =bbdb-wl.el= 桥接
   Wanderlust，不用额外找 =lsdb=（参考文档用的 =lsdb= 没进
   nixpkgs，=bbdb= 有）
+- =oauth2= ：Hotmail 走 XOAUTH2 认证需要的 OAuth 2.0 客户端库。
+  =sasl-xoauth2.el= 不是独立的包，它就是 FLIM 自带的一个文件（跟
+  =sasl.el=/=smtp.el= 放在一起），=(require 'sasl-xoauth2)= 内部会
+  自己 =(require 'oauth2)=，所以只需要把 =oauth2= 加进 Emacs 包列
+  表，不用另外找一个叫 =sasl-xoauth2= 的包
 #+begin_src nix
   wanderlust
   org-mime
   bbdb
-#+end_src
-*** 外部依赖
-:PROPERTIES:
-:header-args: :noweb-ref deps
-:END:
-- =davmail= ：本地网关，把 Outlook.com/Hotmail 要求的 OAuth2 认证转换
-  成普通的本地 IMAP/SMTP，这样 Wanderlust 完全不用感知 OAuth2
-#+begin_src nix
-  davmail
+  oauth2
 #+end_src
 *** 配置
 :PROPERTIES:
 :header-args: :noweb-ref ecfg
 :END:
 
-**** Outlook (=davmail= 网关)
-生成 =davmail.properties=（=davmail.server=true= + =O365EWS= +
-=O365DeviceCode=，无需写入任何密钥——真正的登录靠设备代码流程完成，
-token 由 davmail 自己缓存），然后用 =start-process= 拉起来，作为独立
-后台服务持续跑，不随 Emacs 退出而结束——重新拉起一个 JVM 有启动开
-销，没道理绑定 Emacs 的生命周期。因此「是否已经在跑」不能看 Emacs 自
-己的进程列表（那样只能看到当前会话起的进程，看不到上一次会话留下
-的，会导致重复启动、抢同一个端口），而是直接探测
-=idiig/davmail-imap-port= 端口有没有被占用。本地监听端口用
-=idiig/davmail-imap-port= / =idiig/davmail-smtp-port=（默认
-1143 / 1025，和 davmail 自带默认值一致）两个 defvar 记录，供下面
-「账号」那节的 Hotmail 条目引用。
-
-*认证方式踩过一个坑*：一开始用的是 =O365Interactive=（弹浏览器窗口登
-录），但那个需要 GUI（OpenJFX/SWT 嵌入式浏览器），跟我们选的
-=davmail.server=true= （headless/无 GUI 的服务器模式）互斥——实测直
-接报错 =O365Interactive not supported in headless mode=，davmail 连
-认证都进不去就直接失败。改成了 =O365DeviceCode= ：davmail 会在
-=*davmail*= buffer 的日志里打印一个网址和一个短代码，在任意浏览器
-（不需要是这台机器、也不需要 davmail 自己弹窗）打开那个网址、输入代
-码、登录 Microsoft 账号即可，davmail 在后台轮询直到你授权完成——这
-个流程天生就是给 headless 场景设计的，跟我们的部署方式正好匹配。
-
-*另外*：davmail 本地 IMAP/SMTP 那端到底要不要一个「像样」的密码、还
-是随便什么字符串都行，官方 FAQ 没写清楚——这个等第一次实际连接时再
-确认，先按需要一个值来处理（存一个和真实 Microsoft 密码无关的
-=mail_hotmail_local_password=）。
+**** XOAUTH2 依赖 (=oauth2=/=sasl-xoauth2=)
+=sasl-xoauth2.el= 是 FLIM 自带的文件（跟 =sasl.el=/=sasl-scram.el=/
+=smtp.el= 放在一起，不是要另外找的第三方包），实现了 SASL 的
+=XOAUTH2= 机制，登录时把 =user=...\001auth=Bearer <access-token>\001\001=
+这段字符串发给服务器，替代明文密码。但它不会被自动加载——ELMO/FLIM
+里所有用到 SASL 的地方（=elmo-imap4.el= 的
+=elmo-network-authenticate-session=、=smtp.el= 的
+=smtp-primitive-auth=）都只是走 =sasl-find-mechanism= 通用查找，找不
+找得到取决于对应的 =sasl-*.el= 有没有被 =require= 过、有没有执行过
+=(put 'sasl-xoauth2 'sasl-mechanism ...)= 这行注册代码，所以这里要显
+式加载。
 #+begin_src emacs-lisp
-  ;; Local davmail listener ports; `idiig/mail-accounts' (below) points
-  ;; its Hotmail entry at these instead of duplicating the numbers.
-  (defvar idiig/davmail-imap-port 1143)
-  (defvar idiig/davmail-smtp-port 1025)
-  (defvar idiig/davmail-properties-file
-    (expand-file-name "~/.config/davmail.properties"))
-  (defvar idiig/davmail-process-name "davmail")
-
-  (defun idiig/davmail-ensure-config ()
-    "Regenerate `idiig/davmail-properties-file'.
-  No secret lives in this file: Office 365 auth happens through the
-  O365DeviceCode flow (the only interactive mode that works with
-  davmail.server=true / headless mode -- O365Interactive needs a GUI
-  browser popup and fails outright under headless with \"O365Interactive
-  not supported in headless mode\", confirmed against a real davmail
-  log), and davmail caches the refresh token itself, so it is safe to
-  always overwrite this file."
-    (with-temp-file idiig/davmail-properties-file
-      (insert "davmail.server=true\n")
-      (insert "davmail.mode=O365EWS\n")
-      (insert "davmail.authentication=O365DeviceCode\n")
-      (insert "davmail.url=https://outlook.office365.com/EWS/Exchange.asmx\n")
-      (insert (format "davmail.imapPort=%d\n" idiig/davmail-imap-port))
-      (insert (format "davmail.smtpPort=%d\n" idiig/davmail-smtp-port))
-      ;; Only accept connections from this machine.
-      (insert "davmail.allowRemote=false\n")
-      (insert "davmail.disableUpdateCheck=true\n")))
-
-  (defun idiig/davmail-running-p ()
-    "Return non-nil if something already listens on `idiig/davmail-imap-port'.
-  Probed by TCP connection rather than the Emacs process list: davmail
-  is meant to outlive any single Emacs session, so a process-list check
-  would miss an instance a previous session left running and try to
-  start a second one competing for the same port."
-    (let ((probe (ignore-errors
-                   (open-network-stream "davmail-probe" nil
-                                        "localhost" idiig/davmail-imap-port))))
-      (when probe
-        (delete-process probe)
-        t)))
-
-  (defun idiig/davmail-ensure-running ()
-    "Start the davmail gateway unless it is already running.
-  The first IMAP/SMTP connection after startup triggers davmail's
-  O365DeviceCode flow -- watch the *davmail* process buffer for a URL
-  and a short code to enter in any browser.  Later connections reuse
-  the cached refresh token, so this does not prompt again every time."
-    (unless (idiig/davmail-running-p)
-      (idiig/davmail-ensure-config)
-      (start-process idiig/davmail-process-name "*davmail*"
-                      "${pkgs.davmail}/bin/davmail" idiig/davmail-properties-file)))
+  (require 'oauth2)
+  (require 'sasl-xoauth2)
 #+end_src
 
 **** 账号与本地目录
 =idiig/mail-directory= （ =~/mails/= ）统一存放本地状态，
 =elmo-localdir-folder-path= / =elmo-msgdb-directory= 都指过去。核心是
 一张 =idiig/mail-accounts= 数据表，每个账号一条：IMAP/SMTP 的
-host/port、走不走 TLS、sops 里登录用户名/密码/显示地址对应的 key、
-以及后面用来识别账号的 folder 匹配正则。下面几节（订阅 folders、密
-码、身份切换）都从这张表生成，不重复写 3 遍账号信息。
+host/port、走不走 TLS、IMAP/SMTP 各自的认证方式（
+=:imap-auth-type=/=:smtp-auth-type=）、sops 里登录用户名/密码/显示
+地址对应的 key、以及后面用来识别账号的 folder 匹配正则。下面几节
+（订阅 folders、密码、身份切换）都从这张表生成，不重复写 3 遍账号信
+息。
+
+=:imap-auth-type= 是 ELMO 折叠进 folder-spec =/AUTH= 段的那个 symbol
+（见下面「订阅 folders」一节），=:smtp-auth-type= 是 FLIM =smtp.el=
+认的 SASL 机制名字符串，两者词汇表不一样，不能共用一个字段：SDF/Gmail
+密码认证对应 =:imap-auth-type clear=（ELMO 内置的明文 LOGIN，走
+=elmo-imap4-clear-login=，不是走通用 SASL 分支）+
+=:smtp-auth-type "plain"=（SASL PLAIN 机制，由 =sasl-plain.el=
+提供）；Hotmail 统一是 =:imap-auth-type xoauth2= +
+=:smtp-auth-type "xoauth2"=，两边都落到 =sasl-xoauth2= 注册的
+=XOAUTH2= 机制上，不需要真的存密码。
+
+=:imap-auth-type= 故意没写成 =:imap-auth-type 'clear=（带 quote）：
+整张 =idiig/mail-accounts= 表是一个 backquote 表达式，backquote 里的
+裸 symbol 本来就是字面数据，不会被求值，加一个 quote 反而会让这个字
+段的值变成 =(quote clear)= 这个两元素的列表，而不是 symbol
+=clear= 本身——=idiig/mail-account-connection-suffix= 是直接
+=(plist-get plist :imap-auth-type)= 取出来就当 symbol 用
+（=(symbol-name auth)=），不会再 eval 一次，加了 quote 就会在这里报
+=Wrong type argument: symbolp, 'clear= 。这跟下面 =:smtp-auth-type=/
+=:smtp-connection-type= 不是一回事：那两个字段的值会经过
+=idiig/mail-account-overrides= 里 =,(plist-get plist ...)= 这层
+unquote，塞进 =wl-draft-config-alist=/=wl-template-alist= 里等真正
+撰写邮件时才被 =wl-draft-config-exec= eval 一次，所以 =:smtp-connection-type=
+必须留着 quote（=eval= 一次 =(quote starttls)= 才能拿到 symbol
+=starttls=，不加 quote 的话 =eval= 一个裸 symbol 会被当成变量名去查
+值，大概率 void-variable）——两个字段字面上都在用 symbol，但要不要
+quote 完全取决于各自会不会再被 eval 一次。
 
 SDF 的登录用户名和邮件地址不是同一个字符串（ =user= vs
 =user@sdf.org= ），所以表里 =:login-key= （登录用）和 =:from-key=
 （ =From= 头用）分开两个 sops key；Gmail/Hotmail 这两个值相同，直接
-复用同一个 key。Hotmail 条目的端口直接引用上一节的
-=idiig/davmail-imap-port= / =idiig/davmail-smtp-port=，不重复写常量。
+复用同一个 key。
 
 SDF 自己的 SMTP relay 需要 ARPA 验证才能对外发信，这个账号还没有，
 所以 SDF 条目的 =:smtp-host=/=:smtp-port=/=:smtp-connection-type=
@@ -2307,6 +2268,7 @@ Hotmail 目前都是这样）。
        ;; via :smtp-login-key/:smtp-password-key below; IMAP/folders
        ;; stay on SDF.
        :smtp-host "smtp.gmail.com" :smtp-port 587 :smtp-connection-type 'starttls
+       :imap-auth-type clear :smtp-auth-type "plain"
        :login-key "mail_sdf_user" :from-key "mail_sdf_address"
        :from-name-key "mail_sdf_from_name"
        :password-key "mail_sdf_password"
@@ -2319,6 +2281,7 @@ Hotmail 目前都是这样）。
        :petname "Gmail"
        :imap-host "imap.gmail.com" :imap-port 993 :imap-tls t
        :smtp-host "smtp.gmail.com" :smtp-port 587 :smtp-connection-type 'starttls
+       :imap-auth-type clear :smtp-auth-type "plain"
        :login-key "mail_gmail_user" :from-key "mail_gmail_user"
        :from-name-key "mail_gmail_from_name"
        :password-key "mail_gmail_app_password"
@@ -2332,13 +2295,12 @@ Hotmail 目前都是这样）。
        :trash-folder "[Gmail]/Trash")
       (hotmail
        :petname "Hotmail"
-       :imap-host "localhost" :imap-port ,idiig/davmail-imap-port :imap-tls nil
-       :smtp-host "localhost" :smtp-port ,idiig/davmail-smtp-port
-       :smtp-connection-type nil
+       :imap-host "outlook.office365.com" :imap-port 993 :imap-tls t
+       :smtp-host "smtp-mail.outlook.com" :smtp-port 587 :smtp-connection-type 'starttls
+       :imap-auth-type xoauth2 :smtp-auth-type "xoauth2"
        :login-key "mail_hotmail_user" :from-key "mail_hotmail_user"
        :from-name-key "mail_hotmail_from_name"
-       :password-key "mail_hotmail_local_password"
-       :folder-match "@localhost"
+       :folder-match "@outlook\\.office365\\.com"
        :message-id-domain "outlook.com"
        :extra-folders (("Sent Items" . "Sent")
                        ("Drafts" . "Drafts")
@@ -2391,8 +2353,129 @@ Hotmail 目前都是这样）。
      ("mail_gmail_app_password" . "Gmail App Password (Google Account -> Security -> 2-Step Verification -> App passwords; needs 2FA enabled)")
      ("mail_gmail_from_name" . "Display name for the From header on Gmail mail")
      ("mail_hotmail_user" . "Hotmail/Outlook.com full address, used for both login and From")
-     ("mail_hotmail_local_password" . "Arbitrary local password for the davmail IMAP/SMTP handshake -- NOT your real Microsoft password")
+     ("mail_hotmail_oauth_client_id" . "Azure \"Application (client) ID\" for the Hotmail OAuth app -- see the Microsoft OAuth section below; no client secret needed for a public client")
      ("mail_hotmail_from_name" . "Display name for the From header on Hotmail mail")))
+#+end_src
+
+**** Microsoft OAuth 配置
+XOAUTH2 要先在 Microsoft 那边注册一个 OAuth 应用（
+[[https://portal.azure.com][Azure Portal]] → *App registrations* →
+*New registration*）：
+- *Supported account types* 选 "Personal Microsoft accounts" （或者
+  同时覆盖组织账号的那个选项也行，Outlook.com/Hotmail 属于 personal
+  account）
+- *Redirect URI* 平台选 "Mobile and desktop applications"，勾选内
+  置的 =https://login.microsoftonline.com/common/oauth2/nativeclient=
+  ——这是微软给不需要 client secret 的 public client 保留的特殊回调
+  地址，命中后微软自己渲染一个页面明文显示一串 code，配合
+  =oauth2.el= 「本地起浏览器 + 把浏览器上显示的 code 粘贴回 Emacs
+  minibuffer」的流程（见后面「待办：填 secrets.yaml」一节），不需要
+  真的监听这个地址，只是要跟应用注册的值对上
+- *API permissions* 不用管，注册完默认只有一条
+  =Microsoft Graph / User.Read= 就够了——Personal Microsoft account
+  类型的应用在 portal 的「APIs my organization uses」里搜不到
+  =Office 365 Exchange Online= 这个资源，没法像组织账号那样在 portal
+  里预先勾选 IMAP/SMTP 权限；这些权限是运行期直接在授权 URL 的
+  =scope= 参数里请求的（对应下面代码里
+  =sasl-xoauth2-host-url-table= 那条覆盖记录的 scope 字符串），
+  Microsoft 登录后会弹一个单独的同意页面动态问要不要给这些权限，跟
+  portal 「API permissions」页面是两条不同的路径，不需要也不能在
+  portal 里预先加
+- 注册完拿到的 "Application (client) ID" 存进 sops 的
+  =mail_hotmail_oauth_client_id=；public client 不需要 client
+  secret
+
+=sasl-xoauth2.el= 自带一份 =sasl-xoauth2-host-url-table= 默认值，但两
+条跟 Hotmail 相关的记录都不合适：=\.outlook\.com$= 那条指向已经停用
+的 =login.live.com= 端点（旧 Windows Live/MSA-only OAuth，scope 只
+有 =wl.imap=，不含 SMTP）；=\.office365\.com$= 那条 scope 是对的，但
+一是 redirect-uri 是 =nil=，二是授权/token 端点用的是 =/common/=——
+实测（真实报错）确认 =/common/= 对个人账号会失败：Azure Portal 用个
+人账号登录时会自动给这个账号建一个「默认目录」（一个看不太见但确实
+存在的组织租户，=publisherDomain= 字段能看到类似
+=xxxhotmail.onmicrosoft.com= 这样的名字），应用就注册在这个自动建的
+组织租户下；=/common/= 端点会先按这个组织租户的身份去解析登录请求，
+个人账号又不是这个租户的正式成员，于是报
+=AADSTS500200: Personal Microsoft accounts are not supported for this
+application unless explicitly invited to an organization=——即使
+=signInAudience= 已经是 =AzureADandPersonalMicrosoftAccount=（同时允
+许组织和个人账号）也一样会卡在这一步，因为这是租户路由问题，不是账
+号类型限制问题。换成 =/consumers/= 端点直接跳过组织租户解析，走微软
+专门给纯个人账号（MSA）用的身份系统就没有这个问题；redirect-uri 依
+然写死成 =/common/oauth2/nativeclient= 那个固定值——它是微软给
+「展示 code 给用户手动输入」这个 native-client 流程保留的特殊地
+址，跟用哪个端点发起授权请求无关，不用跟着变。所以这里直接覆盖，不
+依赖内置默认值命中还是不命中。=sasl-xoauth2-host-user-id-table=
+按登录邮箱正则匹配到上面注册的 client-id；token 缓存目录单独放在
+=~/mails/.sasl-xoauth2/=，跟 Wanderlust 其它本地状态放一起，不用
+=oauth2.el= 默认塞进 =user-emacs-directory= 的那份 plstore。这一节要
+放在「账号与本地目录」之后——下面用到的 =idiig/mail-directory= 是那
+一节才定义的，放前面会在加载时报 =Symbol's value as variable is
+void: idiig/mail-directory= 。
+#+begin_src emacs-lisp
+  (defvar idiig/sasl-xoauth2-token-directory
+    (expand-file-name ".sasl-xoauth2/" idiig/mail-directory))
+
+  (unless (file-directory-p idiig/sasl-xoauth2-token-directory)
+    (make-directory idiig/sasl-xoauth2-token-directory t))
+
+  (setq sasl-xoauth2-token-directory idiig/sasl-xoauth2-token-directory)
+
+  ;; Overrides sasl-xoauth2's own "\\.outlook\\.com$"/"\\.office365\\.com$"
+  ;; defaults (retired endpoint / missing redirect-uri, see prose above)
+  ;; with one entry that matches our exact Hotmail IMAP host.  Uses the
+  ;; /consumers/ authorize+token endpoints, not /common/: an app
+  ;; registered from a personal Microsoft account gets auto-provisioned
+  ;; into a real (if invisible) organizational tenant, and /common/
+  ;; tries to resolve that tenant context first -- since the personal
+  ;; account signing in isn't a member/guest of it, that fails with
+  ;; AADSTS500200 ("Personal Microsoft accounts are not supported for
+  ;; this application unless explicitly invited to an organization")
+  ;; even though signInAudience already allows personal accounts.
+  ;; /consumers/ skips tenant resolution and goes straight to the MSA
+  ;; identity system.  The redirect-uri keeps the literal
+  ;; login.microsoftonline.com/common/oauth2/nativeclient string
+  ;; regardless -- that's Microsoft's fixed reserved value for the
+  ;; native-client code-display flow, unrelated to which endpoint
+  ;; issued the authorization request.
+  ;;
+  ;; Scope resource is outlook.office.com, NOT outlook.office365.com,
+  ;; even though the actual IMAP/SMTP server hostnames above are on
+  ;; office365.com -- confirmed against a real error: requesting scope
+  ;; under office365.com against the /consumers/ endpoint fails with
+  ;; error=invalid_scope ("The provided resource value for the input
+  ;; parameter 'scope' is not valid"), Microsoft's own legacy-protocol
+  ;; OAuth docs use office.com for the scope URI.  sasl-xoauth2's own
+  ;; built-in ".office365.com$" default table entry uses office365.com
+  ;; for the scope, which is presumably fine under /common/ or
+  ;; /organizations/ but not /consumers/.
+  (add-to-list 'sasl-xoauth2-host-url-table
+               '("^outlook\\.office365\\.com$"
+                 "https://login.microsoftonline.com/consumers/oauth2/v2.0/authorize"
+                 "https://login.microsoftonline.com/consumers/oauth2/v2.0/token"
+                 "https://outlook.office.com/IMAP.AccessAsUser.All https://outlook.office.com/SMTP.Send offline_access"
+                 "https://login.microsoftonline.com/common/oauth2/nativeclient"))
+
+  (defvar idiig/sasl-xoauth2-client-id-warmed nil
+    "Non-nil once the Hotmail entry has been added to
+  `sasl-xoauth2-host-user-id-table' for this Emacs session.")
+
+  (defun idiig/sasl-xoauth2-ensure-hotmail-client-id ()
+    "Register the Hotmail account's OAuth client-id in
+  `sasl-xoauth2-host-user-id-table', keyed by its login address.
+  Public client apps registered under \"Mobile and desktop
+  applications\" in Azure need no client secret -- the empty string is
+  deliberate, since leaving this entry out entirely would make
+  `sasl-xoauth2' fall back to `sasl-read-passphrase' and prompt for one
+  on every connection.  Only runs once per session, same reasoning as
+  `idiig/mail-auth-source-warm-cache'."
+    (unless idiig/sasl-xoauth2-client-id-warmed
+      (add-to-list 'sasl-xoauth2-host-user-id-table
+                   (list "^outlook\\.office365\\.com$"
+                         (regexp-quote (idiig/get-sops-secret-value "mail_hotmail_user"))
+                         (idiig/get-sops-secret-value "mail_hotmail_oauth_client_id")
+                         ""))
+      (setq idiig/sasl-xoauth2-client-id-warmed t)))
 #+end_src
 
 **** 订阅 folders
@@ -2400,7 +2483,19 @@ Hotmail 目前都是这样）。
 =~/mails/.folders= ）的内容。每个账号一个 group（=PETNAME { ... }=），
 组里第一行是 =INBOX=，后面跟 =:extra-folders= 里列的子文件夹（Sent/
 Drafts/Spam/Trash 之类），每一行都用 elmo 的
-=%"mailbox":"user"/clear@host:port!= 语法把连接信息整个编码进去。
+=%"mailbox":"user"/auth@host:port!= 语法把连接信息整个编码进去，其中
+=auth= 段直接来自账号的 =:imap-auth-type=（=clear= 或 =xoauth2=），
+=!= 结尾则单独由 =:imap-tls= 决定——两者是正交的两件事：=auth= 段是
+=elmo-imap4-folder-create= 解析出来、挂到
+=elmo-network-session-auth-internal= 上的登录方式（对着
+=elmo-imap4.el= 源码确认过：非 =clear=/=login= 的值会落到通用 SASL
+分支，把这段字符串大写后去匹配 =sasl-find-mechanism=，=xoauth2= 正好
+命中 =sasl-xoauth2= 注册的 =XOAUTH2= 机制）；=!= 结尾是纯粹的
+=elmo-net-folder-stream-type= 标记，代表这条连接要不要走 SSL/TLS。以
+前 3 个账号 IMAP 全走密码认证，=/clear= 是不是要加恰好跟要不要 TLS
+同步变化，看起来像是同一件事；现在 Hotmail 改用 XOAUTH2 但 IMAP 仍然
+是 993/隐式 TLS，两者不再同步，混在一起判断就会生成错误的 folder
+line，所以分开处理。
 
 两处都要加双引号，不是随便选的：
 - 用户名要引起来——Gmail/Hotmail 的登录名本身就是完整邮箱地址，也带
@@ -2421,7 +2516,7 @@ Drafts/Spam/Trash 之类），每一行都用 elmo 的
     (setq wl-folders-file (expand-file-name ".folders" idiig/mail-directory)))
 
   (defun idiig/mail-account-connection-suffix (plist)
-    "The \"user\"/clear@host:port! suffix shared by every folder line
+    "The \"user\"/auth@host:port! suffix shared by every folder line
 for an account described by PLIST.
 Quotes the username: elmo's folder-spec grammar is
 USER@HOST:PORT, and Gmail/Hotmail logins are themselves full
@@ -2429,12 +2524,18 @@ email addresses containing an @, which is ambiguous unless
 quoted (confirmed against a real connection log: unquoted
 \"chewingguno@gmail.com/clear@imap.gmail.com:993!\" mis-parses
 and elmo can't connect at all -- SDF's bare \"idg\" username has
-no @, which is why only SDF worked)."
+no @, which is why only SDF worked).
+The /auth segment comes straight from :imap-auth-type (`clear' or
+`xoauth2') and the trailing ! from :imap-tls -- kept as two
+independent decisions rather than inferring one from the other, since
+Hotmail now uses XOAUTH2 while still connecting over implicit TLS on
+993, same as SDF/Gmail's password logins."
     (let ((user (idiig/get-sops-secret-value (plist-get plist :login-key)))
+          (auth (plist-get plist :imap-auth-type))
           (tls (plist-get plist :imap-tls)))
-      (format "\"%s\"%s@%s:%d%s"
+      (format "\"%s\"/%s@%s:%d%s"
               user
-              (if tls "/clear" "")
+              (symbol-name auth)
               (plist-get plist :imap-host)
               (plist-get plist :imap-port)
               (if tls "!" ""))))
@@ -2489,14 +2590,23 @@ Wanderlust 的密码存取（=elmo-passwd.el=）支持把
 过这个调用形式，也对着 =auth-source.el= 源码确认过 =auth-sources=
 是每次 =auth-source-search= 调用时现查现解析的，没有额外的、动态绑定
 影响不到的缓存。做法是运行期生成一个 0600 权限的临时 netrc 文件（内
-容来自 sops），塞进 =auth-sources= ，对 3 个账号的 IMAP/SMTP 各查一次
-把结果传给 auth-source 自己的缓存，然后立刻删除临时文件——明文密码
-只在磁盘上停留很短时间。
+容来自 sops），塞进 =auth-sources= ，对密码认证账号的 IMAP/SMTP 各查
+一次把结果传给 auth-source 自己的缓存，然后立刻删除临时文件——明文
+密码只在磁盘上停留很短时间。
+
+这套桥接只对 =:imap-auth-type= 是 =clear= 的账号有意义——Hotmail 用
+XOAUTH2，根本没有「密码」这个概念，凭据来自
+=sasl-xoauth2-host-user-id-table=（见前面「Microsoft OAuth 配置」一
+节）和浏览器授权流程，不经过 =elmo-passwd=/=auth-source=。所以这里
+先用 =idiig/mail-account-password-auth-p= 过滤掉它，而不是照样查一个
+不存在的 =:password-key=（那会是 =nil=，传给
+=idiig/get-sops-secret-value= 只会去问 sops 一个叫 =nil= 的字符串
+key，静默拿到空结果，不会报错但也没有意义）。
 
 =auth-source-search= 自己会按 host/port/user 缓存查询结果，所以这个
 "预热"函数只需要在本次 Emacs 会话里成功跑过一次；用一个 =idiig/=
-变量记一下，避免每次打开 =wl= 都重新解密 6 次 sops key、重新写一遍临
-时文件。
+变量记一下，避免每次打开 =wl= 都重新解密 sops key、重新写一遍临时文
+件。
 #+begin_src emacs-lisp
   (with-eval-after-load 'wl
     (setq elmo-passwd-storage-type 'auth-source))
@@ -2511,19 +2621,30 @@ send through a different account's SMTP server than they receive on."
     "The sops key for ACCOUNT's SMTP password; see `idiig/mail-account-smtp-login-key'."
     (or (plist-get plist :smtp-password-key) (plist-get plist :password-key)))
 
+  (defun idiig/mail-account-password-auth-p (plist)
+    "Non-nil when ACCOUNT authenticates with a password rather than
+XOAUTH2.  XOAUTH2 accounts have no :password-key at all -- their
+credentials come from `sasl-xoauth2-host-user-id-table' and a
+browser-based OAuth consent flow instead, so there is nothing here
+for sops/auth-source to bridge."
+    (not (eq (plist-get plist :imap-auth-type) 'xoauth2)))
+
   (defun idiig/mail-account-netrc-lines (account)
-    "netrc lines for ACCOUNT's IMAP and SMTP credentials, read from sops."
-    (let* ((plist (cdr account))
-           (imap-user (idiig/get-sops-secret-value (plist-get plist :login-key)))
-           (imap-password (idiig/get-sops-secret-value (plist-get plist :password-key)))
-           (smtp-user (idiig/get-sops-secret-value (idiig/mail-account-smtp-login-key plist)))
-           (smtp-password (idiig/get-sops-secret-value (idiig/mail-account-smtp-password-key plist))))
-      (list (format "machine %s login %s port %d password %s\n"
-                    (plist-get plist :imap-host) imap-user
-                    (plist-get plist :imap-port) imap-password)
-            (format "machine %s login %s port %d password %s\n"
-                    (plist-get plist :smtp-host) smtp-user
-                    (plist-get plist :smtp-port) smtp-password))))
+    "netrc lines for ACCOUNT's IMAP and SMTP credentials, read from
+sops.  Returns nil for XOAUTH2 accounts; see
+`idiig/mail-account-password-auth-p'."
+    (let ((plist (cdr account)))
+      (when (idiig/mail-account-password-auth-p plist)
+        (let* ((imap-user (idiig/get-sops-secret-value (plist-get plist :login-key)))
+               (imap-password (idiig/get-sops-secret-value (plist-get plist :password-key)))
+               (smtp-user (idiig/get-sops-secret-value (idiig/mail-account-smtp-login-key plist)))
+               (smtp-password (idiig/get-sops-secret-value (idiig/mail-account-smtp-password-key plist))))
+          (list (format "machine %s login %s port %d password %s\n"
+                        (plist-get plist :imap-host) imap-user
+                        (plist-get plist :imap-port) imap-password)
+                (format "machine %s login %s port %d password %s\n"
+                        (plist-get plist :smtp-host) smtp-user
+                        (plist-get plist :smtp-port) smtp-password))))))
 
   (defvar idiig/mail-auth-source-warmed nil
     "Non-nil once `idiig/mail-auth-source-warm-cache' has populated
@@ -2553,19 +2674,20 @@ send through a different account's SMTP server than they receive on."
                     (insert line))))
               (let ((auth-sources (cons netrc-file auth-sources)))
                 (dolist (account idiig/mail-accounts)
-                  (let* ((plist (cdr account))
-                         (imap-user (idiig/get-sops-secret-value
-                                     (plist-get plist :login-key)))
-                         (smtp-user (idiig/get-sops-secret-value
-                                     (idiig/mail-account-smtp-login-key plist))))
-                    (auth-source-search :host (plist-get plist :imap-host)
-                                         :port (number-to-string
-                                                (plist-get plist :imap-port))
-                                         :user imap-user :require '(:secret) :create t)
-                    (auth-source-search :host (plist-get plist :smtp-host)
-                                         :port (number-to-string
-                                                (plist-get plist :smtp-port))
-                                         :user smtp-user :require '(:secret) :create t)))))
+                  (let ((plist (cdr account)))
+                    (when (idiig/mail-account-password-auth-p plist)
+                      (let* ((imap-user (idiig/get-sops-secret-value
+                                         (plist-get plist :login-key)))
+                             (smtp-user (idiig/get-sops-secret-value
+                                         (idiig/mail-account-smtp-login-key plist))))
+                        (auth-source-search :host (plist-get plist :imap-host)
+                                             :port (number-to-string
+                                                    (plist-get plist :imap-port))
+                                             :user imap-user :require '(:secret) :create t)
+                        (auth-source-search :host (plist-get plist :smtp-host)
+                                             :port (number-to-string
+                                                    (plist-get plist :smtp-port))
+                                             :user smtp-user :require '(:secret) :create t)))))))
           (delete-file netrc-file)))
       (setq idiig/mail-auth-source-warmed t)))
 #+end_src
@@ -2663,7 +2785,7 @@ moment `wl-draft-config-exec' evals this entry."
         (wl-smtp-posting-port . ,(plist-get plist :smtp-port))
         (wl-smtp-posting-user
          . (idiig/get-sops-secret-value ,(idiig/mail-account-smtp-login-key plist)))
-        (wl-smtp-authenticate-type . "plain")
+        (wl-smtp-authenticate-type . ,(plist-get plist :smtp-auth-type))
         (wl-smtp-connection-type . ,(plist-get plist :smtp-connection-type))
         (wl-local-domain . ,(plist-get plist :message-id-domain))
         (wl-message-id-domain . ,(plist-get plist :message-id-domain)))))
@@ -2803,26 +2925,28 @@ Wanderlust/SEMI 自己那套 MIME 菜单（=C-c C-x= 前缀）就能调用 GPG �
 Wanderlust——单独设 =mail-user-agent= 没用，必须配合
 =define-mail-user-agent= 把 =wl-user-agent= 这个符号真正注册进去。
 =:config= 结尾用 =advice-add= 挂 =idiig/wl-bootstrap=，把前面几节的
-setup 函数（davmail、folders、签名、auth-source 缓存）都跑一遍——各
-自都是幂等操作，重复跑无副作用。挂载点有两个，不是只挂 =wl= 一个：
-=wl-draft-create-buffer= 是 =wl=/=wl-draft=/=wl-user-agent-compose=
-（也就是 =C-x m=）共用的撰写邮件入口，只挂 =wl= 的话，如果这次 Emacs
-会话里第一个动作就是直接 =C-x m= 而不是先 =M-x wl=，=idiig/wl-bootstrap=
-根本不会被触发——SMTP 要用的 auth-source 缓存没预热、davmail 也没启
-动，发信会失败。两处都挂，先后顺序不影响（都是幂等的）。
+setup 函数（folders、签名、auth-source 密码缓存、XOAUTH2 client-id）
+都跑一遍——各自都是幂等操作，重复跑无副作用。挂载点有两个，不是只挂
+=wl= 一个：=wl-draft-create-buffer= 是 =wl=/=wl-draft=/
+=wl-user-agent-compose= （也就是 =C-x m=）共用的撰写邮件入口，只挂
+=wl= 的话，如果这次 Emacs 会话里第一个动作就是直接 =C-x m= 而不是先
+=M-x wl=，=idiig/wl-bootstrap= 根本不会被触发——SMTP 要用的
+auth-source 缓存/XOAUTH2 client-id 都没预热，发信会失败。两处都挂，
+先后顺序不影响（都是幂等的）。
 #+begin_src emacs-lisp
   (defun idiig/wl-bootstrap (&rest _args)
-    "Prepare everything Wanderlust needs before opening: start the
-  davmail gateway, bootstrap `wl-folders-file' and the signature file
-  if missing, and warm the auth-source password cache.  Runs before
-  every `wl' call via :before advice, which passes through whatever
-  arguments `wl' was called with (an optional prefix arg) -- ARGS
-  absorbs those since this function doesn't need them.  Each step
-  no-ops once already done, so repeating this on every call is cheap."
-    (idiig/davmail-ensure-running)
+    "Prepare everything Wanderlust needs before opening: bootstrap
+  `wl-folders-file' and the signature file if missing, warm the
+  auth-source password cache, and register the Hotmail XOAUTH2
+  client-id.  Runs before every `wl' call via :before advice, which
+  passes through whatever arguments `wl' was called with (an optional
+  prefix arg) -- ARGS absorbs those since this function doesn't need
+  them.  Each step no-ops once already done, so repeating this on
+  every call is cheap."
     (idiig/mail-folders-setup)
     (idiig/mail-signature-setup)
-    (idiig/mail-auth-source-warm-cache))
+    (idiig/mail-auth-source-warm-cache)
+    (idiig/sasl-xoauth2-ensure-hotmail-client-id))
 
   (use-package wl
     :commands (wl wl-draft wl-user-agent-compose)
@@ -2840,14 +2964,22 @@ setup 函数（davmail、folders、签名、auth-source 缓存）都跑一遍—
 =M-x idiig/sops-secrets-setup=。7 个 key（=mail_sdf_user=、
 =mail_sdf_password=、=mail_sdf_address=、=mail_gmail_user=、
 =mail_gmail_app_password=、=mail_hotmail_user=、
-=mail_hotmail_local_password= ）已经在「账号与本地目录」那节通过
+=mail_hotmail_oauth_client_id= ）已经在「账号与本地目录」那节通过
 =idiig/sops-register-keys= 注册过，缺失的会被自动填上
 =TODO: <说明>= 占位符再打开编辑器，不用凭记忆手打 key 名或去翻这份
-文件找说明。
+文件找说明。=mail_hotmail_oauth_client_id= 填的是「Microsoft OAuth
+配置」一节里在 Azure Portal 注册应用后拿到的 "Application (client)
+ID"，不是密码。
 
 Hotmail 那个账号第一次真正连接（第一次 =wl= 打开 Hotmail 的 folder）
-时，davmail 会弹浏览器窗口走 Microsoft 的 OAuth2 登录，跟上面这些
-sops key 无关，是单独的一次性步骤。
+时，=oauth2.el= 会在默认浏览器里弹出 Microsoft 的登录/同意页面；登录
+同意之后跳转到 =nativeclient= 这个地址——这是微软专门为「没有本地
+server 接收回调」的桌面/命令行应用保留的特殊 redirect URI，命中之后
+微软自己渲染一个页面，上面明文显示一串 code，把这串 code 复制粘贴回
+Emacs minibuffer 里 =oauth2.el= 弹出的 "Enter the code your browser
+displayed" 提示即可（=oauth2-request-authorization= 要的是这串
+code 本身，不是浏览器地址栏的 URL）。跟上面这些 sops key 无关，是单
+独的一次性步骤，之后走 refresh token，除非撤销授权否则不用重复。
 ** 文档写作
 :PROPERTIES:
 :header-args: :noweb-ref ecfg

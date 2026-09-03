@@ -1188,57 +1188,8 @@
 	            (idiig/sops-fill-missing-keys secrets-file)
 	            (with-editor-async-shell-command (format "${pkgs.sops}/bin/sops %s"
 	                                                       (shell-quote-argument secrets-file))))))
-	    ;; Local davmail listener ports; `idiig/mail-accounts' (below) points
-	    ;; its Hotmail entry at these instead of duplicating the numbers.
-	    (defvar idiig/davmail-imap-port 1143)
-	    (defvar idiig/davmail-smtp-port 1025)
-	    (defvar idiig/davmail-properties-file
-	      (expand-file-name "~/.config/davmail.properties"))
-	    (defvar idiig/davmail-process-name "davmail")
-	    
-	    (defun idiig/davmail-ensure-config ()
-	      "Regenerate `idiig/davmail-properties-file'.
-	    No secret lives in this file: Office 365 auth happens through the
-	    O365DeviceCode flow (the only interactive mode that works with
-	    davmail.server=true / headless mode -- O365Interactive needs a GUI
-	    browser popup and fails outright under headless with \"O365Interactive
-	    not supported in headless mode\", confirmed against a real davmail
-	    log), and davmail caches the refresh token itself, so it is safe to
-	    always overwrite this file."
-	      (with-temp-file idiig/davmail-properties-file
-	        (insert "davmail.server=true\n")
-	        (insert "davmail.mode=O365EWS\n")
-	        (insert "davmail.authentication=O365DeviceCode\n")
-	        (insert "davmail.url=https://outlook.office365.com/EWS/Exchange.asmx\n")
-	        (insert (format "davmail.imapPort=%d\n" idiig/davmail-imap-port))
-	        (insert (format "davmail.smtpPort=%d\n" idiig/davmail-smtp-port))
-	        ;; Only accept connections from this machine.
-	        (insert "davmail.allowRemote=false\n")
-	        (insert "davmail.disableUpdateCheck=true\n")))
-	    
-	    (defun idiig/davmail-running-p ()
-	      "Return non-nil if something already listens on `idiig/davmail-imap-port'.
-	    Probed by TCP connection rather than the Emacs process list: davmail
-	    is meant to outlive any single Emacs session, so a process-list check
-	    would miss an instance a previous session left running and try to
-	    start a second one competing for the same port."
-	      (let ((probe (ignore-errors
-	                     (open-network-stream "davmail-probe" nil
-	                                          "localhost" idiig/davmail-imap-port))))
-	        (when probe
-	          (delete-process probe)
-	          t)))
-	    
-	    (defun idiig/davmail-ensure-running ()
-	      "Start the davmail gateway unless it is already running.
-	    The first IMAP/SMTP connection after startup triggers davmail's
-	    O365DeviceCode flow -- watch the *davmail* process buffer for a URL
-	    and a short code to enter in any browser.  Later connections reuse
-	    the cached refresh token, so this does not prompt again every time."
-	      (unless (idiig/davmail-running-p)
-	        (idiig/davmail-ensure-config)
-	        (start-process idiig/davmail-process-name "*davmail*"
-	                        "${pkgs.davmail}/bin/davmail" idiig/davmail-properties-file)))
+	    (require 'oauth2)
+	    (require 'sasl-xoauth2)
 	    (defvar idiig/mail-directory (expand-file-name "~/mails/")
 	      "Local root for all Wanderlust state: message cache, signature file,
 	    folder subscription list.  Deliberately not synced across machines via
@@ -1261,6 +1212,7 @@
 	         ;; via :smtp-login-key/:smtp-password-key below; IMAP/folders
 	         ;; stay on SDF.
 	         :smtp-host "smtp.gmail.com" :smtp-port 587 :smtp-connection-type 'starttls
+	         :imap-auth-type clear :smtp-auth-type "plain"
 	         :login-key "mail_sdf_user" :from-key "mail_sdf_address"
 	         :from-name-key "mail_sdf_from_name"
 	         :password-key "mail_sdf_password"
@@ -1273,6 +1225,7 @@
 	         :petname "Gmail"
 	         :imap-host "imap.gmail.com" :imap-port 993 :imap-tls t
 	         :smtp-host "smtp.gmail.com" :smtp-port 587 :smtp-connection-type 'starttls
+	         :imap-auth-type clear :smtp-auth-type "plain"
 	         :login-key "mail_gmail_user" :from-key "mail_gmail_user"
 	         :from-name-key "mail_gmail_from_name"
 	         :password-key "mail_gmail_app_password"
@@ -1286,13 +1239,12 @@
 	         :trash-folder "[Gmail]/Trash")
 	        (hotmail
 	         :petname "Hotmail"
-	         :imap-host "localhost" :imap-port ,idiig/davmail-imap-port :imap-tls nil
-	         :smtp-host "localhost" :smtp-port ,idiig/davmail-smtp-port
-	         :smtp-connection-type nil
+	         :imap-host "outlook.office365.com" :imap-port 993 :imap-tls t
+	         :smtp-host "smtp-mail.outlook.com" :smtp-port 587 :smtp-connection-type 'starttls
+	         :imap-auth-type xoauth2 :smtp-auth-type "xoauth2"
 	         :login-key "mail_hotmail_user" :from-key "mail_hotmail_user"
 	         :from-name-key "mail_hotmail_from_name"
-	         :password-key "mail_hotmail_local_password"
-	         :folder-match "@localhost"
+	         :folder-match "@outlook\\.office365\\.com"
 	         :message-id-domain "outlook.com"
 	         :extra-folders (("Sent Items" . "Sent")
 	                         ("Drafts" . "Drafts")
@@ -1345,13 +1297,76 @@
 	       ("mail_gmail_app_password" . "Gmail App Password (Google Account -> Security -> 2-Step Verification -> App passwords; needs 2FA enabled)")
 	       ("mail_gmail_from_name" . "Display name for the From header on Gmail mail")
 	       ("mail_hotmail_user" . "Hotmail/Outlook.com full address, used for both login and From")
-	       ("mail_hotmail_local_password" . "Arbitrary local password for the davmail IMAP/SMTP handshake -- NOT your real Microsoft password")
+	       ("mail_hotmail_oauth_client_id" . "Azure \"Application (client) ID\" for the Hotmail OAuth app -- see the Microsoft OAuth section below; no client secret needed for a public client")
 	       ("mail_hotmail_from_name" . "Display name for the From header on Hotmail mail")))
+	    (defvar idiig/sasl-xoauth2-token-directory
+	      (expand-file-name ".sasl-xoauth2/" idiig/mail-directory))
+	    
+	    (unless (file-directory-p idiig/sasl-xoauth2-token-directory)
+	      (make-directory idiig/sasl-xoauth2-token-directory t))
+	    
+	    (setq sasl-xoauth2-token-directory idiig/sasl-xoauth2-token-directory)
+	    
+	    ;; Overrides sasl-xoauth2's own "\\.outlook\\.com$"/"\\.office365\\.com$"
+	    ;; defaults (retired endpoint / missing redirect-uri, see prose above)
+	    ;; with one entry that matches our exact Hotmail IMAP host.  Uses the
+	    ;; /consumers/ authorize+token endpoints, not /common/: an app
+	    ;; registered from a personal Microsoft account gets auto-provisioned
+	    ;; into a real (if invisible) organizational tenant, and /common/
+	    ;; tries to resolve that tenant context first -- since the personal
+	    ;; account signing in isn't a member/guest of it, that fails with
+	    ;; AADSTS500200 ("Personal Microsoft accounts are not supported for
+	    ;; this application unless explicitly invited to an organization")
+	    ;; even though signInAudience already allows personal accounts.
+	    ;; /consumers/ skips tenant resolution and goes straight to the MSA
+	    ;; identity system.  The redirect-uri keeps the literal
+	    ;; login.microsoftonline.com/common/oauth2/nativeclient string
+	    ;; regardless -- that's Microsoft's fixed reserved value for the
+	    ;; native-client code-display flow, unrelated to which endpoint
+	    ;; issued the authorization request.
+	    ;;
+	    ;; Scope resource is outlook.office.com, NOT outlook.office365.com,
+	    ;; even though the actual IMAP/SMTP server hostnames above are on
+	    ;; office365.com -- confirmed against a real error: requesting scope
+	    ;; under office365.com against the /consumers/ endpoint fails with
+	    ;; error=invalid_scope ("The provided resource value for the input
+	    ;; parameter 'scope' is not valid"), Microsoft's own legacy-protocol
+	    ;; OAuth docs use office.com for the scope URI.  sasl-xoauth2's own
+	    ;; built-in ".office365.com$" default table entry uses office365.com
+	    ;; for the scope, which is presumably fine under /common/ or
+	    ;; /organizations/ but not /consumers/.
+	    (add-to-list 'sasl-xoauth2-host-url-table
+	                 '("^outlook\\.office365\\.com$"
+	                   "https://login.microsoftonline.com/consumers/oauth2/v2.0/authorize"
+	                   "https://login.microsoftonline.com/consumers/oauth2/v2.0/token"
+	                   "https://outlook.office.com/IMAP.AccessAsUser.All https://outlook.office.com/SMTP.Send offline_access"
+	                   "https://login.microsoftonline.com/common/oauth2/nativeclient"))
+	    
+	    (defvar idiig/sasl-xoauth2-client-id-warmed nil
+	      "Non-nil once the Hotmail entry has been added to
+	    `sasl-xoauth2-host-user-id-table' for this Emacs session.")
+	    
+	    (defun idiig/sasl-xoauth2-ensure-hotmail-client-id ()
+	      "Register the Hotmail account's OAuth client-id in
+	    `sasl-xoauth2-host-user-id-table', keyed by its login address.
+	    Public client apps registered under \"Mobile and desktop
+	    applications\" in Azure need no client secret -- the empty string is
+	    deliberate, since leaving this entry out entirely would make
+	    `sasl-xoauth2' fall back to `sasl-read-passphrase' and prompt for one
+	    on every connection.  Only runs once per session, same reasoning as
+	    `idiig/mail-auth-source-warm-cache'."
+	      (unless idiig/sasl-xoauth2-client-id-warmed
+	        (add-to-list 'sasl-xoauth2-host-user-id-table
+	                     (list "^outlook\\.office365\\.com$"
+	                           (regexp-quote (idiig/get-sops-secret-value "mail_hotmail_user"))
+	                           (idiig/get-sops-secret-value "mail_hotmail_oauth_client_id")
+	                           ""))
+	        (setq idiig/sasl-xoauth2-client-id-warmed t)))
 	      (with-eval-after-load 'wl
 	        (setq wl-folders-file (expand-file-name ".folders" idiig/mail-directory)))
 	    
 	      (defun idiig/mail-account-connection-suffix (plist)
-	        "The \"user\"/clear@host:port! suffix shared by every folder line
+	        "The \"user\"/auth@host:port! suffix shared by every folder line
 	    for an account described by PLIST.
 	    Quotes the username: elmo's folder-spec grammar is
 	    USER@HOST:PORT, and Gmail/Hotmail logins are themselves full
@@ -1359,12 +1374,18 @@
 	    quoted (confirmed against a real connection log: unquoted
 	    \"chewingguno@gmail.com/clear@imap.gmail.com:993!\" mis-parses
 	    and elmo can't connect at all -- SDF's bare \"idg\" username has
-	    no @, which is why only SDF worked)."
+	    no @, which is why only SDF worked).
+	    The /auth segment comes straight from :imap-auth-type (`clear' or
+	    `xoauth2') and the trailing ! from :imap-tls -- kept as two
+	    independent decisions rather than inferring one from the other, since
+	    Hotmail now uses XOAUTH2 while still connecting over implicit TLS on
+	    993, same as SDF/Gmail's password logins."
 	        (let ((user (idiig/get-sops-secret-value (plist-get plist :login-key)))
+	              (auth (plist-get plist :imap-auth-type))
 	              (tls (plist-get plist :imap-tls)))
-	          (format "\"%s\"%s@%s:%d%s"
+	          (format "\"%s\"/%s@%s:%d%s"
 	                  user
-	                  (if tls "/clear" "")
+	                  (symbol-name auth)
 	                  (plist-get plist :imap-host)
 	                  (plist-get plist :imap-port)
 	                  (if tls "!" ""))))
@@ -1423,19 +1444,30 @@
 	        "The sops key for ACCOUNT's SMTP password; see `idiig/mail-account-smtp-login-key'."
 	        (or (plist-get plist :smtp-password-key) (plist-get plist :password-key)))
 	    
+	      (defun idiig/mail-account-password-auth-p (plist)
+	        "Non-nil when ACCOUNT authenticates with a password rather than
+	    XOAUTH2.  XOAUTH2 accounts have no :password-key at all -- their
+	    credentials come from `sasl-xoauth2-host-user-id-table' and a
+	    browser-based OAuth consent flow instead, so there is nothing here
+	    for sops/auth-source to bridge."
+	        (not (eq (plist-get plist :imap-auth-type) 'xoauth2)))
+	    
 	      (defun idiig/mail-account-netrc-lines (account)
-	        "netrc lines for ACCOUNT's IMAP and SMTP credentials, read from sops."
-	        (let* ((plist (cdr account))
-	               (imap-user (idiig/get-sops-secret-value (plist-get plist :login-key)))
-	               (imap-password (idiig/get-sops-secret-value (plist-get plist :password-key)))
-	               (smtp-user (idiig/get-sops-secret-value (idiig/mail-account-smtp-login-key plist)))
-	               (smtp-password (idiig/get-sops-secret-value (idiig/mail-account-smtp-password-key plist))))
-	          (list (format "machine %s login %s port %d password %s\n"
-	                        (plist-get plist :imap-host) imap-user
-	                        (plist-get plist :imap-port) imap-password)
-	                (format "machine %s login %s port %d password %s\n"
-	                        (plist-get plist :smtp-host) smtp-user
-	                        (plist-get plist :smtp-port) smtp-password))))
+	        "netrc lines for ACCOUNT's IMAP and SMTP credentials, read from
+	    sops.  Returns nil for XOAUTH2 accounts; see
+	    `idiig/mail-account-password-auth-p'."
+	        (let ((plist (cdr account)))
+	          (when (idiig/mail-account-password-auth-p plist)
+	            (let* ((imap-user (idiig/get-sops-secret-value (plist-get plist :login-key)))
+	                   (imap-password (idiig/get-sops-secret-value (plist-get plist :password-key)))
+	                   (smtp-user (idiig/get-sops-secret-value (idiig/mail-account-smtp-login-key plist)))
+	                   (smtp-password (idiig/get-sops-secret-value (idiig/mail-account-smtp-password-key plist))))
+	              (list (format "machine %s login %s port %d password %s\n"
+	                            (plist-get plist :imap-host) imap-user
+	                            (plist-get plist :imap-port) imap-password)
+	                    (format "machine %s login %s port %d password %s\n"
+	                            (plist-get plist :smtp-host) smtp-user
+	                            (plist-get plist :smtp-port) smtp-password))))))
 	    
 	      (defvar idiig/mail-auth-source-warmed nil
 	        "Non-nil once `idiig/mail-auth-source-warm-cache' has populated
@@ -1465,19 +1497,20 @@
 	                        (insert line))))
 	                  (let ((auth-sources (cons netrc-file auth-sources)))
 	                    (dolist (account idiig/mail-accounts)
-	                      (let* ((plist (cdr account))
-	                             (imap-user (idiig/get-sops-secret-value
-	                                         (plist-get plist :login-key)))
-	                             (smtp-user (idiig/get-sops-secret-value
-	                                         (idiig/mail-account-smtp-login-key plist))))
-	                        (auth-source-search :host (plist-get plist :imap-host)
-	                                             :port (number-to-string
-	                                                    (plist-get plist :imap-port))
-	                                             :user imap-user :require '(:secret) :create t)
-	                        (auth-source-search :host (plist-get plist :smtp-host)
-	                                             :port (number-to-string
-	                                                    (plist-get plist :smtp-port))
-	                                             :user smtp-user :require '(:secret) :create t)))))
+	                      (let ((plist (cdr account)))
+	                        (when (idiig/mail-account-password-auth-p plist)
+	                          (let* ((imap-user (idiig/get-sops-secret-value
+	                                             (plist-get plist :login-key)))
+	                                 (smtp-user (idiig/get-sops-secret-value
+	                                             (idiig/mail-account-smtp-login-key plist))))
+	                            (auth-source-search :host (plist-get plist :imap-host)
+	                                                 :port (number-to-string
+	                                                        (plist-get plist :imap-port))
+	                                                 :user imap-user :require '(:secret) :create t)
+	                            (auth-source-search :host (plist-get plist :smtp-host)
+	                                                 :port (number-to-string
+	                                                        (plist-get plist :smtp-port))
+	                                                 :user smtp-user :require '(:secret) :create t)))))))
 	              (delete-file netrc-file)))
 	          (setq idiig/mail-auth-source-warmed t)))
 	      (defun idiig/mail-format-from (name-key address-key)
@@ -1509,7 +1542,7 @@
 	            (wl-smtp-posting-port . ,(plist-get plist :smtp-port))
 	            (wl-smtp-posting-user
 	             . (idiig/get-sops-secret-value ,(idiig/mail-account-smtp-login-key plist)))
-	            (wl-smtp-authenticate-type . "plain")
+	            (wl-smtp-authenticate-type . ,(plist-get plist :smtp-auth-type))
 	            (wl-smtp-connection-type . ,(plist-get plist :smtp-connection-type))
 	            (wl-local-domain . ,(plist-get plist :message-id-domain))
 	            (wl-message-id-domain . ,(plist-get plist :message-id-domain)))))
@@ -1586,17 +1619,18 @@
 	      :config
 	      (bbdb-insinuate-wl))
 	    (defun idiig/wl-bootstrap (&rest _args)
-	      "Prepare everything Wanderlust needs before opening: start the
-	    davmail gateway, bootstrap `wl-folders-file' and the signature file
-	    if missing, and warm the auth-source password cache.  Runs before
-	    every `wl' call via :before advice, which passes through whatever
-	    arguments `wl' was called with (an optional prefix arg) -- ARGS
-	    absorbs those since this function doesn't need them.  Each step
-	    no-ops once already done, so repeating this on every call is cheap."
-	      (idiig/davmail-ensure-running)
+	      "Prepare everything Wanderlust needs before opening: bootstrap
+	    `wl-folders-file' and the signature file if missing, warm the
+	    auth-source password cache, and register the Hotmail XOAUTH2
+	    client-id.  Runs before every `wl' call via :before advice, which
+	    passes through whatever arguments `wl' was called with (an optional
+	    prefix arg) -- ARGS absorbs those since this function doesn't need
+	    them.  Each step no-ops once already done, so repeating this on
+	    every call is cheap."
 	      (idiig/mail-folders-setup)
 	      (idiig/mail-signature-setup)
-	      (idiig/mail-auth-source-warm-cache))
+	      (idiig/mail-auth-source-warm-cache)
+	      (idiig/sasl-xoauth2-ensure-hotmail-client-id))
 	    
 	    (use-package wl
 	      :commands (wl wl-draft wl-user-agent-compose)
@@ -2697,6 +2731,7 @@
             wanderlust
             org-mime
             bbdb
+            oauth2
             spacious-padding
               writeroom-mode
             (lsp-bridge.override {
@@ -2763,7 +2798,6 @@
             sops
             	yq-go
             	age
-            davmail
             universal-ctags
             direnv
             nixd
