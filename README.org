@@ -3117,6 +3117,31 @@ folder）时，=idiig/oauth2-localhost-request-authorization= 会在默
 面（见前面「本地 HTTP 回调接管授权」一节）。跟上面这些 sops key 无
 关，是单独的一次性步骤，之后走 refresh token，除非撤销授权否则不用
 重复。
+*** TODO 待排查问题
+- 启动 =wl= 时报 =gnus-mime-setup is not found.=/=emh-setup is not
+  found.=，来源和影响还没查
+- Hotmail 的 Sent/Trash/Junk 文件夹显示为空，需要确认是
+  =:extra-folders= 里的 mailbox 名字跟 Exchange 实际文件夹对不上，
+  还是订阅/刷新的问题
+- 在 =wl-draft-mode= 里输入 To 收件人时，
+  =completion-preview--post-command= 报 =(error "Not an in-range
+  integer, integral float, or cons of integers")=，怀疑是
+  =completion-preview-mode= 跟 wl-draft/bbdb 补全的兼容性问题
+- 在 =wl-draft-mode= 里给 =C-c C-o= 绑 =org-mime-edit-mail-in-org-mode=，
+  按需弹出完整 org-mode 子编辑器写正文，写完 =C-c C-c=
+  （=org-mime-edit-src-exit=）写回草稿——注意 =C-c C-o= 目前绑的是
+  Wanderlust 自带的 =wl-jump-to-draft-buffer=（在多个草稿间跳转），
+  改绑前要确认是否还需要那个功能，或者换一个不冲突的键
+- =M-x org-mime-org-buffer-htmlize= 在 =wl-draft-mode= 里用 =M-x=
+  补全会搜不到：这个命令源码里声明的是 =(interactive nil org-mode)=，
+  只对 =org-mode= 极其派生模式可见，配合当前配置里
+  =read-extended-command-predicate= 设成
+  =command-completion-default-include-p=（按 major-mode 过滤 =M-x=
+  候选列表）,在非 org-mode 的 draft buffer 里会被过滤掉，看起来像函数
+  不存在了，其实一直在（=fboundp=/=commandp= 都是 =t=，能正常调用）。
+  这也是上面那条 =org-mime-edit-mail-in-org-mode= TODO 更值得做的原因
+  ——切进真正的 org-mode 子编辑器之后，=M-x= 里就能正常搜到 org-mime
+  的命令了
 ** 文档写作
 :PROPERTIES:
 :header-args: :noweb-ref ecfg
