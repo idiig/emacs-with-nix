@@ -1233,15 +1233,24 @@
 	                     ;; and logs every chunk to *Messages*, so a silent
 	                     ;; hang (connection established, nothing parsed) is
 	                     ;; diagnosable instead of just looking stuck.
-	                     (let ((buf (concat (process-get conn 'idiig-buffer) chunk)))
+	                     (let* ((buf (concat (process-get conn 'idiig-buffer) chunk))
+	                            (matched (string-match "\\`GET /?\\?\\([^ ]*\\) HTTP/" buf))
+	                            ;; Captured immediately after string-match, before
+	                            ;; any other regex-using call (message/split-string
+	                            ;; below) can clobber the global match data that
+	                            ;; match-string depends on.
+	                            (query (and matched (match-string 1 buf))))
 	                       (process-put conn 'idiig-buffer buf)
-	                       (message "idiig/oauth2-localhost: %d bytes on this connection (%d total): %S"
-	                                (length chunk) (length buf)
-	                                (substring buf 0 (min 200 (length buf))))
-	                       (when (string-match "\\`GET /?\\?\\([^ ]*\\) HTTP/" buf)
-	                         (let ((params (url-parse-query-string (match-string 1 buf))))
+	                       (message "idiig/oauth2-localhost: +%d bytes (%d total), request-line matched=%s, first line: %S"
+	                                (length chunk) (length buf) (if matched "yes" "no")
+	                                (car (split-string buf "\r\n")))
+	                       (when matched
+	                         (let ((params (url-parse-query-string query)))
 	                           (setq code (cadr (assoc "code" params)))
 	                           (setq received-state (cadr (assoc "state" params))))
+	                         (message "idiig/oauth2-localhost: parsed code length=%s, state=%S"
+	                                  (if code (number-to-string (length code)) "NIL -- no code param found")
+	                                  received-state)
 	                         (process-send-string
 	                          conn (concat "HTTP/1.1 200 OK\r\n"
 	                                       "Content-Type: text/html; charset=utf-8\r\n"
