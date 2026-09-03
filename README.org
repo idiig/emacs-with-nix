@@ -2274,6 +2274,16 @@ SDF 的登录用户名和邮件地址不是同一个字符串（ =user= vs
 （ =From= 头用）分开两个 sops key；Gmail/Hotmail 这两个值相同，直接
 复用同一个 key。Hotmail 条目的端口直接引用上一节的
 =idiig/davmail-imap-port= / =idiig/davmail-smtp-port=，不重复写常量。
+
+SDF 自己的 SMTP relay 需要 ARPA 验证才能对外发信，这个账号还没有，
+所以 SDF 条目的 =:smtp-host=/=:smtp-port=/=:smtp-connection-type=
+指向 Gmail 的 SMTP，另外用 =:smtp-login-key=/=:smtp-password-key=
+（复用已有的 =mail_gmail_user=/=mail_gmail_app_password=，不新注册
+key）覆盖发信用的登录凭据；=:login-key=/=:password-key= 还是 SDF 自
+己的，继续只用于 IMAP 收信。=:from-key=/=:from-name-key= 不受影响，
+发出去的邮件 From 头仍然是 SDF 地址。这两个 override key 是可选的，
+不设置就退回到跟 IMAP 一样的 =:login-key=/=:password-key=（Gmail/
+Hotmail 目前都是这样）。
 #+begin_src emacs-lisp
   (defvar idiig/mail-directory (expand-file-name "~/mails/")
     "Local root for all Wanderlust state: message cache, signature file,
@@ -2292,10 +2302,15 @@ SDF 的登录用户名和邮件地址不是同一个字符串（ =user= vs
     `((sdf
        :petname "SDF"
        :imap-host "mx.sdf.org" :imap-port 993 :imap-tls t
-       :smtp-host "mx.sdf.org" :smtp-port 587 :smtp-connection-type 'starttls
+       ;; SDF's own SMTP relay needs ARPA validation this account
+       ;; doesn't have, so outgoing mail borrows Gmail's SMTP instead
+       ;; via :smtp-login-key/:smtp-password-key below; IMAP/folders
+       ;; stay on SDF.
+       :smtp-host "smtp.gmail.com" :smtp-port 587 :smtp-connection-type 'starttls
        :login-key "mail_sdf_user" :from-key "mail_sdf_address"
        :from-name-key "mail_sdf_from_name"
        :password-key "mail_sdf_password"
+       :smtp-login-key "mail_gmail_user" :smtp-password-key "mail_gmail_app_password"
        :folder-match "@mx\\.sdf\\.org"
        :message-id-domain "sdf.org"
        :extra-folders nil
@@ -2342,6 +2357,13 @@ SDF 的登录用户名和邮件地址不是同一个字符串（ =user= vs
   login is a bare username while the From address needs the full
   \"user@sdf.org\" form; for Gmail/Hotmail the login name already is
   the address, so both keys point at the same sops entry.
+
+  :smtp-login-key and :smtp-password-key are optional; when present
+  they override :login-key/:password-key for the SMTP leg only (IMAP
+  still uses :login-key/:password-key).  SDF is the only account that
+  sets these -- its own SMTP relay requires ARPA validation this
+  account doesn't have, so it authenticates to Gmail's SMTP instead
+  while still sending From the SDF address.
 
   :message-id-domain only affects the generated Message-ID header, not
   routing, so it doesn't need to exactly match the From domain -- it's
@@ -2479,17 +2501,29 @@ Wanderlust 的密码存取（=elmo-passwd.el=）支持把
   (with-eval-after-load 'wl
     (setq elmo-passwd-storage-type 'auth-source))
 
+  (defun idiig/mail-account-smtp-login-key (plist)
+    "The sops key for ACCOUNT's SMTP login, falling back to :login-key.
+:smtp-login-key only exists on accounts (currently just SDF) that
+send through a different account's SMTP server than they receive on."
+    (or (plist-get plist :smtp-login-key) (plist-get plist :login-key)))
+
+  (defun idiig/mail-account-smtp-password-key (plist)
+    "The sops key for ACCOUNT's SMTP password; see `idiig/mail-account-smtp-login-key'."
+    (or (plist-get plist :smtp-password-key) (plist-get plist :password-key)))
+
   (defun idiig/mail-account-netrc-lines (account)
     "netrc lines for ACCOUNT's IMAP and SMTP credentials, read from sops."
     (let* ((plist (cdr account))
-           (user (idiig/get-sops-secret-value (plist-get plist :login-key)))
-           (password (idiig/get-sops-secret-value (plist-get plist :password-key))))
+           (imap-user (idiig/get-sops-secret-value (plist-get plist :login-key)))
+           (imap-password (idiig/get-sops-secret-value (plist-get plist :password-key)))
+           (smtp-user (idiig/get-sops-secret-value (idiig/mail-account-smtp-login-key plist)))
+           (smtp-password (idiig/get-sops-secret-value (idiig/mail-account-smtp-password-key plist))))
       (list (format "machine %s login %s port %d password %s\n"
-                    (plist-get plist :imap-host) user
-                    (plist-get plist :imap-port) password)
+                    (plist-get plist :imap-host) imap-user
+                    (plist-get plist :imap-port) imap-password)
             (format "machine %s login %s port %d password %s\n"
-                    (plist-get plist :smtp-host) user
-                    (plist-get plist :smtp-port) password))))
+                    (plist-get plist :smtp-host) smtp-user
+                    (plist-get plist :smtp-port) smtp-password))))
 
   (defvar idiig/mail-auth-source-warmed nil
     "Non-nil once `idiig/mail-auth-source-warm-cache' has populated
@@ -2520,16 +2554,18 @@ Wanderlust 的密码存取（=elmo-passwd.el=）支持把
               (let ((auth-sources (cons netrc-file auth-sources)))
                 (dolist (account idiig/mail-accounts)
                   (let* ((plist (cdr account))
-                         (user (idiig/get-sops-secret-value
-                                (plist-get plist :login-key))))
+                         (imap-user (idiig/get-sops-secret-value
+                                     (plist-get plist :login-key)))
+                         (smtp-user (idiig/get-sops-secret-value
+                                     (idiig/mail-account-smtp-login-key plist))))
                     (auth-source-search :host (plist-get plist :imap-host)
                                          :port (number-to-string
                                                 (plist-get plist :imap-port))
-                                         :user user :require '(:secret) :create t)
+                                         :user imap-user :require '(:secret) :create t)
                     (auth-source-search :host (plist-get plist :smtp-host)
                                          :port (number-to-string
                                                 (plist-get plist :smtp-port))
-                                         :user user :require '(:secret) :create t)))))
+                                         :user smtp-user :require '(:secret) :create t)))))
           (delete-file netrc-file)))
       (setq idiig/mail-auth-source-warmed t)))
 #+end_src
@@ -2626,7 +2662,7 @@ moment `wl-draft-config-exec' evals this entry."
         (wl-smtp-posting-server . ,(plist-get plist :smtp-host))
         (wl-smtp-posting-port . ,(plist-get plist :smtp-port))
         (wl-smtp-posting-user
-         . (idiig/get-sops-secret-value ,(plist-get plist :login-key)))
+         . (idiig/get-sops-secret-value ,(idiig/mail-account-smtp-login-key plist)))
         (wl-smtp-authenticate-type . "plain")
         (wl-smtp-connection-type . ,(plist-get plist :smtp-connection-type))
         (wl-local-domain . ,(plist-get plist :message-id-domain))

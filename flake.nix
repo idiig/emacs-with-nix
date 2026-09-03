@@ -1256,10 +1256,15 @@
 	      `((sdf
 	         :petname "SDF"
 	         :imap-host "mx.sdf.org" :imap-port 993 :imap-tls t
-	         :smtp-host "mx.sdf.org" :smtp-port 587 :smtp-connection-type 'starttls
+	         ;; SDF's own SMTP relay needs ARPA validation this account
+	         ;; doesn't have, so outgoing mail borrows Gmail's SMTP instead
+	         ;; via :smtp-login-key/:smtp-password-key below; IMAP/folders
+	         ;; stay on SDF.
+	         :smtp-host "smtp.gmail.com" :smtp-port 587 :smtp-connection-type 'starttls
 	         :login-key "mail_sdf_user" :from-key "mail_sdf_address"
 	         :from-name-key "mail_sdf_from_name"
 	         :password-key "mail_sdf_password"
+	         :smtp-login-key "mail_gmail_user" :smtp-password-key "mail_gmail_app_password"
 	         :folder-match "@mx\\.sdf\\.org"
 	         :message-id-domain "sdf.org"
 	         :extra-folders nil
@@ -1306,6 +1311,13 @@
 	    login is a bare username while the From address needs the full
 	    \"user@sdf.org\" form; for Gmail/Hotmail the login name already is
 	    the address, so both keys point at the same sops entry.
+	    
+	    :smtp-login-key and :smtp-password-key are optional; when present
+	    they override :login-key/:password-key for the SMTP leg only (IMAP
+	    still uses :login-key/:password-key).  SDF is the only account that
+	    sets these -- its own SMTP relay requires ARPA validation this
+	    account doesn't have, so it authenticates to Gmail's SMTP instead
+	    while still sending From the SDF address.
 	    
 	    :message-id-domain only affects the generated Message-ID header, not
 	    routing, so it doesn't need to exactly match the From domain -- it's
@@ -1398,62 +1410,76 @@
 	          (with-temp-file wl-folders-file
 	            (dolist (account idiig/mail-accounts)
 	              (insert (idiig/mail-account-folder-block account))))))
-	    (with-eval-after-load 'wl
-	      (setq elmo-passwd-storage-type 'auth-source))
+	      (with-eval-after-load 'wl
+	        (setq elmo-passwd-storage-type 'auth-source))
 	    
-	    (defun idiig/mail-account-netrc-lines (account)
-	      "netrc lines for ACCOUNT's IMAP and SMTP credentials, read from sops."
-	      (let* ((plist (cdr account))
-	             (user (idiig/get-sops-secret-value (plist-get plist :login-key)))
-	             (password (idiig/get-sops-secret-value (plist-get plist :password-key))))
-	        (list (format "machine %s login %s port %d password %s\n"
-	                      (plist-get plist :imap-host) user
-	                      (plist-get plist :imap-port) password)
-	              (format "machine %s login %s port %d password %s\n"
-	                      (plist-get plist :smtp-host) user
-	                      (plist-get plist :smtp-port) password))))
+	      (defun idiig/mail-account-smtp-login-key (plist)
+	        "The sops key for ACCOUNT's SMTP login, falling back to :login-key.
+	    :smtp-login-key only exists on accounts (currently just SDF) that
+	    send through a different account's SMTP server than they receive on."
+	        (or (plist-get plist :smtp-login-key) (plist-get plist :login-key)))
 	    
-	    (defvar idiig/mail-auth-source-warmed nil
-	      "Non-nil once `idiig/mail-auth-source-warm-cache' has populated
-	    auth-source's in-memory cache for this Emacs session.")
+	      (defun idiig/mail-account-smtp-password-key (plist)
+	        "The sops key for ACCOUNT's SMTP password; see `idiig/mail-account-smtp-login-key'."
+	        (or (plist-get plist :smtp-password-key) (plist-get plist :password-key)))
 	    
-	    (defun idiig/mail-auth-source-warm-cache ()
-	      "Feed `idiig/mail-accounts' IMAP/SMTP credentials into auth-source.
-	    `elmo-passwd-storage-type' is `auth-source', so elmo looks up passwords
-	    via `auth-source-search' keyed by :host/:port/:user (see
-	    `elmo-passwd-get' in elmo-passwd.el).  Bridge that to sops by writing
-	    a short-lived 0600 netrc file, letting auth-source read and cache one
-	    search per account/protocol, then deleting the file -- plaintext
-	    only touches disk for as long as that takes.
+	      (defun idiig/mail-account-netrc-lines (account)
+	        "netrc lines for ACCOUNT's IMAP and SMTP credentials, read from sops."
+	        (let* ((plist (cdr account))
+	               (imap-user (idiig/get-sops-secret-value (plist-get plist :login-key)))
+	               (imap-password (idiig/get-sops-secret-value (plist-get plist :password-key)))
+	               (smtp-user (idiig/get-sops-secret-value (idiig/mail-account-smtp-login-key plist)))
+	               (smtp-password (idiig/get-sops-secret-value (idiig/mail-account-smtp-password-key plist))))
+	          (list (format "machine %s login %s port %d password %s\n"
+	                        (plist-get plist :imap-host) imap-user
+	                        (plist-get plist :imap-port) imap-password)
+	                (format "machine %s login %s port %d password %s\n"
+	                        (plist-get plist :smtp-host) smtp-user
+	                        (plist-get plist :smtp-port) smtp-password))))
 	    
-	    Only runs once per session: `auth-source-search' caches its own
-	    results by (host port user), so calling this again would just cost 6
-	    more sops subprocess calls for no benefit."
-	      (unless idiig/mail-auth-source-warmed
-	        (require 'auth-source)
-	        (let ((netrc-file (make-temp-file "wl-authinfo-")))
-	          (unwind-protect
-	              (progn
-	                (set-file-modes netrc-file #o600)
-	                (with-temp-file netrc-file
-	                  (dolist (account idiig/mail-accounts)
-	                    (dolist (line (idiig/mail-account-netrc-lines account))
-	                      (insert line))))
-	                (let ((auth-sources (cons netrc-file auth-sources)))
-	                  (dolist (account idiig/mail-accounts)
-	                    (let* ((plist (cdr account))
-	                           (user (idiig/get-sops-secret-value
-	                                  (plist-get plist :login-key))))
-	                      (auth-source-search :host (plist-get plist :imap-host)
-	                                           :port (number-to-string
-	                                                  (plist-get plist :imap-port))
-	                                           :user user :require '(:secret) :create t)
-	                      (auth-source-search :host (plist-get plist :smtp-host)
-	                                           :port (number-to-string
-	                                                  (plist-get plist :smtp-port))
-	                                           :user user :require '(:secret) :create t)))))
-	            (delete-file netrc-file)))
-	        (setq idiig/mail-auth-source-warmed t)))
+	      (defvar idiig/mail-auth-source-warmed nil
+	        "Non-nil once `idiig/mail-auth-source-warm-cache' has populated
+	      auth-source's in-memory cache for this Emacs session.")
+	    
+	      (defun idiig/mail-auth-source-warm-cache ()
+	        "Feed `idiig/mail-accounts' IMAP/SMTP credentials into auth-source.
+	      `elmo-passwd-storage-type' is `auth-source', so elmo looks up passwords
+	      via `auth-source-search' keyed by :host/:port/:user (see
+	      `elmo-passwd-get' in elmo-passwd.el).  Bridge that to sops by writing
+	      a short-lived 0600 netrc file, letting auth-source read and cache one
+	      search per account/protocol, then deleting the file -- plaintext
+	      only touches disk for as long as that takes.
+	    
+	      Only runs once per session: `auth-source-search' caches its own
+	      results by (host port user), so calling this again would just cost 6
+	      more sops subprocess calls for no benefit."
+	        (unless idiig/mail-auth-source-warmed
+	          (require 'auth-source)
+	          (let ((netrc-file (make-temp-file "wl-authinfo-")))
+	            (unwind-protect
+	                (progn
+	                  (set-file-modes netrc-file #o600)
+	                  (with-temp-file netrc-file
+	                    (dolist (account idiig/mail-accounts)
+	                      (dolist (line (idiig/mail-account-netrc-lines account))
+	                        (insert line))))
+	                  (let ((auth-sources (cons netrc-file auth-sources)))
+	                    (dolist (account idiig/mail-accounts)
+	                      (let* ((plist (cdr account))
+	                             (imap-user (idiig/get-sops-secret-value
+	                                         (plist-get plist :login-key)))
+	                             (smtp-user (idiig/get-sops-secret-value
+	                                         (idiig/mail-account-smtp-login-key plist))))
+	                        (auth-source-search :host (plist-get plist :imap-host)
+	                                             :port (number-to-string
+	                                                    (plist-get plist :imap-port))
+	                                             :user imap-user :require '(:secret) :create t)
+	                        (auth-source-search :host (plist-get plist :smtp-host)
+	                                             :port (number-to-string
+	                                                    (plist-get plist :smtp-port))
+	                                             :user smtp-user :require '(:secret) :create t)))))
+	              (delete-file netrc-file)))
+	          (setq idiig/mail-auth-source-warmed t)))
 	      (defun idiig/mail-format-from (name-key address-key)
 	        "Build an RFC 5322 \"Name <addr>\" From value from two sops keys.
 	    Kept as a named function (rather than inlined into the
@@ -1482,7 +1508,7 @@
 	            (wl-smtp-posting-server . ,(plist-get plist :smtp-host))
 	            (wl-smtp-posting-port . ,(plist-get plist :smtp-port))
 	            (wl-smtp-posting-user
-	             . (idiig/get-sops-secret-value ,(plist-get plist :login-key)))
+	             . (idiig/get-sops-secret-value ,(idiig/mail-account-smtp-login-key plist)))
 	            (wl-smtp-authenticate-type . "plain")
 	            (wl-smtp-connection-type . ,(plist-get plist :smtp-connection-type))
 	            (wl-local-domain . ,(plist-get plist :message-id-domain))
