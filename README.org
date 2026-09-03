@@ -2267,17 +2267,27 @@ URI 都更直观。下面这个端口需要额外去 Azure Portal → Authentica
                  :server t
                  :filter
                  (lambda (conn chunk)
-                   (when (string-match "\\`GET /?\\?\\([^ ]*\\) HTTP/" chunk)
-                     (let ((params (url-parse-query-string (match-string 1 chunk))))
-                       (setq code (cadr (assoc "code" params)))
-                       (setq received-state (cadr (assoc "state" params))))
-                     (process-send-string
-                      conn (concat "HTTP/1.1 200 OK\r\n"
-                                   "Content-Type: text/html; charset=utf-8\r\n"
-                                   "Connection: close\r\n\r\n"
-                                   "<html><body>Authorized -- you can close this "
-                                   "tab and go back to Emacs.</body></html>"))
-                     (delete-process conn))))))
+                   ;; Buffers across filter calls instead of assuming
+                   ;; the whole request line arrives in one read --
+                   ;; and logs every chunk to *Messages*, so a silent
+                   ;; hang (connection established, nothing parsed) is
+                   ;; diagnosable instead of just looking stuck.
+                   (let ((buf (concat (process-get conn 'idiig-buffer) chunk)))
+                     (process-put conn 'idiig-buffer buf)
+                     (message "idiig/oauth2-localhost: %d bytes on this connection (%d total): %S"
+                              (length chunk) (length buf)
+                              (substring buf 0 (min 200 (length buf))))
+                     (when (string-match "\\`GET /?\\?\\([^ ]*\\) HTTP/" buf)
+                       (let ((params (url-parse-query-string (match-string 1 buf))))
+                         (setq code (cadr (assoc "code" params)))
+                         (setq received-state (cadr (assoc "state" params))))
+                       (process-send-string
+                        conn (concat "HTTP/1.1 200 OK\r\n"
+                                     "Content-Type: text/html; charset=utf-8\r\n"
+                                     "Connection: close\r\n\r\n"
+                                     "<html><body>Authorized -- you can close this "
+                                     "tab and go back to Emacs.</body></html>"))
+                       (delete-process conn)))))))
       (unwind-protect
           (progn
             (browse-url (oauth2--build-authorization-request-url
