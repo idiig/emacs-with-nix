@@ -2292,28 +2292,45 @@ SDF 的登录用户名和邮件地址不是同一个字符串（ =user= vs
     `((sdf
        :petname "SDF"
        :imap-host "mx.sdf.org" :imap-port 993 :imap-tls t
-       :smtp-host "mx.sdf.org" :smtp-port 587 :smtp-connection-type starttls
+       :smtp-host "mx.sdf.org" :smtp-port 587 :smtp-connection-type 'starttls
        :login-key "mail_sdf_user" :from-key "mail_sdf_address"
+       :from-name-key "mail_sdf_from_name"
        :password-key "mail_sdf_password"
        :folder-match "@mx\\.sdf\\.org"
-       :message-id-domain "sdf.org")
+       :message-id-domain "sdf.org"
+       :extra-folders nil
+       :sent-folder nil :trash-folder nil)
       (gmail
        :petname "Gmail"
        :imap-host "imap.gmail.com" :imap-port 993 :imap-tls t
-       :smtp-host "smtp.gmail.com" :smtp-port 587 :smtp-connection-type starttls
+       :smtp-host "smtp.gmail.com" :smtp-port 587 :smtp-connection-type 'starttls
        :login-key "mail_gmail_user" :from-key "mail_gmail_user"
+       :from-name-key "mail_gmail_from_name"
        :password-key "mail_gmail_app_password"
        :folder-match "@imap\\.gmail\\.com"
-       :message-id-domain "gmail.com")
+       :message-id-domain "gmail.com"
+       :extra-folders (("[Gmail]/Sent Mail" . "Sent")
+                       ("[Gmail]/Drafts" . "Drafts")
+                       ("[Gmail]/Spam" . "Spam")
+                       ("[Gmail]/Trash" . "Trash"))
+       :sent-folder "[Gmail]/Sent Mail"
+       :trash-folder "[Gmail]/Trash")
       (hotmail
        :petname "Hotmail"
        :imap-host "localhost" :imap-port ,idiig/davmail-imap-port :imap-tls nil
        :smtp-host "localhost" :smtp-port ,idiig/davmail-smtp-port
        :smtp-connection-type nil
        :login-key "mail_hotmail_user" :from-key "mail_hotmail_user"
+       :from-name-key "mail_hotmail_from_name"
        :password-key "mail_hotmail_local_password"
        :folder-match "@localhost"
-       :message-id-domain "outlook.com"))
+       :message-id-domain "outlook.com"
+       :extra-folders (("Sent Items" . "Sent")
+                       ("Drafts" . "Drafts")
+                       ("Junk Email" . "Junk")
+                       ("Deleted Items" . "Trash"))
+       :sent-folder "Sent Items"
+       :trash-folder "Deleted Items"))
     "The 3 mail accounts this config manages: SDF, Gmail, Hotmail.
   Each entry is (NAME . PLIST); every other section below (folders
   file, auth-source bridge, wl-draft-config-alist/wl-template-alist)
@@ -2328,35 +2345,62 @@ SDF 的登录用户名和邮件地址不是同一个字符串（ =user= vs
 
   :message-id-domain only affects the generated Message-ID header, not
   routing, so it doesn't need to exactly match the From domain -- it's
-  there so outgoing mail doesn't leak this machine's hostname.")
+  there so outgoing mail doesn't leak this machine's hostname.
+
+  :from-name-key points at a sops key holding the display name shown
+  in the From header (e.g. \"Jane Doe\" in \"Jane Doe <jane@x.com>\").
+  This is kept out of README.org entirely, unlike :message-id-domain
+  or :folder-match -- a real name is personally identifying, whereas
+  those are just infrastructure strings.
+
+  :sent-folder and :trash-folder are mailbox names from :extra-folders
+  (or nil, for SDF, where the layout beyond INBOX isn't known).  They
+  drive `Fcc' on outgoing mail and per-account `wl-dispose-folder-alist'
+  routing, so deleting a message in any of these 3 accounts' folders
+  refiles it into that same account's own remote Trash instead of one
+  shared `wl-trash-folder'.")
 
   (idiig/sops-register-keys
    '(("mail_sdf_user" . "SDF IMAP/SMTP login username, no @domain")
      ("mail_sdf_password" . "SDF password")
      ("mail_sdf_address" . "SDF full email address, e.g. user@sdf.org")
+     ("mail_sdf_from_name" . "Display name for the From header on SDF mail")
      ("mail_gmail_user" . "Gmail full address, used for both login and From")
      ("mail_gmail_app_password" . "Gmail App Password (Google Account -> Security -> 2-Step Verification -> App passwords; needs 2FA enabled)")
+     ("mail_gmail_from_name" . "Display name for the From header on Gmail mail")
      ("mail_hotmail_user" . "Hotmail/Outlook.com full address, used for both login and From")
-     ("mail_hotmail_local_password" . "Arbitrary local password for the davmail IMAP/SMTP handshake -- NOT your real Microsoft password")))
+     ("mail_hotmail_local_password" . "Arbitrary local password for the davmail IMAP/SMTP handshake -- NOT your real Microsoft password")
+     ("mail_hotmail_from_name" . "Display name for the From header on Hotmail mail")))
 #+end_src
 
 **** 订阅 folders
 从 =idiig/mail-accounts= 生成 =wl-folders-file= （放在
-=~/mails/.folders= ）的内容，每个账号一行，用 elmo 的
-=%INBOX:"user"/clear@host:port!= 语法把连接信息整个编码进 folder 名
-里（SDF、Gmail 走 TLS 加 =/clear@...!= ，Hotmail 走本地 davmail 不需
-要 TLS 后缀）。用户名一定要用双引号包起来——Gmail/Hotmail 的登录名本
-身就是完整邮箱地址，也带 =@= ，跟分隔 user/host 的那个 =@= 撞在一起会
-解析错乱，实测（见下面 =idiig/mail-account-folder-line= 的 docstring）
-不加引号直接导致 elmo 连不上；SDF 的用户名没有 =@= 所以当时看不出问
-题。只在文件不存在时写一次，写完之后就是用户自己维护的文件（加子文
-件夹、改名随意），不会被覆盖。
+=~/mails/.folders= ）的内容。每个账号一个 group（=PETNAME { ... }=），
+组里第一行是 =INBOX=，后面跟 =:extra-folders= 里列的子文件夹（Sent/
+Drafts/Spam/Trash 之类），每一行都用 elmo 的
+=%"mailbox":"user"/clear@host:port!= 语法把连接信息整个编码进去。
+
+两处都要加双引号，不是随便选的：
+- 用户名要引起来——Gmail/Hotmail 的登录名本身就是完整邮箱地址，也带
+  =@= ，跟分隔 user/host 的那个 =@= 撞在一起会解析错乱，实测（见下面
+  =idiig/mail-account-connection-suffix= 的 docstring）不加引号直接
+  导致 elmo 连不上；SDF 的用户名没有 =@= 所以当时看不出问题
+- =mailbox= 名字也要引起来——用真实的 elmo tokenizer 代码（不是凭经
+  验）测过：=%[Gmail]/Sent:user@host:port!= 这种不加引号的写法，
+  =mailbox= 只会解析出 =[Gmail]= ，后面 =/Sent:user@host:port!=
+  整段都解析失败；引号包起来之后 =mailbox= 才能正确取到完整的
+  =[Gmail]/Sent= 。这也是为什么 Sent/Drafts 这些名字里带 =/= 的文件
+  夹必须加引号，纯 =INBOX= 这种不带特殊字符的不加也没事。
+
+只在文件不存在时写一次，写完之后就是用户自己维护的文件（加子文件
+夹、改名随意），不会被覆盖。
 #+begin_src emacs-lisp
   (with-eval-after-load 'wl
     (setq wl-folders-file (expand-file-name ".folders" idiig/mail-directory)))
 
-  (defun idiig/mail-account-folder-line (account)
-    "One `wl-folders-file' line for ACCOUNT, an entry of `idiig/mail-accounts'.
+  (defun idiig/mail-account-connection-suffix (plist)
+    "The \"user\"/clear@host:port! suffix shared by every folder line
+for an account described by PLIST.
 Quotes the username: elmo's folder-spec grammar is
 USER@HOST:PORT, and Gmail/Hotmail logins are themselves full
 email addresses containing an @, which is ambiguous unless
@@ -2364,16 +2408,45 @@ quoted (confirmed against a real connection log: unquoted
 \"chewingguno@gmail.com/clear@imap.gmail.com:993!\" mis-parses
 and elmo can't connect at all -- SDF's bare \"idg\" username has
 no @, which is why only SDF worked)."
-    (let* ((plist (cdr account))
-           (user (idiig/get-sops-secret-value (plist-get plist :login-key)))
-           (tls (plist-get plist :imap-tls)))
-      (format "  %%INBOX:\"%s\"%s@%s:%d%s \"%s\"\n"
+    (let ((user (idiig/get-sops-secret-value (plist-get plist :login-key)))
+          (tls (plist-get plist :imap-tls)))
+      (format "\"%s\"%s@%s:%d%s"
               user
               (if tls "/clear" "")
               (plist-get plist :imap-host)
               (plist-get plist :imap-port)
-              (if tls "!" "")
-              (plist-get plist :petname))))
+              (if tls "!" ""))))
+
+  (defun idiig/mail-account-folder-spec (account-name mailbox)
+    "Full elmo folder-spec string for MAILBOX under the connection
+settings of the `idiig/mail-accounts' entry named ACCOUNT-NAME.
+Takes the account's NAME symbol and looks it up fresh, rather than
+an already-resolved plist, so callers in the \"身份切换\" section can
+keep the sops-backed username lazily decrypted until this actually
+runs (see `idiig/mail-format-from' for the same pattern)."
+    (format "%%\"%s\":%s" mailbox
+            (idiig/mail-account-connection-suffix
+             (cdr (assq account-name idiig/mail-accounts)))))
+
+  (defun idiig/mail-account-folder-block (account)
+    "A `wl-folders-file' group for ACCOUNT: INBOX plus whatever
+`:extra-folders' lists, all sharing one connection suffix.
+Quotes every mailbox name: verified against elmo's actual tokenizer
+(`elmo-parse-separated-tokens') that an unquoted mailbox containing
+`/', like Gmail's \"[Gmail]/Sent\", only parses out as \"[Gmail]\" and
+the rest of the line fails to parse at all -- quoting makes the whole
+mailbox name one token, the same fix as the username's @ problem."
+    (let* ((plist (cdr account))
+           (suffix (idiig/mail-account-connection-suffix plist)))
+      (concat
+       (format "%s {\n" (plist-get plist :petname))
+       (format "  %%\"INBOX\":%s \"Inbox\"\n" suffix)
+       (mapconcat (lambda (folder)
+                    (format "  %%\"%s\":%s \"%s\"\n"
+                            (car folder) suffix (cdr folder)))
+                  (plist-get plist :extra-folders)
+                  "")
+       "}\n")))
 
   (defun idiig/mail-folders-setup ()
     "Bootstrap `wl-folders-file' from `idiig/mail-accounts' if it does
@@ -2384,7 +2457,7 @@ no @, which is why only SDF worked)."
     (unless (file-exists-p wl-folders-file)
       (with-temp-file wl-folders-file
         (dolist (account idiig/mail-accounts)
-          (insert (idiig/mail-account-folder-line account))))))
+          (insert (idiig/mail-account-folder-block account))))))
 #+end_src
 
 **** 密码 (=auth-source= 桥接)
@@ -2461,7 +2534,7 @@ Wanderlust 的密码存取（=elmo-passwd.el=）支持把
       (setq idiig/mail-auth-source-warmed t)))
 #+end_src
 
-**** 身份切换（多账号 From / SMTP）
+**** 身份切换（多账号 From / SMTP / Sent / Trash）
 =wl-draft-config-alist= 的官方语法是「条件 + (header-or-var . value)
 列表」，条件可以是 =(string-match REGEXP wl-draft-parent-folder)= ——
 =wl-draft-parent-folder= 是撰写邮件时所在的 folder 名，而 folder 名本
@@ -2473,13 +2546,27 @@ Wanderlust 的密码存取（=elmo-passwd.el=）支持把
 带出本机 hostname）。从 =idiig/mail-accounts= 循环生成 3 条，不手写。
 
 但 =wl-draft-parent-folder= 只有在从某个账号的 folder 里按 =w=
-回信/写信时才有值——直接 =C-x m= 撰写新邮件时它是 nil，上面 3 条规
-则一条都不会命中，From/SMTP 就没人设置。参照
+回信/写信时才有值——对着 =wl-draft-create-buffer= 源码确认过，直接
+=C-x m= 撰写新邮件时它不是 nil 而是空字符串 =""=（源码注释写得很明
+白：特意留空字符串而不是 nil，就是为了让 =wl-draft-config-alist= 里
+的 =string-match= 不用另外判断 nil），=string-match= 对着空字符串自
+然不会命中任何一条规则，From/SMTP 就没人设置。参照
 [[https://github.com/LdBeth/Emacs-for-Noobs/blob/master/WanderLust.org][这份参考文档]]
 的做法，把同一份 override 列表也生成一份 =wl-template-alist= ，撰写
 新邮件时按 =C-c C-j= （=wl-template-select=，Wanderlust 自带绑定）手
 动选一个账号，效果和自动匹配完全一样——两张表背后是同一个
 =idiig/mail-account-overrides= ，不用维护两份。
+
+=wl-template-visible-select= 默认 =t=，=C-c C-j= 出来的是 =n=/=p= 一
+个个翻的界面；设成 =nil= 之后走 =completing-read=，直接打字过滤候
+选。=wl-draft-parent-folder= 为空字符串（=C-x m= 这种没有来源 folder
+的场景）时，=wl-draft-create-buffer= 返回后立刻自动调用一次
+=wl-template-select= ，不需要手动记得按 =C-c C-j= 。挂在
+=wl-draft-create-buffer= 的 =:after= advice 上，而不是
+=wl-draft-mode-hook= ——=wl-draft-parent-folder= 是在
+=wl-draft-create-buffer= 内部、调用完 =(wl-draft-mode)= 触发
+mode-hook *之后* 才被赋值的，挂在 mode-hook 上读到的还是赋值前的
+默认值，时机不对。
 
 对着 =wl-draft.el= 源码确认过一个细节：条件和 value 都是没被求值
 的 Lisp form，Wanderlust 自己在真正撰写邮件、命中某条规则（或者手
@@ -2490,7 +2577,38 @@ Wanderlust 的密码存取（=elmo-passwd.el=）支持把
 的时候就求值成字符串——sops 密钥要留到真正写信那一刻才解密，不用在
 =wl-draft-config-alist= 一 setq 的时候就全部解开。反引号只用来把账号
 表里的 host/port 这些非密钥字段拼进去。
+
+=Fcc= 也走同一套懒加载：账号有 =:sent-folder= 时（SDF 没有，不知道
+它的文件夹结构，不生成这条），往 override 列表里加一条 =("Fcc" .
+(idiig/mail-account-folder-spec ',账号名 ,sent-folder))= ——同样是没
+求值的字面 form，真正发信时才去查 =idiig/mail-accounts= 、拼出完整
+folder spec、解密用户名。发出去的邮件会自动存一份到对应账号自己的
+Sent 文件夹，不是全局共用一个。
+
+Trash 这块不能用同一套机制——=wl-draft-config-alist=/=wl-template-alist=
+只在撰写邮件的 draft buffer 里生效，但"删除邮件"这个动作发生在浏览
+邮件的 summary buffer 里，跟 draft 完全不搭边。Wanderlust 自己另外有
+一个专门管这个的变量 =wl-dispose-folder-alist= ：=(FOLDER-REGEXP .
+POLICY)= 的表，POLICY 是字符串时就代表"删除时改成 refile 到这个文件
+夹"，天然支持"按当前 folder 是谁决定丢到哪个 Trash"，不需要另外挂
+advice。这里唯一的取舍是：=wl-dispose-folder-alist= 是普通变量，没
+有 =wl-draft-config-alist= 那种"命中的时候才 eval"的机制，只能在
+=with-eval-after-load 'wl= 里老老实实 =setq= 一次性算好——意味着有
+=:trash-folder= 的账号（Gmail、Hotmail），它们的登录用户名会在 wl
+加载的时候就解密一次，不再是"真正用到才解密"。用户名不是密码，这个
+折中可以接受。
 #+begin_src emacs-lisp
+  (defun idiig/mail-format-from (name-key address-key)
+    "Build an RFC 5322 \"Name <addr>\" From value from two sops keys.
+Kept as a named function (rather than inlined into the
+`idiig/mail-account-overrides' backquote) so the unevaluated form
+left in `wl-draft-config-alist'/`wl-template-alist' stays a plain
+function call and both secrets stay lazily decrypted, only at the
+moment `wl-draft-config-exec' evals this entry."
+    (format "%s <%s>"
+            (idiig/get-sops-secret-value name-key)
+            (idiig/get-sops-secret-value address-key)))
+
   (defun idiig/mail-account-overrides (account)
     "The (FIELD . VALUE) override list for ACCOUNT, shared by
   `wl-draft-config-alist' (auto, matched by folder) and
@@ -2500,7 +2618,11 @@ Wanderlust 的密码存取（=elmo-passwd.el=）支持把
   applies this entry, so secrets stay encrypted until the moment a
   message is really being composed."
     (let ((plist (cdr account)))
-      `(("From" . (idiig/get-sops-secret-value ,(plist-get plist :from-key)))
+      `(("From" . (idiig/mail-format-from ,(plist-get plist :from-name-key)
+                                          ,(plist-get plist :from-key)))
+        ,@(when (plist-get plist :sent-folder)
+            `(("Fcc" . (idiig/mail-account-folder-spec
+                        ',(car account) ,(plist-get plist :sent-folder)))))
         (wl-smtp-posting-server . ,(plist-get plist :smtp-host))
         (wl-smtp-posting-port . ,(plist-get plist :smtp-port))
         (wl-smtp-posting-user
@@ -2522,11 +2644,33 @@ Wanderlust 的密码存取（=elmo-passwd.el=）支持把
     (cons (plist-get (cdr account) :petname)
           (idiig/mail-account-overrides account)))
 
+  (defun idiig/wl-draft-maybe-select-account (&rest _)
+    "Prompt for an account via `wl-template-select' when a draft has no
+parent folder (`C-x m', or any other entry point that does not pass
+`wl-draft-create-buffer' a folder to reply/forward from).  Otherwise
+the draft would sit with the bare default from `wl-from' until the
+user remembers to press `C-c C-j' themselves."
+    (when (string-empty-p wl-draft-parent-folder)
+      (wl-template-select)))
+
   (with-eval-after-load 'wl
     (setq wl-draft-config-alist
           (mapcar #'idiig/mail-account-draft-config idiig/mail-accounts))
     (setq wl-template-alist
-          (mapcar #'idiig/mail-account-template idiig/mail-accounts)))
+          (mapcar #'idiig/mail-account-template idiig/mail-accounts))
+    (setq wl-template-visible-select nil)
+    (advice-add 'wl-draft-create-buffer :after
+                #'idiig/wl-draft-maybe-select-account)
+    (setq wl-dispose-folder-alist
+          (delq nil
+                (mapcar (lambda (account)
+                          (let ((plist (cdr account)))
+                            (when (plist-get plist :trash-folder)
+                              (cons (plist-get plist :folder-match)
+                                    (idiig/mail-account-folder-spec
+                                     (car account)
+                                     (plist-get plist :trash-folder))))))
+                        idiig/mail-accounts))))
 #+end_src
 
 **** 签名与外观
@@ -2622,9 +2766,14 @@ Wanderlust/SEMI 自己那套 MIME 菜单（=C-c C-x= 前缀）就能调用 GPG �
 =mail-user-agent= + =define-mail-user-agent=，让 =C-x m= 能唤出
 Wanderlust——单独设 =mail-user-agent= 没用，必须配合
 =define-mail-user-agent= 把 =wl-user-agent= 这个符号真正注册进去。
-=:config= 结尾用 =advice-add 'wl :before= 挂一个 =idiig/wl-bootstrap=，
-每次打开 =wl= 之前把前面几节的 setup 函数（davmail、folders、签名、
-auth-source 缓存）都跑一遍——各自都是幂等操作，重复跑无副作用。
+=:config= 结尾用 =advice-add= 挂 =idiig/wl-bootstrap=，把前面几节的
+setup 函数（davmail、folders、签名、auth-source 缓存）都跑一遍——各
+自都是幂等操作，重复跑无副作用。挂载点有两个，不是只挂 =wl= 一个：
+=wl-draft-create-buffer= 是 =wl=/=wl-draft=/=wl-user-agent-compose=
+（也就是 =C-x m=）共用的撰写邮件入口，只挂 =wl= 的话，如果这次 Emacs
+会话里第一个动作就是直接 =C-x m= 而不是先 =M-x wl=，=idiig/wl-bootstrap=
+根本不会被触发——SMTP 要用的 auth-source 缓存没预热、davmail 也没启
+动，发信会失败。两处都挂，先后顺序不影响（都是幂等的）。
 #+begin_src emacs-lisp
   (defun idiig/wl-bootstrap (&rest _args)
     "Prepare everything Wanderlust needs before opening: start the
@@ -2646,7 +2795,8 @@ auth-source 缓存）都跑一遍——各自都是幂等操作，重复跑无�
     (define-mail-user-agent 'wl-user-agent
       'wl-user-agent-compose 'wl-draft-send 'wl-draft-kill 'mail-send-hook)
     :config
-    (advice-add 'wl :before #'idiig/wl-bootstrap))
+    (advice-add 'wl :before #'idiig/wl-bootstrap)
+    (advice-add 'wl-draft-create-buffer :before #'idiig/wl-bootstrap))
 #+end_src
 
 *** 待办：填 secrets.yaml

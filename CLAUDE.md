@@ -15,6 +15,10 @@
     `=` jammed against `网关`)
   - No extra space needed when the delimiter is next to ASCII text, or
     at the start/end of a line.
+- Do not write conversational narration into README.org prose (e.g.
+  "顺手做了一些改进", "这里我们额外加了一个小优化"). Describe what the
+  config does and why, as documentation, not as a running commentary
+  on the editing session that produced it.
 
 ## Communication
 

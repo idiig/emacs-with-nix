@@ -1256,28 +1256,45 @@
 	      `((sdf
 	         :petname "SDF"
 	         :imap-host "mx.sdf.org" :imap-port 993 :imap-tls t
-	         :smtp-host "mx.sdf.org" :smtp-port 587 :smtp-connection-type starttls
+	         :smtp-host "mx.sdf.org" :smtp-port 587 :smtp-connection-type 'starttls
 	         :login-key "mail_sdf_user" :from-key "mail_sdf_address"
+	         :from-name-key "mail_sdf_from_name"
 	         :password-key "mail_sdf_password"
 	         :folder-match "@mx\\.sdf\\.org"
-	         :message-id-domain "sdf.org")
+	         :message-id-domain "sdf.org"
+	         :extra-folders nil
+	         :sent-folder nil :trash-folder nil)
 	        (gmail
 	         :petname "Gmail"
 	         :imap-host "imap.gmail.com" :imap-port 993 :imap-tls t
-	         :smtp-host "smtp.gmail.com" :smtp-port 587 :smtp-connection-type starttls
+	         :smtp-host "smtp.gmail.com" :smtp-port 587 :smtp-connection-type 'starttls
 	         :login-key "mail_gmail_user" :from-key "mail_gmail_user"
+	         :from-name-key "mail_gmail_from_name"
 	         :password-key "mail_gmail_app_password"
 	         :folder-match "@imap\\.gmail\\.com"
-	         :message-id-domain "gmail.com")
+	         :message-id-domain "gmail.com"
+	         :extra-folders (("[Gmail]/Sent Mail" . "Sent")
+	                         ("[Gmail]/Drafts" . "Drafts")
+	                         ("[Gmail]/Spam" . "Spam")
+	                         ("[Gmail]/Trash" . "Trash"))
+	         :sent-folder "[Gmail]/Sent Mail"
+	         :trash-folder "[Gmail]/Trash")
 	        (hotmail
 	         :petname "Hotmail"
 	         :imap-host "localhost" :imap-port ,idiig/davmail-imap-port :imap-tls nil
 	         :smtp-host "localhost" :smtp-port ,idiig/davmail-smtp-port
 	         :smtp-connection-type nil
 	         :login-key "mail_hotmail_user" :from-key "mail_hotmail_user"
+	         :from-name-key "mail_hotmail_from_name"
 	         :password-key "mail_hotmail_local_password"
 	         :folder-match "@localhost"
-	         :message-id-domain "outlook.com"))
+	         :message-id-domain "outlook.com"
+	         :extra-folders (("Sent Items" . "Sent")
+	                         ("Drafts" . "Drafts")
+	                         ("Junk Email" . "Junk")
+	                         ("Deleted Items" . "Trash"))
+	         :sent-folder "Sent Items"
+	         :trash-folder "Deleted Items"))
 	      "The 3 mail accounts this config manages: SDF, Gmail, Hotmail.
 	    Each entry is (NAME . PLIST); every other section below (folders
 	    file, auth-source bridge, wl-draft-config-alist/wl-template-alist)
@@ -1292,21 +1309,38 @@
 	    
 	    :message-id-domain only affects the generated Message-ID header, not
 	    routing, so it doesn't need to exactly match the From domain -- it's
-	    there so outgoing mail doesn't leak this machine's hostname.")
+	    there so outgoing mail doesn't leak this machine's hostname.
+	    
+	    :from-name-key points at a sops key holding the display name shown
+	    in the From header (e.g. \"Jane Doe\" in \"Jane Doe <jane@x.com>\").
+	    This is kept out of README.org entirely, unlike :message-id-domain
+	    or :folder-match -- a real name is personally identifying, whereas
+	    those are just infrastructure strings.
+	    
+	    :sent-folder and :trash-folder are mailbox names from :extra-folders
+	    (or nil, for SDF, where the layout beyond INBOX isn't known).  They
+	    drive `Fcc' on outgoing mail and per-account `wl-dispose-folder-alist'
+	    routing, so deleting a message in any of these 3 accounts' folders
+	    refiles it into that same account's own remote Trash instead of one
+	    shared `wl-trash-folder'.")
 	    
 	    (idiig/sops-register-keys
 	     '(("mail_sdf_user" . "SDF IMAP/SMTP login username, no @domain")
 	       ("mail_sdf_password" . "SDF password")
 	       ("mail_sdf_address" . "SDF full email address, e.g. user@sdf.org")
+	       ("mail_sdf_from_name" . "Display name for the From header on SDF mail")
 	       ("mail_gmail_user" . "Gmail full address, used for both login and From")
 	       ("mail_gmail_app_password" . "Gmail App Password (Google Account -> Security -> 2-Step Verification -> App passwords; needs 2FA enabled)")
+	       ("mail_gmail_from_name" . "Display name for the From header on Gmail mail")
 	       ("mail_hotmail_user" . "Hotmail/Outlook.com full address, used for both login and From")
-	       ("mail_hotmail_local_password" . "Arbitrary local password for the davmail IMAP/SMTP handshake -- NOT your real Microsoft password")))
+	       ("mail_hotmail_local_password" . "Arbitrary local password for the davmail IMAP/SMTP handshake -- NOT your real Microsoft password")
+	       ("mail_hotmail_from_name" . "Display name for the From header on Hotmail mail")))
 	      (with-eval-after-load 'wl
 	        (setq wl-folders-file (expand-file-name ".folders" idiig/mail-directory)))
 	    
-	      (defun idiig/mail-account-folder-line (account)
-	        "One `wl-folders-file' line for ACCOUNT, an entry of `idiig/mail-accounts'.
+	      (defun idiig/mail-account-connection-suffix (plist)
+	        "The \"user\"/clear@host:port! suffix shared by every folder line
+	    for an account described by PLIST.
 	    Quotes the username: elmo's folder-spec grammar is
 	    USER@HOST:PORT, and Gmail/Hotmail logins are themselves full
 	    email addresses containing an @, which is ambiguous unless
@@ -1314,16 +1348,45 @@
 	    \"chewingguno@gmail.com/clear@imap.gmail.com:993!\" mis-parses
 	    and elmo can't connect at all -- SDF's bare \"idg\" username has
 	    no @, which is why only SDF worked)."
-	        (let* ((plist (cdr account))
-	               (user (idiig/get-sops-secret-value (plist-get plist :login-key)))
-	               (tls (plist-get plist :imap-tls)))
-	          (format "  %%INBOX:\"%s\"%s@%s:%d%s \"%s\"\n"
+	        (let ((user (idiig/get-sops-secret-value (plist-get plist :login-key)))
+	              (tls (plist-get plist :imap-tls)))
+	          (format "\"%s\"%s@%s:%d%s"
 	                  user
 	                  (if tls "/clear" "")
 	                  (plist-get plist :imap-host)
 	                  (plist-get plist :imap-port)
-	                  (if tls "!" "")
-	                  (plist-get plist :petname))))
+	                  (if tls "!" ""))))
+	    
+	      (defun idiig/mail-account-folder-spec (account-name mailbox)
+	        "Full elmo folder-spec string for MAILBOX under the connection
+	    settings of the `idiig/mail-accounts' entry named ACCOUNT-NAME.
+	    Takes the account's NAME symbol and looks it up fresh, rather than
+	    an already-resolved plist, so callers in the \"身份切换\" section can
+	    keep the sops-backed username lazily decrypted until this actually
+	    runs (see `idiig/mail-format-from' for the same pattern)."
+	        (format "%%\"%s\":%s" mailbox
+	                (idiig/mail-account-connection-suffix
+	                 (cdr (assq account-name idiig/mail-accounts)))))
+	    
+	      (defun idiig/mail-account-folder-block (account)
+	        "A `wl-folders-file' group for ACCOUNT: INBOX plus whatever
+	    `:extra-folders' lists, all sharing one connection suffix.
+	    Quotes every mailbox name: verified against elmo's actual tokenizer
+	    (`elmo-parse-separated-tokens') that an unquoted mailbox containing
+	    `/', like Gmail's \"[Gmail]/Sent\", only parses out as \"[Gmail]\" and
+	    the rest of the line fails to parse at all -- quoting makes the whole
+	    mailbox name one token, the same fix as the username's @ problem."
+	        (let* ((plist (cdr account))
+	               (suffix (idiig/mail-account-connection-suffix plist)))
+	          (concat
+	           (format "%s {\n" (plist-get plist :petname))
+	           (format "  %%\"INBOX\":%s \"Inbox\"\n" suffix)
+	           (mapconcat (lambda (folder)
+	                        (format "  %%\"%s\":%s \"%s\"\n"
+	                                (car folder) suffix (cdr folder)))
+	                      (plist-get plist :extra-folders)
+	                      "")
+	           "}\n")))
 	    
 	      (defun idiig/mail-folders-setup ()
 	        "Bootstrap `wl-folders-file' from `idiig/mail-accounts' if it does
@@ -1334,7 +1397,7 @@
 	        (unless (file-exists-p wl-folders-file)
 	          (with-temp-file wl-folders-file
 	            (dolist (account idiig/mail-accounts)
-	              (insert (idiig/mail-account-folder-line account))))))
+	              (insert (idiig/mail-account-folder-block account))))))
 	    (with-eval-after-load 'wl
 	      (setq elmo-passwd-storage-type 'auth-source))
 	    
@@ -1391,42 +1454,79 @@
 	                                           :user user :require '(:secret) :create t)))))
 	            (delete-file netrc-file)))
 	        (setq idiig/mail-auth-source-warmed t)))
-	    (defun idiig/mail-account-overrides (account)
-	      "The (FIELD . VALUE) override list for ACCOUNT, shared by
-	    `wl-draft-config-alist' (auto, matched by folder) and
-	    `wl-template-alist' (manual, via `wl-template-select'/`C-c C-j').
-	    The sops-backed values are left as unevaluated Lisp forms on purpose:
-	    `wl-draft-config-exec' evals them itself, only when a draft actually
-	    applies this entry, so secrets stay encrypted until the moment a
-	    message is really being composed."
-	      (let ((plist (cdr account)))
-	        `(("From" . (idiig/get-sops-secret-value ,(plist-get plist :from-key)))
-	          (wl-smtp-posting-server . ,(plist-get plist :smtp-host))
-	          (wl-smtp-posting-port . ,(plist-get plist :smtp-port))
-	          (wl-smtp-posting-user
-	           . (idiig/get-sops-secret-value ,(plist-get plist :login-key)))
-	          (wl-smtp-authenticate-type . "plain")
-	          (wl-smtp-connection-type . ,(plist-get plist :smtp-connection-type))
-	          (wl-local-domain . ,(plist-get plist :message-id-domain))
-	          (wl-message-id-domain . ,(plist-get plist :message-id-domain)))))
+	      (defun idiig/mail-format-from (name-key address-key)
+	        "Build an RFC 5322 \"Name <addr>\" From value from two sops keys.
+	    Kept as a named function (rather than inlined into the
+	    `idiig/mail-account-overrides' backquote) so the unevaluated form
+	    left in `wl-draft-config-alist'/`wl-template-alist' stays a plain
+	    function call and both secrets stay lazily decrypted, only at the
+	    moment `wl-draft-config-exec' evals this entry."
+	        (format "%s <%s>"
+	                (idiig/get-sops-secret-value name-key)
+	                (idiig/get-sops-secret-value address-key)))
 	    
-	    (defun idiig/mail-account-draft-config (account)
-	      "One `wl-draft-config-alist' entry for ACCOUNT: matches by folder."
-	      (cons `(string-match ,(plist-get (cdr account) :folder-match)
-	                            wl-draft-parent-folder)
-	            (idiig/mail-account-overrides account)))
+	      (defun idiig/mail-account-overrides (account)
+	        "The (FIELD . VALUE) override list for ACCOUNT, shared by
+	      `wl-draft-config-alist' (auto, matched by folder) and
+	      `wl-template-alist' (manual, via `wl-template-select'/`C-c C-j').
+	      The sops-backed values are left as unevaluated Lisp forms on purpose:
+	      `wl-draft-config-exec' evals them itself, only when a draft actually
+	      applies this entry, so secrets stay encrypted until the moment a
+	      message is really being composed."
+	        (let ((plist (cdr account)))
+	          `(("From" . (idiig/mail-format-from ,(plist-get plist :from-name-key)
+	                                              ,(plist-get plist :from-key)))
+	            ,@(when (plist-get plist :sent-folder)
+	                `(("Fcc" . (idiig/mail-account-folder-spec
+	                            ',(car account) ,(plist-get plist :sent-folder)))))
+	            (wl-smtp-posting-server . ,(plist-get plist :smtp-host))
+	            (wl-smtp-posting-port . ,(plist-get plist :smtp-port))
+	            (wl-smtp-posting-user
+	             . (idiig/get-sops-secret-value ,(plist-get plist :login-key)))
+	            (wl-smtp-authenticate-type . "plain")
+	            (wl-smtp-connection-type . ,(plist-get plist :smtp-connection-type))
+	            (wl-local-domain . ,(plist-get plist :message-id-domain))
+	            (wl-message-id-domain . ,(plist-get plist :message-id-domain)))))
 	    
-	    (defun idiig/mail-account-template (account)
-	      "One `wl-template-alist' entry for ACCOUNT, selectable by name via
-	    `wl-template-select' (`C-c C-j')."
-	      (cons (plist-get (cdr account) :petname)
-	            (idiig/mail-account-overrides account)))
+	      (defun idiig/mail-account-draft-config (account)
+	        "One `wl-draft-config-alist' entry for ACCOUNT: matches by folder."
+	        (cons `(string-match ,(plist-get (cdr account) :folder-match)
+	                              wl-draft-parent-folder)
+	              (idiig/mail-account-overrides account)))
 	    
-	    (with-eval-after-load 'wl
-	      (setq wl-draft-config-alist
-	            (mapcar #'idiig/mail-account-draft-config idiig/mail-accounts))
-	      (setq wl-template-alist
-	            (mapcar #'idiig/mail-account-template idiig/mail-accounts)))
+	      (defun idiig/mail-account-template (account)
+	        "One `wl-template-alist' entry for ACCOUNT, selectable by name via
+	      `wl-template-select' (`C-c C-j')."
+	        (cons (plist-get (cdr account) :petname)
+	              (idiig/mail-account-overrides account)))
+	    
+	      (defun idiig/wl-draft-maybe-select-account (&rest _)
+	        "Prompt for an account via `wl-template-select' when a draft has no
+	    parent folder (`C-x m', or any other entry point that does not pass
+	    `wl-draft-create-buffer' a folder to reply/forward from).  Otherwise
+	    the draft would sit with the bare default from `wl-from' until the
+	    user remembers to press `C-c C-j' themselves."
+	        (when (string-empty-p wl-draft-parent-folder)
+	          (wl-template-select)))
+	    
+	      (with-eval-after-load 'wl
+	        (setq wl-draft-config-alist
+	              (mapcar #'idiig/mail-account-draft-config idiig/mail-accounts))
+	        (setq wl-template-alist
+	              (mapcar #'idiig/mail-account-template idiig/mail-accounts))
+	        (setq wl-template-visible-select nil)
+	        (advice-add 'wl-draft-create-buffer :after
+	                    #'idiig/wl-draft-maybe-select-account)
+	        (setq wl-dispose-folder-alist
+	              (delq nil
+	                    (mapcar (lambda (account)
+	                              (let ((plist (cdr account)))
+	                                (when (plist-get plist :trash-folder)
+	                                  (cons (plist-get plist :folder-match)
+	                                        (idiig/mail-account-folder-spec
+	                                         (car account)
+	                                         (plist-get plist :trash-folder))))))
+	                            idiig/mail-accounts))))
 	    (defvar idiig/mail-signature-file
 	      (expand-file-name ".signature" idiig/mail-directory))
 	    
@@ -1479,7 +1579,8 @@
 	      (define-mail-user-agent 'wl-user-agent
 	        'wl-user-agent-compose 'wl-draft-send 'wl-draft-kill 'mail-send-hook)
 	      :config
-	      (advice-add 'wl :before #'idiig/wl-bootstrap))
+	      (advice-add 'wl :before #'idiig/wl-bootstrap)
+	      (advice-add 'wl-draft-create-buffer :before #'idiig/wl-bootstrap))
 	    (defvar idiig/writing-environment-list '("\\.org\\'"
 	                                             "\\.md\\'"
 	                                             "\\.qmd\\'"
