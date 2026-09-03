@@ -3146,6 +3146,10 @@ folder）时，=idiig/oauth2-localhost-request-authorization= 会在默
   这也是上面那条 =org-mime-edit-mail-in-org-mode= TODO 更值得做的原因
   ——切进真正的 org-mode 子编辑器之后，=M-x= 里就能正常搜到 org-mime
   的命令了
+- Hotmail 账号删邮件（=D= 标记 + 执行）经常要执行两次才会真的删掉：
+  第一次报 =1 execution(s) were failed=，紧接着再执行一次才
+  =Deleting messages...done=，怀疑是 IMAP/XOAUTH2 那次请求偶发失败
+  后 Wanderlust 没有自动重试，需要抓一下具体是哪步报的错
 ** 文档写作
 :PROPERTIES:
 :header-args: :noweb-ref ecfg
