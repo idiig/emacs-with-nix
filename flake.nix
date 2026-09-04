@@ -1797,6 +1797,48 @@
 	      :after wl
 	      :config
 	      (bbdb-insinuate-wl))
+	    (with-eval-after-load 'elmo-imap4
+	      (defun idiig/elmo-imap4-response-value-all (response symbol)
+	        "Same as `elmo-imap4-response-value-all', but wraps each collected
+	    value in a one-element list before handing it to `nconc' -- see
+	    `idiig/elmo-imap4-mailbox-size-update-maybe-fixed' for why."
+	        (let (matched)
+	          (while response
+	            (when (eq (car (car response)) symbol)
+	              (setq matched (nconc matched (list (nth 1 (car response))))))
+	            (setq response (cdr response)))
+	          matched))
+	    
+	      (defun idiig/elmo-imap4-mailbox-size-update-maybe-fixed (session response)
+	        "Bugfixed replacement for `elmo-imap4-mailbox-size-update-maybe'.
+	    Upstream's `elmo-imap4-response-value-all' collects EXISTS/RECENT
+	    values via `(nconc matched (nth 1 (car response)))', but an
+	    EXISTS/RECENT response value is a bare integer, not a list -- `nconc'
+	    tolerates that for a single match (returns the integer as-is), then
+	    crashes with `(wrong-type-argument consp N)' the instant a second
+	    EXISTS/RECENT response lands within the same command's response
+	    stream, which happens whenever the mailbox size changes mid-command
+	    during `expunge'/`uid expunge' -- i.e. the ordinary multi-message
+	    delete/dispose path (`wl-summary-exec' with `D'/`d' marks).
+	    `elmo-imap4-response-value-all' is declared `defsubst' and gets
+	    inlined into its callers at byte-compile time, so redefining that
+	    symbol alone never reaches an already-compiled caller; this function
+	    replaces `elmo-imap4-mailbox-size-update-maybe' wholesale instead,
+	    since that one is a plain `defun' and isn't inlined into its own
+	    caller (`elmo-imap4-read-response')."
+	        (let ((exists (idiig/elmo-imap4-response-value-all response 'exists))
+	              (recent (idiig/elmo-imap4-response-value-all response 'recent))
+	              (current-size (or (elmo-imap4-session-current-mailbox-size-internal
+	                                  session)
+	                                 (cons nil nil))))
+	          (when exists
+	            (setcar current-size (if (atom exists) exists (car (last exists)))))
+	          (when recent
+	            (setcdr current-size (if (atom recent) recent (car (last recent)))))
+	          (elmo-imap4-session-set-current-mailbox-size-internal session current-size)))
+	    
+	      (advice-add 'elmo-imap4-mailbox-size-update-maybe :override
+	                  #'idiig/elmo-imap4-mailbox-size-update-maybe-fixed))
 	    (defun idiig/wl-bootstrap (&rest _args)
 	      "Prepare everything Wanderlust needs before opening: bootstrap
 	    `wl-folders-file' and the signature file if missing, warm the

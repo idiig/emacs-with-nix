@@ -3062,6 +3062,76 @@ Wanderlust/SEMI 自己那套 MIME 菜单（=C-c C-x= 前缀）就能调用 GPG �
     :config
     (bbdb-insinuate-wl))
 #+end_src
+**** Wanderlust/elmo 上游 bug 补丁
+Hotmail 账号删邮件/dispose（=D=/=d= 标记 + 执行）经常要执行两次才会
+真的生效，第一次报 =N execution(s) were failed=，有时能在
+=*Messages*= 里看到更具体的 =(wrong-type-argument consp N)=。用
+=advice-add= 顺着调用链一路往下抓（=elmo-folder-move-messages= →
+=elmo-folder-delete-messages-internal= → =elmo-imap4-send-command-wait=）
+最终定位到 Wanderlust 自带的 =elmo-imap4.el= 里一个真实 bug，不是账号
+配置或网络问题：=elmo-imap4-response-value-all=（收集同一条命令响应
+里多次出现的 =EXISTS=/=RECENT= 之类的值）用
+=(nconc matched (nth 1 (car response)))= 累积结果，但 =EXISTS=/
+=RECENT= 响应解析出来的是裸整数，不是列表——只出现一次时
+=(nconc nil 448)= 碰巧能返回整数本身蒙混过关，但同一条命令的响应里
+一旦出现第二个 =EXISTS=（=expunge= 过程中邮箱消息数变化、服务器连续
+推了两条 =EXISTS= 就是这样，我们最早那次成功日志里就有
+=(exists 437) ... (exists 448)= 两条），第二次 =nconc= 就变成对裸整
+数调用，直接 =(wrong-type-argument consp 448)=。这解释了报错里那些
+看起来随机的数字——全是当时的邮箱消息总数，不是消息 UID，也不是消
+息数量。
+
+=elmo-imap4-response-value-all= 是 =defsubst=，字节编译时会被内联进
+调用它的函数体里，光重新定义这个符号本身对已经编译好的调用点不生
+效（实测确认过：单独重定义完，通过它的调用者
+=elmo-imap4-mailbox-size-update-maybe= 再调还是报同样的错）。
+=elmo-imap4-mailbox-size-update-maybe= 本身是普通 =defun=，不会被内
+联进*它的*调用者（=elmo-imap4-read-response=），所以把它整个用
+=advice-add :override= 换成一份修好的实现才真正生效。
+#+begin_src emacs-lisp
+  (with-eval-after-load 'elmo-imap4
+    (defun idiig/elmo-imap4-response-value-all (response symbol)
+      "Same as `elmo-imap4-response-value-all', but wraps each collected
+  value in a one-element list before handing it to `nconc' -- see
+  `idiig/elmo-imap4-mailbox-size-update-maybe-fixed' for why."
+      (let (matched)
+        (while response
+          (when (eq (car (car response)) symbol)
+            (setq matched (nconc matched (list (nth 1 (car response))))))
+          (setq response (cdr response)))
+        matched))
+
+    (defun idiig/elmo-imap4-mailbox-size-update-maybe-fixed (session response)
+      "Bugfixed replacement for `elmo-imap4-mailbox-size-update-maybe'.
+  Upstream's `elmo-imap4-response-value-all' collects EXISTS/RECENT
+  values via `(nconc matched (nth 1 (car response)))', but an
+  EXISTS/RECENT response value is a bare integer, not a list -- `nconc'
+  tolerates that for a single match (returns the integer as-is), then
+  crashes with `(wrong-type-argument consp N)' the instant a second
+  EXISTS/RECENT response lands within the same command's response
+  stream, which happens whenever the mailbox size changes mid-command
+  during `expunge'/`uid expunge' -- i.e. the ordinary multi-message
+  delete/dispose path (`wl-summary-exec' with `D'/`d' marks).
+  `elmo-imap4-response-value-all' is declared `defsubst' and gets
+  inlined into its callers at byte-compile time, so redefining that
+  symbol alone never reaches an already-compiled caller; this function
+  replaces `elmo-imap4-mailbox-size-update-maybe' wholesale instead,
+  since that one is a plain `defun' and isn't inlined into its own
+  caller (`elmo-imap4-read-response')."
+      (let ((exists (idiig/elmo-imap4-response-value-all response 'exists))
+            (recent (idiig/elmo-imap4-response-value-all response 'recent))
+            (current-size (or (elmo-imap4-session-current-mailbox-size-internal
+                                session)
+                               (cons nil nil))))
+        (when exists
+          (setcar current-size (if (atom exists) exists (car (last exists)))))
+        (when recent
+          (setcdr current-size (if (atom recent) recent (car (last recent)))))
+        (elmo-imap4-session-set-current-mailbox-size-internal session current-size)))
+
+    (advice-add 'elmo-imap4-mailbox-size-update-maybe :override
+                #'idiig/elmo-imap4-mailbox-size-update-maybe-fixed))
+#+end_src
 **** 入口与启动
 把前面几节的 setup 函数（folders、签名、auth-source 密码缓存、
 XOAUTH2 client-id）串成一个 bootstrap，各步骤都是幂等操作，重复跑无
@@ -3146,23 +3216,10 @@ folder）时，=idiig/oauth2-localhost-request-authorization= 会在默
   这也是上面那条 =org-mime-edit-mail-in-org-mode= TODO 更值得做的原因
   ——切进真正的 org-mode 子编辑器之后，=M-x= 里就能正常搜到 org-mime
   的命令了
-- Hotmail 账号删邮件（=D= 标记 + 执行）经常要执行两次才会真的删掉：
-  第一次报 =1 execution(s) were failed=，紧接着再执行一次才
-  =Deleting messages...done=。已定位到吞错误的位置，但还没抓到具体是
-  哪一步失败：=wl-summary-move-mark-list-messages=（wl-action.el）用
-  =(condition-case nil (setq result (elmo-folder-move-messages ...))
-  (error nil))= 包住整个删除调用；=elmo-folder-delete-messages-plugged=
-  （elmo-imap4.el，IMAP4 后端）内部要连续发好几轮同步 IMAP 命令——先
-  =search deleted= 找出已有的 =\Deleted= 消息，再对本次要删的消息
-  =store ... +flags.silent (\Deleted)=，最后视 =UIDPLUS= 能力选
-  =uid expunge= 或 =expunge=——这几轮里任何一轮失败，都会被外层那个
-  =condition-case= 整体吞掉、连错误信息都拿不到，直接按「这批全部失
-  败」处理。失败时消息在 buffer 里仍保留 =D= 标记，不会从
-  =wl-summary-buffer-temp-mark-list= 里摘除，所以「再执行一次」本质
-  是用同一个（此时已建立好）IMAP session 重试同一批命令，自然就成
-  功了；Wanderlust 本身没有针对这种偶发失败的自动重试。要抓到具体是
-  哪一步报的错，得在复现前 =(setq elmo-imap4-debug t)=，失败后去
-  =*IMAP4 DEBUG*= buffer 里看原始协议交互
+- ~~Hotmail 账号删邮件/dispose 经常要执行两次才会真的生效~~——已确诊
+  为 Wanderlust 自身 =elmo-imap4-response-value-all= 的一个真实 bug
+  （对裸整数误用 =nconc=，同一条命令响应里出现第二个 =EXISTS= 就炸），
+  已在「Wanderlust/elmo 上游 bug 补丁」一节加了运行时补丁修复
 - Gmail 账号长时间不打开 wl 之后再进邮箱，会弹出交互式密码提示
   =IMAP password for chewingguno@gmail.com@imap.gmail.com:993? =，
   怀疑是 =auth-source= 缓存的 App Password 过期/被清掉了，需要确认
