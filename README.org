@@ -3076,6 +3076,142 @@ Wanderlust/SEMI 自己那套 MIME 菜单（=C-c C-x= 前缀）就能调用 GPG �
     :config
     (bbdb-insinuate-wl))
 #+end_src
+**** 地址/文件夹补全接入 CAPF
+Wanderlust 自己的地址/文件夹/newsgroup 补全（=wl-complete-field-body-or-tab=，
+绑在 =wl-draft-mode= 的 TAB）和 BBDB 的联系人补全（=bbdb-complete-mail=，
+绑 =M-;=/=M-TAB=）都是各自独立的老式补全命令，直接改写 buffer 文本，不
+走 =completion-at-point-functions= 管线——这也是「输入时预览补全」
+（=completion-preview=）在 =wl-draft-mode= 里完全用不上、甚至会跟 TAB 抢
+键冲突的根源：=global-completion-preview-mode= 默认排除列表里没有
+=wl-draft-mode=，输入 To 收件人时会自动尝试起 preview，但当时
+=completion-at-point-functions= 只有没用的 =tags-completion-at-point-function=，
+啥也补不出来；一旦 preview 真的显示出来，=completion-preview-active-mode-map=
+自己占的 =C-i=/=<tab>= 优先级又高于 =wl-draft-mode-map=，会直接抢走 TAB，
+让 =wl-complete-field-body-or-tab= 按不出来。
+
+与其把 =wl-draft-mode= 从 =completion-preview= 里排除掉（治标，但从此这
+个 buffer 永远没有内联预览），不如把两边的补全表包成标准 CAPF，一次性
+接进管线——两边的补全表本身格式都已经是 =try-completion=/=all-completions=
+认识的标准 collection（=wl-address-completion-list= 是 alist，
+=wl-folder-entity-hashtb=/=wl-folder-newsgroups-hashtb= 是 hashtable，
+=bbdb-hashtable= 配 =bbdb-completion-predicate= 是 BBDB 自己补全用的那
+一份），不用另起一套数据结构：
+- 用哪种补全（地址/文件夹/newsgroup）由 =wl-address-complete-header-regexp=/
+  =wl-folder-complete-header-regexp=/=wl-newsgroups-complete-header-regexp=
+  判断当前处在哪个头域——跟 =wl-complete-field-body-or-tab= 内部用的是同
+  一套正则，只是它写死在一个交互命令里，这里抽成独立函数复用
+- 两份 CAPF 都标 =:exclusive 'no=：这样如果排在前面的一个在当前位置没
+  找到候选，后面那个还能接着试；但如果两个补全源对同一个前缀都各自有
+  候选，只有排在前面、且实际找到候选的那个会生效，不会自动合并成一张
+  列表——这是 CAPF 协议本身的限制（corfu/company 等消费者都是这个行
+  为），不是这份补丁的 bug。这里把 BBDB 排在前面，因为通讯录规模通常
+  比 =wl-address-completion-list= 大，想换优先级直接调整
+  =completion-at-point-functions= 里两个函数的顺序即可
+- 两边补全表存的 key 都不是最终要插入的文本（BBDB 存的是记录本身，
+  =wl-address-completion-list= 存的是 =(简称 . 完整地址)= 的 alist），
+  所以都靠 =:exit-function= 把选中的候选换成真正要写进 buffer 的内
+  容——地址栏查 =wl-address-completion-list= 的 =cdr=，BBDB 那边复用
+  =bbdb-gethash=/=bbdb-dwim-mail= 这两个 BBDB 自己导出的公开函数来定位
+  记录、按用户配置的 =bbdb-mail-name-format= 格式化，不重新实现
+  =bbdb-complete-mail= 内部那一整套记录匹配/去重/format 逻辑
+- 原来的 TAB / =M-;=/=M-TAB= 完全不受影响，两条路径背后是同一份数据，
+  只是现在多了一条 CAPF 通道，=completion-preview=/=M-x completion-at-point=
+  也能用了
+
+已经用真实的 Wanderlust + BBDB 包（batch 模式，建了一条真实 BBDB 记录）
+把这两个 CAPF 函数单独测过，也接进 =completion-preview--update= 跑过完
+整管线：地址栏输入 "jane" 能正确弹出 BBDB 记录格式化后的候选，输入
+"bob" 能正确弹出 =wl-address-completion-list= 里的候选，非地址头域
+（比如 Subject）两个 CAPF 都正确返回 nil，不会误触发。
+#+begin_src emacs-lisp
+  (with-eval-after-load 'bbdb
+    (require 'bbdb-com))
+
+  (defun idiig/wl-draft-header-end ()
+    "Position of the end of the header area in the current
+  `wl-draft-mode' buffer, i.e. just past the blank line that separates
+  headers from the body."
+    (save-excursion
+      (goto-char (point-min))
+      (search-forward (concat "\n" mail-header-separator "\n") nil 0)
+      (point)))
+
+  (defun idiig/wl-draft-field-type ()
+    "Return the wl-draft header-body completion type at point: `address',
+  `folder', `newsgroups', or nil if point isn't in a header field body
+  that Wanderlust knows how to complete.  Mirrors the header-type `cond'
+  inside `wl-complete-field-body-or-tab', which only exposes this logic
+  inline in an interactive command, not as a reusable predicate."
+    (when (< (point) (idiig/wl-draft-header-end))
+      (save-excursion
+        (beginning-of-line)
+        (while (and (looking-at "^[ \t]") (not (bobp)))
+          (forward-line -1))
+        (cond ((looking-at wl-address-complete-header-regexp) 'address)
+              ((looking-at wl-folder-complete-header-regexp) 'folder)
+              ((looking-at wl-newsgroups-complete-header-regexp) 'newsgroups)))))
+
+  (defun idiig/wl-draft-field-bounds ()
+    "Bounds of the header-body token before point, using the same
+  `skip-chars-backward' delimiters `wl-complete-field-body' uses."
+    (let ((end (point))
+          (beg (save-excursion
+                 (skip-chars-backward "^:,>\n")
+                 (skip-chars-forward " \t")
+                 (point))))
+      (cons beg end)))
+
+  (defun idiig/wl-draft-bbdb-capf ()
+    "`completion-at-point-functions' entry wrapping BBDB's own
+  `bbdb-hashtable', formatting the chosen candidate via `bbdb-dwim-mail'
+  the same way `bbdb-complete-mail' (M-;/M-TAB) does, so BBDB completion
+  is also reachable through the standard CAPF pipeline."
+    (when (eq (idiig/wl-draft-field-type) 'address)
+      (let ((bounds (idiig/wl-draft-field-bounds)))
+        (list (car bounds) (cdr bounds) bbdb-hashtable
+              :predicate #'bbdb-completion-predicate
+              :exclusive 'no
+              :exit-function
+              (lambda (str _status)
+                (when-let* ((records (bbdb-gethash str))
+                            (record (car records))
+                            (mail (or (car (member str (bbdb-record-mail record)))
+                                      (car (bbdb-record-mail record)))))
+                  (delete-region (- (point) (length str)) (point))
+                  (insert (bbdb-dwim-mail record mail))))))))
+
+  (defun idiig/wl-draft-wl-capf ()
+    "`completion-at-point-functions' entry wrapping Wanderlust's own
+  address/folder/newsgroups completion tables (`wl-address-completion-list',
+  `wl-folder-entity-hashtb', `wl-folder-newsgroups-hashtb'), so they're
+  reachable through the standard CAPF pipeline -- and therefore through
+  `completion-preview' -- instead of only via `wl-complete-field-body-or-tab'
+  (TAB)."
+    (let ((type (idiig/wl-draft-field-type)))
+      (when type
+        (let ((bounds (idiig/wl-draft-field-bounds))
+              (table (pcase type
+                       ('address wl-address-completion-list)
+                       ('folder wl-folder-entity-hashtb)
+                       ('newsgroups wl-folder-newsgroups-hashtb))))
+          (list (car bounds) (cdr bounds) table
+                :exclusive 'no
+                :exit-function
+                (when (eq type 'address)
+                  (lambda (str _status)
+                    (when-let* ((full (cdr (assoc str wl-address-completion-list))))
+                      (unless (string= str full)
+                        (delete-region (- (point) (length str)) (point))
+                        (insert full))))))))))
+
+  (with-eval-after-load 'wl
+    (add-hook 'wl-draft-mode-hook
+              (lambda ()
+                (setq-local completion-ignore-case t)
+                (setq-local completion-at-point-functions
+                            (list #'idiig/wl-draft-bbdb-capf
+                                  #'idiig/wl-draft-wl-capf)))))
+#+end_src
 **** Wanderlust/elmo 上游 bug 补丁
 Hotmail 账号删邮件/dispose（=D=/=d= 标记 + 执行）经常要执行两次才会
 真的生效，第一次报 =N execution(s) were failed=，有时能在

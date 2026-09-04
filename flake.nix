@@ -1798,6 +1798,93 @@
 	      :after wl
 	      :config
 	      (bbdb-insinuate-wl))
+	    (with-eval-after-load 'bbdb
+	      (require 'bbdb-com))
+	    
+	    (defun idiig/wl-draft-header-end ()
+	      "Position of the end of the header area in the current
+	    `wl-draft-mode' buffer, i.e. just past the blank line that separates
+	    headers from the body."
+	      (save-excursion
+	        (goto-char (point-min))
+	        (search-forward (concat "\n" mail-header-separator "\n") nil 0)
+	        (point)))
+	    
+	    (defun idiig/wl-draft-field-type ()
+	      "Return the wl-draft header-body completion type at point: `address',
+	    `folder', `newsgroups', or nil if point isn't in a header field body
+	    that Wanderlust knows how to complete.  Mirrors the header-type `cond'
+	    inside `wl-complete-field-body-or-tab', which only exposes this logic
+	    inline in an interactive command, not as a reusable predicate."
+	      (when (< (point) (idiig/wl-draft-header-end))
+	        (save-excursion
+	          (beginning-of-line)
+	          (while (and (looking-at "^[ \t]") (not (bobp)))
+	            (forward-line -1))
+	          (cond ((looking-at wl-address-complete-header-regexp) 'address)
+	                ((looking-at wl-folder-complete-header-regexp) 'folder)
+	                ((looking-at wl-newsgroups-complete-header-regexp) 'newsgroups)))))
+	    
+	    (defun idiig/wl-draft-field-bounds ()
+	      "Bounds of the header-body token before point, using the same
+	    `skip-chars-backward' delimiters `wl-complete-field-body' uses."
+	      (let ((end (point))
+	            (beg (save-excursion
+	                   (skip-chars-backward "^:,>\n")
+	                   (skip-chars-forward " \t")
+	                   (point))))
+	        (cons beg end)))
+	    
+	    (defun idiig/wl-draft-bbdb-capf ()
+	      "`completion-at-point-functions' entry wrapping BBDB's own
+	    `bbdb-hashtable', formatting the chosen candidate via `bbdb-dwim-mail'
+	    the same way `bbdb-complete-mail' (M-;/M-TAB) does, so BBDB completion
+	    is also reachable through the standard CAPF pipeline."
+	      (when (eq (idiig/wl-draft-field-type) 'address)
+	        (let ((bounds (idiig/wl-draft-field-bounds)))
+	          (list (car bounds) (cdr bounds) bbdb-hashtable
+	                :predicate #'bbdb-completion-predicate
+	                :exclusive 'no
+	                :exit-function
+	                (lambda (str _status)
+	                  (when-let* ((records (bbdb-gethash str))
+	                              (record (car records))
+	                              (mail (or (car (member str (bbdb-record-mail record)))
+	                                        (car (bbdb-record-mail record)))))
+	                    (delete-region (- (point) (length str)) (point))
+	                    (insert (bbdb-dwim-mail record mail))))))))
+	    
+	    (defun idiig/wl-draft-wl-capf ()
+	      "`completion-at-point-functions' entry wrapping Wanderlust's own
+	    address/folder/newsgroups completion tables (`wl-address-completion-list',
+	    `wl-folder-entity-hashtb', `wl-folder-newsgroups-hashtb'), so they're
+	    reachable through the standard CAPF pipeline -- and therefore through
+	    `completion-preview' -- instead of only via `wl-complete-field-body-or-tab'
+	    (TAB)."
+	      (let ((type (idiig/wl-draft-field-type)))
+	        (when type
+	          (let ((bounds (idiig/wl-draft-field-bounds))
+	                (table (pcase type
+	                         ('address wl-address-completion-list)
+	                         ('folder wl-folder-entity-hashtb)
+	                         ('newsgroups wl-folder-newsgroups-hashtb))))
+	            (list (car bounds) (cdr bounds) table
+	                  :exclusive 'no
+	                  :exit-function
+	                  (when (eq type 'address)
+	                    (lambda (str _status)
+	                      (when-let* ((full (cdr (assoc str wl-address-completion-list))))
+	                        (unless (string= str full)
+	                          (delete-region (- (point) (length str)) (point))
+	                          (insert full))))))))))
+	    
+	    (with-eval-after-load 'wl
+	      (add-hook 'wl-draft-mode-hook
+	                (lambda ()
+	                  (setq-local completion-ignore-case t)
+	                  (setq-local completion-at-point-functions
+	                              (list #'idiig/wl-draft-bbdb-capf
+	                                    #'idiig/wl-draft-wl-capf)))))
 	    (with-eval-after-load 'elmo-imap4
 	      (defun idiig/elmo-imap4-response-value-all (response symbol)
 	        "Same as `elmo-imap4-response-value-all', but wraps each collected
