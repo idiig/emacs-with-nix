@@ -5674,16 +5674,26 @@ insert-state 时重新打开输入方式：
 #+end_src
 
 *** 状态判定修正
+:PROPERTIES:
+:header-args: :noweb-ref ecfg
+:END:
 meow 对没有显式规则的 major mode 会猜状态：a-z 绑了 self-insert 就
 normal，没绑就 motion。这个猜测只对 =define-derived-mode= 写的 mode
 稳定；老式 =(defun foo-mode () ...)= 写法猜测不稳定，比如 Wanderlust
 的 =wl-summary-mode=/=wl-folder-mode= 曾落到 normal，导致 =q= 被
-=meow-quit= 抢走而不是各自 mode 自己的按键。遇到这类 mode 就加进
-=meow-mode-state-list=，不用等它出问题才发现。
+=meow-quit= 抢走而不是各自 mode 自己的按键。仅修改
+=meow-mode-state-list= 不足以覆盖 Wanderlust 进入 buffer 后的状态切换，
+因此在这两个 mode 的 hook 和 buffer-local 的 =post-command-hook= 中强制切到
+motion。
 #+begin_src emacs-lisp
   (with-eval-after-load 'meow
-    (dolist (mode '(wl-summary-mode wl-folder-mode))
-      (add-to-list 'meow-mode-state-list (cons mode 'motion))))
+    (defun idiig/meow-wl-force-motion (&rest _)
+      (when (memq major-mode '(wl-summary-mode wl-folder-mode))
+        (meow--switch-state 'motion)))
+
+    (add-hook 'wl-summary-mode-hook #'idiig/meow-wl-force-motion)
+    (add-hook 'wl-folder-mode-hook #'idiig/meow-wl-force-motion)
+    (add-hook 'post-command-hook #'idiig/meow-wl-force-motion nil t))
 #+end_src
 
 ** 多线程丰富功能 (=EAF=)

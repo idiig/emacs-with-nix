@@ -3222,6 +3222,14 @@
 	    	  (lambda ()
 	    	    (setq the-late-input-method current-input-method)
 	    	    (deactivate-input-method)))
+	    (with-eval-after-load 'meow
+	      (defun idiig/meow-wl-force-motion (&rest _)
+	        (when (memq major-mode '(wl-summary-mode wl-folder-mode))
+	          (meow--switch-state 'motion)))
+
+	      (add-hook 'wl-summary-mode-hook #'idiig/meow-wl-force-motion)
+	      (add-hook 'wl-folder-mode-hook #'idiig/meow-wl-force-motion)
+	      (add-hook 'post-command-hook #'idiig/meow-wl-force-motion nil t))
 	    ${pkgs.lib.optionalString (!pkgs.stdenv.hostPlatform.isDarwin) ''
 	    (require 'eaf)
 	    (require 'eaf-browser)
