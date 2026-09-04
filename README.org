@@ -5668,6 +5668,19 @@ insert-state 时重新打开输入方式：
   	    (deactivate-input-method)))
 #+end_src
 
+*** 状态判定修正
+meow 对没有显式规则的 major mode 会猜状态：a-z 绑了 self-insert 就
+normal，没绑就 motion。这个猜测只对 =define-derived-mode= 写的 mode
+稳定；老式 =(defun foo-mode () ...)= 写法猜测不稳定，比如 Wanderlust
+的 =wl-summary-mode=/=wl-folder-mode= 曾落到 normal，导致 =q= 被
+=meow-quit= 抢走而不是各自 mode 自己的按键。遇到这类 mode 就加进
+=meow-mode-state-list=，不用等它出问题才发现。
+#+begin_src emacs-lisp
+  (with-eval-after-load 'meow
+    (dolist (mode '(wl-summary-mode wl-folder-mode))
+      (add-to-list 'meow-mode-state-list (cons mode 'motion))))
+#+end_src
+
 ** 多线程丰富功能 (=EAF=)
 EAF（Emacs Application Framework）是一个在 Emacs 中运行的应用框架，我
 偶尔使用这个框架来使用浏览器和 PDF 阅读器等应用。
