@@ -523,12 +523,17 @@
 	            orderless-style-dispatchers '(+orderless-dispatch)))
 	    (use-package marginalia
 	      :after vertico
-	      ;; 只在minibuffer启用快捷键
-	      :bind (:map minibuffer-local-map ("M-A" . marginalia-cycle))
+	      ;; 只在minibuffer启用快捷键；默认不开，M-A 第一次按开启，
+	      ;; 开启后再按就是 marginalia-cycle 原本的切换注解样式
+	      :bind (:map minibuffer-local-map ("M-A" . idiig/marginalia-enable-or-cycle))
 	      :init
 	      (setq marginalia-align-offset 5)
 	      :config
-	      (marginalia-mode))
+	      (defun idiig/marginalia-enable-or-cycle ()
+	        (interactive)
+	        (if marginalia-mode
+	            (marginalia-cycle)
+	          (marginalia-mode 1))))
 	    (use-package consult
 	      :hook (after-init . (lambda () (require 'consult)))
 	      :bind (([remap M-x] . execute-extended-command)
