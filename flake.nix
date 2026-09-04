@@ -1779,6 +1779,27 @@
 	          (insert "-- \n"))))
 	    
 	    (setq mail-signature-file idiig/mail-signature-file)
+	    
+	    (defvar idiig/mail-address-file
+	      (expand-file-name ".addresses" idiig/mail-directory))
+	    
+	    (defun idiig/mail-address-setup ()
+	      "Write a placeholder at `idiig/mail-address-file' if it doesn't
+	    exist yet, documenting the format `wl-address-make-address-list'
+	    expects (EMAIL<tab>\"Full Name\"<tab>\"Nickname\", one per line,
+	    lines starting with # ignored).  Only runs once, same as
+	    `idiig/mail-signature-setup'.  Distinct from BBDB (which auto-fills
+	    itself from sent mail, see `idiig/wl-draft-bbdb-record-recipients'):
+	    this file's only reason to exist is short-alias completion (e.g.
+	    typing \"boss\" to complete a full address) that BBDB doesn't do, so
+	    it stays an empty placeholder unless the user actually wants that."
+	      (interactive)
+	      (unless (file-exists-p idiig/mail-address-file)
+	        (with-temp-file idiig/mail-address-file
+	          (insert "# One address per line: EMAIL<tab>\"Full Name\"<tab>\"Nickname\"\n")
+	          (insert "# e.g.: boss@example.com\t\"The Boss\"\t\"boss\"\n"))))
+	    
+	    (setq wl-address-file idiig/mail-address-file)
 	    (with-eval-after-load 'wl
 	      (setq wl-stay-folder-window nil)
 	      (define-key wl-draft-mode-map (kbd "C-c C-w") #'wl-draft-insert-signature)
@@ -1797,7 +1818,210 @@
 	    (use-package bbdb
 	      :after wl
 	      :config
-	      (bbdb-insinuate-wl))
+	      (bbdb-insinuate-wl)
+	      (setq bbdb-mua-auto-action 'create))
+	    
+	    (defvar idiig/bbdb-user-mail-address-re-ready nil
+	      "Non-nil once `bbdb-user-mail-address-re' has been set from
+	    `idiig/mail-accounts'.  Guards `idiig/bbdb-user-mail-address-re-setup'
+	    from re-running the sops decryption for all 3 accounts' :from-key on
+	    every `idiig/wl-bootstrap' call.")
+	    
+	    (defvar idiig/bbdb-ignored-address-re
+	      (regexp-opt '("noreply" "no-reply" "donotreply" "do-not-reply"
+	                    "support" "unsubscribe" "subscribe" "mailer-daemon"
+	                    "postmaster" "bounce" "notifications" "notification"))
+	      "Regexp matched against the local part (before \"@\") of a
+	    candidate address to decide it's an automated support/mailing-list
+	    sender rather than a real correspondent, even though it technically
+	    matches the \"replied to\"/\"sent to\" criteria used by
+	    `idiig/bbdb-import-correspondents'/`idiig/wl-draft-bbdb-record-recipients'
+	    -- e.g. `support@keychron.co.jp' or
+	    `unsubscribe@academia-noreply.com' are real recipients/repliers by
+	    those functions' own logic (a support ticket reply really is a
+	    reply, a newsletter's unsubscribe address really can end up in To),
+	    but aren't a contact worth keeping.")
+	    
+	    (defun idiig/bbdb-ignored-address-p (mail)
+	      "Non-nil if MAIL's local part matches `idiig/bbdb-ignored-address-re'."
+	      (and mail (string-match idiig/bbdb-ignored-address-re
+	                              (car (split-string mail "@")))))
+	    
+	    (defun idiig/bbdb-user-mail-address-re-setup ()
+	      "Set `bbdb-user-mail-address-re' to match every address in
+	    `idiig/mail-accounts', not just a single `user-mail-address'.  With 3
+	    accounts across 3 different domains, BBDB's default regexp (built
+	    from one address) would miss 1-2 of them, letting a self-CC slip
+	    through as if it were a real recipient in
+	    `idiig/wl-draft-bbdb-record-recipients'.  Only runs once per
+	    session; see `idiig/bbdb-user-mail-address-re-ready'."
+	      (unless idiig/bbdb-user-mail-address-re-ready
+	        (setq bbdb-user-mail-address-re
+	              (regexp-opt
+	               (mapcar (lambda (account)
+	                         (idiig/get-sops-secret-value (plist-get (cdr account) :from-key)))
+	                       idiig/mail-accounts)
+	               'words))
+	        (setq idiig/bbdb-user-mail-address-re-ready t)))
+	    
+	    (defun idiig/wl-draft-bbdb-record-recipients ()
+	      "Create/update BBDB records for the To/Cc/Bcc recipients of the
+	    current wl-draft-mode buffer, via `bbdb-update-records' and
+	    `bbdb-mua-auto-action'.  Meant for `wl-draft-send-hook', so BBDB
+	    learns contacts from mail the user actually writes to, instead of
+	    from every message merely viewed in wl-summary (which is what
+	    `bbdb-mua-auto-update-init' would wire up, and which BBDB's own
+	    `bbdb/wl-header' can't do from a compose buffer anyway -- see the
+	    prose above).
+	    
+	    Binds `bbdb-message-all-addresses' to t: `bbdb-update-records'
+	    otherwise stops after the FIRST address that resolves to a record
+	    (its normal use case is picking the one authoritative sender out of
+	    several sender-ish headers), silently dropping every other
+	    recipient -- confirmed by testing directly against the real BBDB
+	    package, where a 2-recipient ADDRESS-LIST only ever produced 1
+	    record until this let-bind was added.  Also skips
+	    `idiig/bbdb-ignored-address-p' matches (support/noreply/mailing-list
+	    addresses), same as `idiig/bbdb-import-correspondents'."
+	      (let ((bbdb-message-all-addresses t)
+	            address-list)
+	        (dolist (header '("To" "Cc" "Bcc"))
+	          (let ((content (mail-fetch-field header nil t)))
+	            (when content
+	              (dolist (address (bbdb-extract-address-components content t))
+	                (let ((name (car address)) (mail (cadr address)))
+	                  (unless (or (idiig/bbdb-ignored-address-p mail)
+	                              (and bbdb-user-mail-address-re
+	                                   (or (and name (string-match bbdb-user-mail-address-re name))
+	                                       (and mail (string-match bbdb-user-mail-address-re mail)))))
+	                    (push (list name mail header 'recipients 'wl) address-list)))))))
+	        (bbdb-update-records (nreverse address-list) bbdb-mua-auto-action)))
+	    
+	    (with-eval-after-load 'wl
+	      (add-hook 'wl-draft-send-hook #'idiig/wl-draft-bbdb-record-recipients))
+	    
+	    (defun idiig/bbdb-folder-address-entries (folder-spec headers header-class
+	                                                          &optional filter-numbers)
+	      "Return a list of (NAME MAIL HEADER HEADER-CLASS wl) entries read
+	    from HEADERS (a list of header symbols such as \\='(to cc)) across
+	    messages in FOLDER-SPEC, an elmo folder-spec string.  If
+	    FILTER-NUMBERS is given, it's called with the opened folder and
+	    should return the message numbers to actually read; otherwise every
+	    message in the folder is read.  Doesn't dedup entries or filter out
+	    the user's own addresses -- `idiig/bbdb-import-correspondents' does
+	    that once results from multiple folders/header sets are combined,
+	    so the same address seen via both Sent and Inbox only gets recorded
+	    once.  Skips any message whose entity can't be read rather than
+	    aborting.
+	    
+	    `elmo-folder-info-hashtb' has to be a real hash-table before
+	    `elmo-folder-synchronize'/`elmo-message-entity' will work -- normally
+	    true by the time the user can even run this command interactively,
+	    since `wl' itself initializes it on startup, but confirmed by
+	    testing against a real (if synthetic) elmo folder that it's nil
+	    until then, throwing `wrong-type-argument' from deep inside elmo.
+	    The `unless' guards against running this before `wl' has been opened
+	    even once.  Doesn't need to run from a live wl-summary buffer either:
+	    opens FOLDER-SPEC directly via `elmo-make-folder'/`elmo-folder-open',
+	    the same primitives `wl-summary' itself uses to display a folder."
+	      (unless (hash-table-p elmo-folder-info-hashtb)
+	        (elmo-folder-info-make-hashtb nil nil))
+	      (let* ((folder (elmo-make-folder folder-spec))
+	             entries)
+	        (elmo-folder-open folder)
+	        (elmo-folder-synchronize folder)
+	        (dolist (number (if filter-numbers
+	                            (funcall filter-numbers folder)
+	                          (elmo-folder-list-messages folder)))
+	          (let ((entity (ignore-errors (elmo-message-entity folder number))))
+	            (when entity
+	              (dolist (header headers)
+	                (let ((content (elmo-message-entity-field entity header 'string)))
+	                  (when content
+	                    (dolist (address (bbdb-extract-address-components content t))
+	                      (push (list (car address) (cadr address) (symbol-name header)
+	                                  header-class 'wl)
+	                            entries))))))))
+	        (elmo-folder-close folder)
+	        entries))
+	    
+	    (defun idiig/bbdb-import-correspondents (&optional action)
+	      "Bulk-import BBDB records for people the user has actually
+	    corresponded with: the To/Cc recipients of every message in each
+	    `idiig/mail-accounts' account's Sent folder, plus the From sender of
+	    every INBOX message flagged `answered' (Wanderlust sets this
+	    automatically when a reply is sent, via the default
+	    `wl-draft-reply-hook' entry `(wl-draft-setup-parent-flag \\='answered)'
+	    -- no extra configuration needed, just confirmed it hasn't been
+	    turned off).  A one-time way to seed BBDB from mail that's already
+	    there, with the same \"people I actually communicated with\"
+	    semantics as `idiig/wl-draft-bbdb-record-recipients' -- scanning
+	    every Inbox message's From instead of only the `answered' ones
+	    would just as happily record every newsletter/cold-email sender as
+	    a contact.  ACTION defaults to `bbdb-mua-auto-action'; call with a
+	    prefix arg to pick a different one interactively (see
+	    `bbdb-update-records').
+	    
+	    Can't use BBDB's own `bbdb-mua-update-records' for either the Sent
+	    or Inbox side: its `bbdb/wl-header' only reads the ONE currently
+	    selected message via `wl-summary-message-number', not every message
+	    in a folder, so this uses `idiig/bbdb-folder-address-entries'
+	    instead.
+	    
+	    Each account's Sent/Inbox scan is wrapped in `condition-case': one
+	    account's folder being unreachable (auth issue, wrong folder name,
+	    not plugged in, ...) used to silently abort the whole `dolist' and
+	    every account processed AFTER the failing one -- confirmed by the
+	    user only ever getting Gmail's contacts imported (the first account
+	    in `idiig/mail-accounts') while SDF and Hotmail (processed later)
+	    contributed nothing.  Failures are reported via `message' instead of
+	    silently swallowed, so a persistently-failing account is visible
+	    instead of just mysteriously never showing up.  Also skips
+	    `idiig/bbdb-ignored-address-p' matches (support/noreply/mailing-list
+	    addresses) -- these are real recipients/repliers by this function's
+	    own \"sent to\"/\"replied to\" logic (a support ticket reply really
+	    is a reply), but aren't a contact worth keeping."
+	      (interactive
+	       (list (if current-prefix-arg
+	                 (intern (completing-read "Action: "
+	                                          '("create" "query" "update" "search") nil t))
+	               bbdb-mua-auto-action)))
+	      (let (entries)
+	        (dolist (account idiig/mail-accounts)
+	          (let ((sent-folder (plist-get (cdr account) :sent-folder)))
+	            (when sent-folder
+	              (condition-case err
+	                  (setq entries
+	                        (nconc entries
+	                               (idiig/bbdb-folder-address-entries
+	                                (idiig/mail-account-folder-spec (car account) sent-folder)
+	                                '(to cc) 'recipients)))
+	                (error (message "idiig/bbdb-import-correspondents: skipping %s's Sent (%S)"
+	                                (car account) err)))))
+	          (condition-case err
+	              (setq entries
+	                    (nconc entries
+	                           (idiig/bbdb-folder-address-entries
+	                            (idiig/mail-account-folder-spec (car account) "INBOX")
+	                            '(from) 'sender
+	                            (lambda (folder) (elmo-folder-list-flagged folder 'answered)))))
+	            (error (message "idiig/bbdb-import-correspondents: skipping %s's INBOX (%S)"
+	                            (car account) err))))
+	        (let ((bbdb-message-all-addresses t)
+	              address-list seen)
+	          (dolist (entry entries)
+	            (let ((name (nth 0 entry)) (mail (nth 1 entry)))
+	              (when (and mail (not (member mail seen))
+	                         (not (idiig/bbdb-ignored-address-p mail))
+	                         (not (and bbdb-user-mail-address-re
+	                                   (or (and name (string-match bbdb-user-mail-address-re name))
+	                                       (string-match bbdb-user-mail-address-re mail)))))
+	                (push mail seen)
+	                (push entry address-list))))
+	          (let ((records (bbdb-update-records (nreverse address-list) action)))
+	            (message "Imported %d BBDB record(s) from %d correspondence entries"
+	                     (length records) (length entries))
+	            records))))
 	    (with-eval-after-load 'bbdb
 	      (require 'bbdb-com))
 	    
@@ -1929,14 +2153,17 @@
 	                  #'idiig/elmo-imap4-mailbox-size-update-maybe-fixed))
 	    (defun idiig/wl-bootstrap (&rest _args)
 	      "Prepare everything Wanderlust needs before opening: bootstrap
-	    `wl-folders-file' and the signature file if missing, warm the
-	    auth-source password cache, register the Hotmail XOAUTH2
-	    client-id, and load the `wl-address-completion-list'/BBDB address
-	    sources that the wl-draft-mode CAPFs need.  Runs before every `wl'
-	    call via :before advice, which passes through whatever arguments
-	    `wl' was called with (an optional prefix arg) -- ARGS absorbs those
-	    since this function doesn't need them.  Each step no-ops once
-	    already done, so repeating this on every call is cheap.
+	    `wl-folders-file', the signature file, and the address file if
+	    missing, warm the auth-source password cache, register the Hotmail
+	    XOAUTH2 client-id, load the `wl-address-completion-list'/BBDB
+	    address sources that the wl-draft-mode CAPFs need, set
+	    `bbdb-user-mail-address-re' from all 3 accounts, and -- the first
+	    time only, when `bbdb-file' doesn't exist yet -- seed BBDB via
+	    `idiig/bbdb-import-correspondents'.  Runs before every `wl' call via
+	    :before advice, which passes through whatever arguments `wl' was
+	    called with (an optional prefix arg) -- ARGS absorbs those since
+	    this function doesn't need them.  Each step no-ops once already
+	    done, so repeating this on every call is cheap.
 	    
 	    `wl-address-init'/`bbdb-records' can't be called directly here:
 	    this function runs as :before advice, i.e. strictly before `wl'
@@ -1945,15 +2172,35 @@
 	    too early signals `void-function'.  `with-eval-after-load' handles
 	    both cases correctly: it defers until the feature loads on the
 	    first call, and runs immediately (refreshing the address lists) on
-	    every call after that, once `wl'/`bbdb' are already loaded."
+	    every call after that, once `wl'/`bbdb' are already loaded.
+	    
+	    The one-time seed import is wrapped in `ignore-errors': it runs
+	    before `wl' itself has finished opening (this is :before advice on
+	    `wl', not code that runs after `wl' returns), so it's not certain
+	    the account connections are plugged in/ready yet -- if the import
+	    fails here, `bbdb-file' stays absent and the same attempt just
+	    retries on the next call, or the user can run
+	    `idiig/bbdb-import-correspondents' by hand.  `bbdb-update-records'
+	    only changes BBDB's in-memory buffer, it doesn't write `bbdb-file'
+	    by itself (`bbdb-save' is a separate, non-automatic step -- checked
+	    against BBDB's own `bbdb-change-record'/`bbdb-save'), so without the
+	    explicit `bbdb-save' call here the `file-exists-p' guard would never
+	    see the file and this would silently re-scan every single account's
+	    Sent+Inbox on every `wl' startup forever."
 	      (idiig/mail-folders-setup)
 	      (idiig/mail-signature-setup)
+	      (idiig/mail-address-setup)
 	      (idiig/mail-auth-source-warm-cache)
 	      (idiig/sasl-xoauth2-ensure-hotmail-client-id)
 	      (with-eval-after-load 'wl
 	        (wl-address-init))
 	      (with-eval-after-load 'bbdb
-	        (bbdb-records)))
+	        (bbdb-records)
+	        (idiig/bbdb-user-mail-address-re-setup)
+	        (unless (file-exists-p bbdb-file)
+	          (ignore-errors
+	            (idiig/bbdb-import-correspondents 'create)
+	            (bbdb-save nil nil)))))
 	    (use-package wl
 	      :commands (wl wl-draft wl-user-agent-compose)
 	      :init
