@@ -1782,6 +1782,7 @@
 	    (with-eval-after-load 'wl
 	      (setq wl-stay-folder-window nil)
 	      (define-key wl-draft-mode-map (kbd "C-c C-w") #'wl-draft-insert-signature)
+	      (define-key wl-draft-mode-map (kbd "C-c M-o") #'org-mime-edit-mail-in-org-mode)
 	      (setq wl-message-ignored-field-list '("."))
 	      (setq wl-message-visible-field-list
 	            '("^\\(To\\|Cc\\):"
@@ -1789,7 +1790,7 @@
 	              "^\\(From\\|Reply-To\\):"
 	              "^Date:")))
 	    (use-package org-mime
-	      :commands (org-mime-org-buffer-htmlize)
+	      :commands (org-mime-org-buffer-htmlize org-mime-edit-mail-in-org-mode)
 	      :init
 	      (setq org-mime-library 'semi))
 	    (setq epa-pinentry-mode 'loopback)

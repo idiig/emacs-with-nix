@@ -3011,6 +3011,7 @@ Emacs 内置变量）。不自动插入，补一个 =C-c C-w= 快捷键，想带
   (with-eval-after-load 'wl
     (setq wl-stay-folder-window nil)
     (define-key wl-draft-mode-map (kbd "C-c C-w") #'wl-draft-insert-signature)
+    (define-key wl-draft-mode-map (kbd "C-c M-o") #'org-mime-edit-mail-in-org-mode)
     (setq wl-message-ignored-field-list '("."))
     (setq wl-message-visible-field-list
           '("^\\(To\\|Cc\\):"
@@ -3030,9 +3031,22 @@ MUA 用的，默认值 ='mml= 是给 =message-mode= 用的，两者生成的 MIM
 像绑死了 =message-mode=，但两者的函数体只是按 =mail-header-separator=
 文本查找位置，并不检查 =major-mode=，用在 =wl-draft-mode=（继承自
 =mail-mode=，用的是同一套 header-separator 约定）里没问题。
+
+正文比较长、想用完整 org-mode 编辑体验（大纲折叠、表格、代码块高亮
+等）来写时，=C-c M-o=（=org-mime-edit-mail-in-org-mode=）弹出一个子
+编辑 buffer，写完 =C-c C-c=（=org-mime-edit-src-exit=）写回草稿正文。
+没有绑成 =C-c C-o=：那个键 Wanderlust 自己占了，绑的是
+=wl-jump-to-draft-buffer=（在多个草稿间跳转，带前缀参数会跳到 Drafts
+文件夹），不想覆盖掉这个功能。=org-mime-edit-mail-in-org-mode= 源码里
+声明的 =(interactive nil message-mode)= 只影响 =M-x= 补全能不能搜到
+它（跟前面 =org-mime-org-buffer-htmlize= 那条是同一个问题），不影响
+直接按键调用；函数体本身只在 =major-mode= 是 =org-mode= 时才拒绝执
+行，定位正文位置用的 =org-mime-mail-body-begin=/=org-mime-mail-signature-begin=
+也是纯文本搜 =mail-header-separator=，跟 =wl-draft-mode= 没有兼容性
+问题。
 #+begin_src emacs-lisp
   (use-package org-mime
-    :commands (org-mime-org-buffer-htmlize)
+    :commands (org-mime-org-buffer-htmlize org-mime-edit-mail-in-org-mode)
     :init
     (setq org-mime-library 'semi))
 #+end_src
@@ -3171,34 +3185,10 @@ XOAUTH2 client-id 就没预热，发信会失败。两处顺序不影响，都�
 #+end_src
 
 *** TODO 待排查问题
-- 启动 =wl= 时报 =gnus-mime-setup is not found.=/=emh-setup is not
-  found.=，来源和影响还没查
-- Hotmail 的 Sent/Trash/Junk 文件夹显示为空，需要确认是
-  =:extra-folders= 里的 mailbox 名字跟 Exchange 实际文件夹对不上，
-  还是订阅/刷新的问题
 - 在 =wl-draft-mode= 里输入 To 收件人时，
   =completion-preview--post-command= 报 =(error "Not an in-range
   integer, integral float, or cons of integers")=，怀疑是
   =completion-preview-mode= 跟 wl-draft/bbdb 补全的兼容性问题
-- 在 =wl-draft-mode= 里给 =C-c C-o= 绑 =org-mime-edit-mail-in-org-mode=，
-  按需弹出完整 org-mode 子编辑器写正文，写完 =C-c C-c=
-  （=org-mime-edit-src-exit=）写回草稿——注意 =C-c C-o= 目前绑的是
-  Wanderlust 自带的 =wl-jump-to-draft-buffer=（在多个草稿间跳转），
-  改绑前要确认是否还需要那个功能，或者换一个不冲突的键
-- =M-x org-mime-org-buffer-htmlize= 在 =wl-draft-mode= 里用 =M-x=
-  补全会搜不到：这个命令源码里声明的是 =(interactive nil org-mode)=，
-  只对 =org-mode= 及其派生模式可见，配合当前配置里
-  =read-extended-command-predicate= 设成
-  =command-completion-default-include-p=（按 major-mode 过滤 =M-x=
-  候选列表）,在非 org-mode 的 draft buffer 里会被过滤掉，看起来像函数
-  不存在了，其实一直在（=fboundp=/=commandp= 都是 =t=，能正常调用）。
-  这也是上面那条 =org-mime-edit-mail-in-org-mode= TODO 更值得做的原因
-  ——切进真正的 org-mode 子编辑器之后，=M-x= 里就能正常搜到 org-mime
-  的命令了
-- ~~Hotmail 账号删邮件/dispose 经常要执行两次才会真的生效~~——已确诊
-  为 Wanderlust 自身 =elmo-imap4-response-value-all= 的一个真实 bug
-  （对裸整数误用 =nconc=，同一条命令响应里出现第二个 =EXISTS= 就炸），
-  已在「Wanderlust/elmo 上游 bug 补丁」一节加了运行时补丁修复
 - Gmail 账号长时间不打开 wl 之后再进邮箱，会弹出交互式密码提示
   =IMAP password for chewingguno@gmail.com@imap.gmail.com:993? =，
   怀疑是 =auth-source= 缓存的 App Password 过期/被清掉了，需要确认
