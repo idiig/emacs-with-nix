@@ -1034,70 +1034,66 @@
 	      (defvar idiig/sops-config-file (expand-file-name "~/.config/.sops.yaml")
 	        "Path to the sops creation-rules file that grants `idiig/sops-age-key-file'
 	    access to `idiig/sops-secrets-file'.")
+	    (defvar idiig/sops-required-keys nil
+	      "Alist of (KEY . DESCRIPTION) for every sops key some feature in this
+	    config reads via `idiig/get-sops-secret-value'.  Features register
+	    their own keys with `idiig/sops-register-keys' next to wherever they
+	    define what the key is for, instead of this list being maintained by
+	    hand in one place.  `idiig/sops-secrets-setup' uses this to pre-fill
+	    any key that's still missing with a placeholder describing what
+	    belongs there, so opening the file for editing shows exactly what's
+	    left to fill in instead of the user having to remember key names.")
 	    
-	      (defvar idiig/sops-required-keys nil
-	        "Alist of (KEY . DESCRIPTION) for every sops key some feature in this
-	      config reads via `idiig/get-sops-secret-value'.  Features register
-	      their own keys with `idiig/sops-register-keys' next to wherever they
-	      define what the key is for, instead of this list being maintained by
-	      hand in one place.  `idiig/sops-secrets-setup' uses this to pre-fill
-	      any key that's still missing with a placeholder describing what
-	      belongs there, so opening the file for editing shows exactly what's
-	      left to fill in instead of the user having to remember key names.")
+	    (defun idiig/sops-register-keys (alist)
+	      "Register ALIST, a list of (KEY . DESCRIPTION) pairs, onto
+	    `idiig/sops-required-keys'.  Keys already registered are left alone
+	    (first registration wins), so this is safe to call unconditionally
+	    at load time."
+	      (dolist (entry alist)
+	        (unless (assoc (car entry) idiig/sops-required-keys)
+	          (setq idiig/sops-required-keys
+	                (append idiig/sops-required-keys (list entry))))))
+	    (defvar idiig/sops-todo-prefix "TODO: "
+	      "Prefix `idiig/sops-fill-missing-keys' writes on placeholder values.
+	    A value starting with this prefix is a non-empty string, so a naive
+	    \"is this key present\" check would treat it as a real secret and
+	    happily hand it to whatever's asking.  `idiig/get-sops-secret-value'
+	    and `idiig/sops-key-present-p' both special-case this prefix so a
+	    forgotten placeholder fails loudly instead of silently being used as
+	    if it were real.")
+	    (defun idiig/get-sops-secret-value	 (key &optional path)
+	      "Get secret value from SOPS-encrypted file.
+	    KEY is the key to lookup in the YAML file.
+	    PATH is the path to the secrets file, defaulting to `idiig/sops-secrets-file'.
 	    
-	      (defun idiig/sops-register-keys (alist)
-	        "Register ALIST, a list of (KEY . DESCRIPTION) pairs, onto
-	      `idiig/sops-required-keys'.  Keys already registered are left alone
-	      (first registration wins), so this is safe to call unconditionally
-	      at load time."
-	        (dolist (entry alist)
-	          (unless (assoc (car entry) idiig/sops-required-keys)
-	            (setq idiig/sops-required-keys
-	                  (append idiig/sops-required-keys (list entry))))))
-	    
-	      (defvar idiig/sops-todo-prefix "TODO: "
-	        "Prefix `idiig/sops-fill-missing-keys' writes on placeholder values.
-	      A value starting with this prefix is a non-empty string, so a naive
-	      \"is this key present\" check would treat it as a real secret and
-	      happily hand it to whatever's asking.  `idiig/get-sops-secret-value'
-	      and `idiig/sops-key-present-p' both special-case this prefix so a
-	      forgotten placeholder fails loudly instead of silently being used as
-	      if it were real.")
-	    
-	      (defun idiig/get-sops-secret-value	 (key &optional path)
-	        "Get secret value from SOPS-encrypted file.
-	      KEY is the key to lookup in the YAML file.
-	      PATH is the path to the secrets file, defaulting to `idiig/sops-secrets-file'.
-	    
-	      If the secrets file doesn't exist, display a helpful message with setup instructions."
-	        (let ((secrets-file (expand-file-name (or path idiig/sops-secrets-file)))
-	              ;; sops has no implicit "check ~/.config/sops/age/" fallback of its
-	              ;; own; without this it only looks at $SOPS_AGE_KEY_FILE, $SOPS_AGE_KEY,
-	              ;; $SOPS_AGE_KEY_CMD or the default SSH key, and decryption fails
-	              ;; with "no identity matched any of the recipients".
-	              (process-environment
-	               (cons (format "SOPS_AGE_KEY_FILE=%s" idiig/sops-age-key-file)
-	                     process-environment)))
-	          (if (file-exists-p secrets-file)
-	              (let ((result (string-trim
-	                             (shell-command-to-string
-	      			(format "${pkgs.sops}/bin/sops -d %s | ${pkgs.yq-go}/bin/yq -r '.%s'"
-	      				(shell-quote-argument secrets-file)
-	      				key)))))
-	                (cond
-	                 ((or (string-empty-p result) (string= result "null"))
-	                  (error (concat "Key '%s' not found in %s.  "
-	                                 "Run M-x idiig/sops-secrets-setup to fill in "
-	                                 "a placeholder for it, then replace the "
-	                                 "placeholder with a real value")
-	                         key secrets-file))
-	                 ((string-prefix-p idiig/sops-todo-prefix result)
-	                  (error "Key '%s' in %s still has a placeholder value: %s"
-	                         key secrets-file result))
-	                 (t result)))
-	            (error "Secrets file not found: %s.  Run M-x idiig/sops-secrets-setup to bootstrap it"
-	                   secrets-file))))
-	    
+	    If the secrets file doesn't exist, display a helpful message with setup instructions."
+	      (let ((secrets-file (expand-file-name (or path idiig/sops-secrets-file)))
+	            ;; sops has no implicit "check ~/.config/sops/age/" fallback of its
+	            ;; own; without this it only looks at $SOPS_AGE_KEY_FILE, $SOPS_AGE_KEY,
+	            ;; $SOPS_AGE_KEY_CMD or the default SSH key, and decryption fails
+	            ;; with "no identity matched any of the recipients".
+	            (process-environment
+	             (cons (format "SOPS_AGE_KEY_FILE=%s" idiig/sops-age-key-file)
+	                   process-environment)))
+	        (if (file-exists-p secrets-file)
+	            (let ((result (string-trim
+	                           (shell-command-to-string
+	    			(format "${pkgs.sops}/bin/sops -d %s | ${pkgs.yq-go}/bin/yq -r '.%s'"
+	    				(shell-quote-argument secrets-file)
+	    				key)))))
+	              (cond
+	               ((or (string-empty-p result) (string= result "null"))
+	                (error (concat "Key '%s' not found in %s.  "
+	                               "Run M-x idiig/sops-secrets-setup to fill in "
+	                               "a placeholder for it, then replace the "
+	                               "placeholder with a real value")
+	                       key secrets-file))
+	               ((string-prefix-p idiig/sops-todo-prefix result)
+	                (error "Key '%s' in %s still has a placeholder value: %s"
+	                       key secrets-file result))
+	               (t result)))
+	          (error "Secrets file not found: %s.  Run M-x idiig/sops-secrets-setup to bootstrap it"
+	                 secrets-file))))
 	      (defun idiig/sops-key-present-p (key secrets-file)
 	        "Non-nil if KEY already has a real value in SECRETS-FILE -- not
 	    missing, and not still an `idiig/sops-todo-prefix' placeholder.
@@ -1115,7 +1111,6 @@
 	               (not (or (string-empty-p result)
 	                        (string= result "null")
 	                        (string-prefix-p idiig/sops-todo-prefix result))))))
-	    
 	      (defun idiig/sops-fill-missing-keys (secrets-file)
 	        "Ensure every key in `idiig/sops-required-keys' exists in
 	    SECRETS-FILE, filling any that's missing with a placeholder that
@@ -1149,7 +1144,6 @@
 	                                            "--encrypt" "--in-place" secrets-file))
 	                (error "idiig/sops-fill-missing-keys: `sops --encrypt --in-place' failed on %s"
 	                       secrets-file))))))
-	    
 	      (defun idiig/sops-secrets-setup (&optional path)
 	        "Bootstrap the SOPS-encrypted secrets file used by `idiig/get-sops-secret-value'.
 	    PATH defaults to `idiig/sops-secrets-file'.
@@ -3226,7 +3220,7 @@
 	      (defun idiig/meow-wl-force-motion (&rest _)
 	        (when (memq major-mode '(wl-summary-mode wl-folder-mode))
 	          (meow--switch-state 'motion)))
-
+	    
 	      (add-hook 'wl-summary-mode-hook #'idiig/meow-wl-force-motion)
 	      (add-hook 'wl-folder-mode-hook #'idiig/meow-wl-force-motion)
 	      (add-hook 'post-command-hook #'idiig/meow-wl-force-motion nil t))

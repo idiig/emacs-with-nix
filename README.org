@@ -1990,6 +1990,14 @@ minibuffer的检索]]。
 :PROPERTIES:
 :header-args: :noweb-ref ecfg
 :END:
+**** 路径配置
+:PROPERTIES:
+:header-args: :noweb-ref ecfg
+:END:
+三个路径变量环环相扣：加密后的密钥文件、解密用的 age 私钥，以及
+sops 用来判断「拿哪把 key 解密哪份文件」的 creation-rules 配置。
+=idiig/sops-config-file= 里登记的规则要精确匹配
+=idiig/sops-secrets-file= 的文件名，否则 sops 找不到对应的加密规则。
 #+begin_src emacs-lisp
   (defvar idiig/sops-secrets-file (expand-file-name "~/.config/secrets.yaml")
     "Default path to the SOPS-encrypted secrets file.")
@@ -2000,7 +2008,18 @@ minibuffer的检索]]。
   (defvar idiig/sops-config-file (expand-file-name "~/.config/.sops.yaml")
     "Path to the sops creation-rules file that grants `idiig/sops-age-key-file'
 access to `idiig/sops-secrets-file'.")
-
+#+end_src
+**** 必需密钥注册 (=idiig/sops-required-keys=/=idiig/sops-register-keys=)
+:PROPERTIES:
+:header-args: :noweb-ref ecfg
+:END:
+各功能自己知道要读哪个 sops key、这个 key 是干什么用的，但这份清
+单不该硬写在密钥管理模块里维护。=idiig/sops-register-keys= 让每个
+功能在自己定义的地方（挨着 key 的实际用途）把 (KEY . DESCRIPTION)
+登记进 =idiig/sops-required-keys=；重复登记同一个 key 时以第一次
+为准，所以在 load 时无条件调用是安全的。=idiig/sops-secrets-setup=
+靠这份清单在密钥文件里预填占位符。
+#+begin_src emacs-lisp
   (defvar idiig/sops-required-keys nil
     "Alist of (KEY . DESCRIPTION) for every sops key some feature in this
   config reads via `idiig/get-sops-secret-value'.  Features register
@@ -2020,7 +2039,17 @@ access to `idiig/sops-secrets-file'.")
       (unless (assoc (car entry) idiig/sops-required-keys)
         (setq idiig/sops-required-keys
               (append idiig/sops-required-keys (list entry))))))
-
+#+end_src
+**** 占位符前缀 (=idiig/sops-todo-prefix=)
+:PROPERTIES:
+:header-args: :noweb-ref ecfg
+:END:
+=idiig/sops-fill-missing-keys= 给缺失的 key 写占位符时用这个前
+缀。占位符本身是非空字符串，只判断「是否非空」会把它当真值交出
+去，所以 =idiig/get-sops-secret-value= 和 =idiig/sops-key-present-p=
+都单独识别这个前缀，让忘记替换占位符的情况直接报错，而不是被悄
+悄当成真实密钥用掉。
+#+begin_src emacs-lisp
   (defvar idiig/sops-todo-prefix "TODO: "
     "Prefix `idiig/sops-fill-missing-keys' writes on placeholder values.
   A value starting with this prefix is a non-empty string, so a naive
@@ -2029,7 +2058,18 @@ access to `idiig/sops-secrets-file'.")
   and `idiig/sops-key-present-p' both special-case this prefix so a
   forgotten placeholder fails loudly instead of silently being used as
   if it were real.")
-
+#+end_src
+**** 读取密钥 (=idiig/get-sops-secret-value=)
+:PROPERTIES:
+:header-args: :noweb-ref ecfg
+:END:
+从 =idiig/sops-secrets-file= 解密后用 =yq= 按 KEY 取值。sops 没
+有隐式去 =~/.config/sops/age/= 找私钥的默认行为——只认
+=$SOPS_AGE_KEY_FILE=/=$SOPS_AGE_KEY=/=$SOPS_AGE_KEY_CMD= 或默认
+SSH key，所以要显式把 =SOPS_AGE_KEY_FILE= 塞进
+=process-environment=。密钥文件不存在、key 找不到、key 还是占位
+符，这三种情况分别报不同的错误，都指引到 =idiig/sops-secrets-setup=。
+#+begin_src emacs-lisp
   (defun idiig/get-sops-secret-value	 (key &optional path)
     "Get secret value from SOPS-encrypted file.
   KEY is the key to lookup in the YAML file.
@@ -2063,7 +2103,16 @@ access to `idiig/sops-secrets-file'.")
              (t result)))
         (error "Secrets file not found: %s.  Run M-x idiig/sops-secrets-setup to bootstrap it"
                secrets-file))))
-
+#+end_src
+**** 检测密钥是否已填 (=idiig/sops-key-present-p=)
+:PROPERTIES:
+:header-args: :noweb-ref ecfg
+:END:
+判断逻辑跟读取函数一致（非空、非 "null"、非占位符前缀），区别
+是密钥文件不存在时返回 nil 而不是报错——对调用方
+=idiig/sops-fill-missing-keys= 来说，文件还没建好只意味着「所有
+key 都缺」，不是异常。
+#+begin_src emacs-lisp
   (defun idiig/sops-key-present-p (key secrets-file)
     "Non-nil if KEY already has a real value in SECRETS-FILE -- not
 missing, and not still an `idiig/sops-todo-prefix' placeholder.
@@ -2081,7 +2130,18 @@ is \"missing\"."
            (not (or (string-empty-p result)
                     (string= result "null")
                     (string-prefix-p idiig/sops-todo-prefix result))))))
-
+#+end_src
+**** 补全缺失密钥占位符 (=idiig/sops-fill-missing-keys=)
+:PROPERTIES:
+:header-args: :noweb-ref ecfg
+:END:
+遍历 =idiig/sops-required-keys=，把真正缺失的 key 用
+=idiig/sops-todo-prefix= 加描述文字写成占位符值。文件已存在时逐
+个 =sops set=，不碰已经填好的 key；文件不存在时没法 =set= 进空文
+件，改成先明文写一份种子文件再整体加密。这样打开密钥文件编辑
+时，看到的就是「还差哪些 key、每个 key 是干什么用的」，不用凭记
+忆猜 key 名。
+#+begin_src emacs-lisp
   (defun idiig/sops-fill-missing-keys (secrets-file)
     "Ensure every key in `idiig/sops-required-keys' exists in
 SECRETS-FILE, filling any that's missing with a placeholder that
@@ -2115,7 +2175,22 @@ and default-directory are already set up correctly by the caller."
                                         "--encrypt" "--in-place" secrets-file))
             (error "idiig/sops-fill-missing-keys: `sops --encrypt --in-place' failed on %s"
                    secrets-file))))))
-
+#+end_src
+**** 初始化向导 (=idiig/sops-secrets-setup=)
+:PROPERTIES:
+:header-args: :noweb-ref ecfg
+:END:
+交互式命令，一次性把密钥管理跑起来：没有 age key 就生成一个，没
+有匹配的 =.sops.yaml= creation rule 就写一份（已有配置但不含这把
+key 的公钥时也会重写，避免上次跑到一半失败留下的半成品被一直沿
+用），再用 =idiig/sops-fill-missing-keys= 补齐占位符，最后调用
+=sops= 打开文件编辑。sops 调用 =$EDITOR= 默认弹独立终端，这里换
+成 =with-editor-async-shell-command=（=with-editor= 已经被 magit
+引入），让编辑发生在当前 Emacs 里。sops 查找 =.sops.yaml= 是从当
+前工作目录向上找，不是从目标文件所在目录找，所以要把
+=default-directory= 切到密钥文件所在目录，否则会报 "config file
+not found"。
+#+begin_src emacs-lisp
   (defun idiig/sops-secrets-setup (&optional path)
     "Bootstrap the SOPS-encrypted secrets file used by `idiig/get-sops-secret-value'.
 PATH defaults to `idiig/sops-secrets-file'.
@@ -2170,7 +2245,6 @@ missing, then opens PATH with sops for interactive editing."
         (with-editor-async-shell-command (format "${pkgs.sops}/bin/sops %s"
                                                    (shell-quote-argument secrets-file))))))
 #+end_src
-
 从 sops 读出的密码经 =auth-source= 桥接后（目前只有邮件账号在用），
 =auth-source-search= 的结果缓存有效期固定为 =auth-source-cache-expiry=
 （默认 2 小时，从首次写入起算，用没用过都一样），到期后没有自动补种
