@@ -382,9 +382,15 @@
 	        ("M-n" . completion-preview-next-candidate)
 	        ("M-p" . completion-preview-prev-candidate)
 	        ("M-<return>" . completion-preview-insert)
-	        ("<tab>" . completion-preview-complete))
+	        ("<tab>" . completion-preview-complete)
+	        ("TAB" . completion-preview-complete)
+	        :map completion-in-region-mode-map
+	        ("M-i" . minibuffer-choose-completion)
+	        ("M-n" . minibuffer-next-completion)
+	        ("M-p" . minibuffer-previous-completion))
 	      :config
 	      (setq completion-preview-minimum-symbol-length 2)
+	      (setq minibuffer-visible-completions t)
 	      (with-eval-after-load 'org
 	        (add-to-list 'completion-preview-commands #'org-self-insert-command))
 	      (global-completion-preview-mode 1))
@@ -1192,6 +1198,7 @@
 	            (idiig/sops-fill-missing-keys secrets-file)
 	            (with-editor-async-shell-command (format "${pkgs.sops}/bin/sops %s"
 	                                                       (shell-quote-argument secrets-file))))))
+	    (setq auth-source-cache-expiry nil)
 	    (require 'oauth2)
 	    (require 'sasl-xoauth2)
 	    (require 'url-util) ; url-parse-query-string

@@ -841,9 +841,19 @@ Emacs 30+ 自带的功能，输入时以浅色文字内联预览排在第一位�
 基本不会显示，主要在 =M-x=、elisp scratch、shell 等走原生补全的地方起
 作用。配置参照 [[https://protesilaos.com/codelog/2026-08-29-emacs-completion-preview-mode/][Prot 的这篇文章]]：
 - =M-i= 采纳当前候选，=M-n=/=M-p= 切换候选，=M-<return>= 直接插入完整补全，
-  =<tab>= 交给 *Completions* buffer 看完整列表
+  =<tab>= 补到候选间最长公共前缀，没有更多公共前缀可补时才弹
+  *Completions* buffer
 - org-mode 会重新绑定 self-insert-command，不加下面这行的话
   completion-preview 在 org buffer 里根本不会触发
+- GUI 下物理 Tab 键发的是独立的 =<tab>= 事件，TUI 下发的是字面
+  =C-i=，两者在 keymap 里是不同的绑定位置——只绑 =<tab>= 的话 TUI 里
+  的 Tab 键会落到内置默认的 =C-i= 绑定（=completion-preview-insert=），
+  跟 GUI 下的行为不一致，所以两个都要绑
+- =<tab>= 弹出的 *Completions* buffer 由 =completion-in-region-mode=
+  接管，用的是另一个 keymap（=completion-in-region-mode-map=），不是
+  =completion-preview-active-mode-map=，两边的 =M-i=/=M-n=/=M-p= 要分
+  别绑；=minibuffer-visible-completions= 让候选连同当前输入内容一起
+  显示，不用切到 *Completions* buffer 里才看得到
 #+begin_src emacs-lisp
   (use-package completion-preview
     :demand t
@@ -854,9 +864,15 @@ Emacs 30+ 自带的功能，输入时以浅色文字内联预览排在第一位�
       ("M-n" . completion-preview-next-candidate)
       ("M-p" . completion-preview-prev-candidate)
       ("M-<return>" . completion-preview-insert)
-      ("<tab>" . completion-preview-complete))
+      ("<tab>" . completion-preview-complete)
+      ("TAB" . completion-preview-complete)
+      :map completion-in-region-mode-map
+      ("M-i" . minibuffer-choose-completion)
+      ("M-n" . minibuffer-next-completion)
+      ("M-p" . minibuffer-previous-completion))
     :config
     (setq completion-preview-minimum-symbol-length 2)
+    (setq minibuffer-visible-completions t)
     (with-eval-after-load 'org
       (add-to-list 'completion-preview-commands #'org-self-insert-command))
     (global-completion-preview-mode 1))
@@ -2148,6 +2164,15 @@ missing, then opens PATH with sops for interactive editing."
         (idiig/sops-fill-missing-keys secrets-file)
         (with-editor-async-shell-command (format "${pkgs.sops}/bin/sops %s"
                                                    (shell-quote-argument secrets-file))))))
+#+end_src
+
+从 sops 读出的密码经 =auth-source= 桥接后（目前只有邮件账号在用），
+=auth-source-search= 的结果缓存有效期固定为 =auth-source-cache-expiry=
+（默认 2 小时，从首次写入起算，用没用过都一样），到期后没有自动补种
+机制，就会退化成交互式 =read-passwd= 提示。设成 nil 让缓存和 session
+等长。
+#+begin_src emacs-lisp
+  (setq auth-source-cache-expiry nil)
 #+end_src
 ** 邮件
 3 个账号：SDF（用户名密码）、Gmail（App Password）、Hotmail/Outlook.com
@@ -3626,11 +3651,6 @@ XOAUTH2 client-id 就没预热，发信会失败。两处顺序不影响，都�
     (advice-add 'wl-draft-create-buffer :before #'idiig/wl-bootstrap))
 #+end_src
 
-*** TODO 待排查问题
-- Gmail 账号长时间不打开 wl 之后再进邮箱，会弹出交互式密码提示
-  =IMAP password for chewingguno@gmail.com@imap.gmail.com:993? =，
-  怀疑是 =auth-source= 缓存的 App Password 过期/被清掉了，需要确认
-  是 auth-source 缓存时长的问题还是 Google 那边 App Password 失效
 ** 文档写作
 :PROPERTIES:
 :header-args: :noweb-ref ecfg
