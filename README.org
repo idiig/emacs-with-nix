@@ -3138,7 +3138,7 @@ folder）时，=idiig/oauth2-localhost-request-authorization= 会在默
   改绑前要确认是否还需要那个功能，或者换一个不冲突的键
 - =M-x org-mime-org-buffer-htmlize= 在 =wl-draft-mode= 里用 =M-x=
   补全会搜不到：这个命令源码里声明的是 =(interactive nil org-mode)=，
-  只对 =org-mode= 极其派生模式可见，配合当前配置里
+  只对 =org-mode= 及其派生模式可见，配合当前配置里
   =read-extended-command-predicate= 设成
   =command-completion-default-include-p=（按 major-mode 过滤 =M-x=
   候选列表）,在非 org-mode 的 draft buffer 里会被过滤掉，看起来像函数
@@ -3148,8 +3148,25 @@ folder）时，=idiig/oauth2-localhost-request-authorization= 会在默
   的命令了
 - Hotmail 账号删邮件（=D= 标记 + 执行）经常要执行两次才会真的删掉：
   第一次报 =1 execution(s) were failed=，紧接着再执行一次才
-  =Deleting messages...done=，怀疑是 IMAP/XOAUTH2 那次请求偶发失败
-  后 Wanderlust 没有自动重试，需要抓一下具体是哪步报的错
+  =Deleting messages...done=。已定位到吞错误的位置，但还没抓到具体是
+  哪一步失败：=wl-summary-move-mark-list-messages=（wl-action.el）用
+  =(condition-case nil (setq result (elmo-folder-move-messages ...))
+  (error nil))= 包住整个删除调用；=elmo-folder-delete-messages-plugged=
+  （elmo-imap4.el，IMAP4 后端）内部要连续发好几轮同步 IMAP 命令——先
+  =search deleted= 找出已有的 =\Deleted= 消息，再对本次要删的消息
+  =store ... +flags.silent (\Deleted)=，最后视 =UIDPLUS= 能力选
+  =uid expunge= 或 =expunge=——这几轮里任何一轮失败，都会被外层那个
+  =condition-case= 整体吞掉、连错误信息都拿不到，直接按「这批全部失
+  败」处理。失败时消息在 buffer 里仍保留 =D= 标记，不会从
+  =wl-summary-buffer-temp-mark-list= 里摘除，所以「再执行一次」本质
+  是用同一个（此时已建立好）IMAP session 重试同一批命令，自然就成
+  功了；Wanderlust 本身没有针对这种偶发失败的自动重试。要抓到具体是
+  哪一步报的错，得在复现前 =(setq elmo-imap4-debug t)=，失败后去
+  =*IMAP4 DEBUG*= buffer 里看原始协议交互
+- Gmail 账号长时间不打开 wl 之后再进邮箱，会弹出交互式密码提示
+  =IMAP password for chewingguno@gmail.com@imap.gmail.com:993? =，
+  怀疑是 =auth-source= 缓存的 App Password 过期/被清掉了，需要确认
+  是 auth-source 缓存时长的问题还是 Google 那边 App Password 失效
 ** 文档写作
 :PROPERTIES:
 :header-args: :noweb-ref ecfg
