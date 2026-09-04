@@ -1863,7 +1863,6 @@
 	                       idiig/mail-accounts)
 	               'words))
 	        (setq idiig/bbdb-user-mail-address-re-ready t)))
-	    
 	    (defun idiig/wl-draft-bbdb-record-recipients ()
 	      "Create/update BBDB records for the To/Cc/Bcc recipients of the
 	    current wl-draft-mode buffer, via `bbdb-update-records' and
@@ -1899,7 +1898,6 @@
 	    
 	    (with-eval-after-load 'wl
 	      (add-hook 'wl-draft-send-hook #'idiig/wl-draft-bbdb-record-recipients))
-	    
 	    (defun idiig/bbdb-folder-address-entries (folder-spec headers header-class
 	                                                          &optional filter-numbers)
 	      "Return a list of (NAME MAIL HEADER HEADER-CLASS wl) entries read

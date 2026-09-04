@@ -3092,39 +3092,12 @@ Wanderlust/SEMI 自己那套 MIME 菜单（=C-c C-x= 前缀）就能调用 GPG �
 =:after wl= 是因为 =bbdb-insinuate-wl= 要往 =wl-summary-mode-map=/
 =wl-draft-mode-map= 里插键，这两个 keymap 得等 wl 加载完才存在。
 
-新账号还没有任何联系人数据，靠手工 =M-x bbdb-create= 一条条建太慢，
-想要的效果是"自己主动发过信的人自动变成联系人"，而不是看收件箱里
-随便哪封邮件（订阅邮件、陌生人来信）都往库里加。BBDB 自带的
-=bbdb-mua-auto-update-init= 不是这个粒度：给 =wl= 传进去挂的是
-=wl-summary-redisplay-hook=，看邮件（包括收件箱）就会触发，跟需求
-不符，所以没用它。改成自己挂 =wl-draft-send-hook=，从当前撰写中的
-草稿本身读 To/Cc/Bcc，把这些地址记进 BBDB——这也是唯一可行的办法：
-BBDB 给 =wl= 用的 =bbdb/wl-header=（读头域取信的实现）只认
-=wl-summary-buffer-elmo-folder= 里当前选中的那条消息，是给"看信"场
-景写的，压根不支持从撰写中的 =wl-draft-mode= buffer 读头，所以这里
-不走 =bbdb-mua-update-records= 这条封装，直接用 =mail-fetch-field=
-读头、=bbdb-extract-address-components= 拆地址，自己拼好参数交给
-=bbdb-update-records=。收件人里混进自己（比如抄送给自己）的地址要
-排除掉，复用下面 =idiig/bbdb-user-mail-address-re-setup= 生成的那份
-正则。=wl-draft-send-hook= 是在 =wl-draft-send= 最开头就跑（发送前
-的确认提示、真正联网发送都还没发生），所以严格来说是"点了发送"而
-不是"确认发出成功"才记录，可以接受的一点误差。
-
-新账号还没发过信，这条自动收集要等第一次发信才会有数据，等不及的
-话用 =M-x idiig/bbdb-import-correspondents= 从已有邮件一次性导入，
-补个种子数据。这里特意不是"扫收件箱、把 From 都存进去"——收件箱里
-From 是陌生人/广告邮件的情况太多，扫进去只会把垃圾邮件地址也变成
-联系人。真正想要的是"自己回复过的人"，Wanderlust 自己刚好有这个信
-号：=wl-draft-reply-hook= 默认值就带一条
-=(wl-draft-setup-parent-flag 'answered)=——回复某封邮件时，原邮件
-会被记下待标记，发送成功后 =wl-draft-send= 就把原邮件在收件箱里标
-成 IMAP 的 =\Answered= 标志（对应 elmo 的 =answered= flag），不用
-额外配置，只要没关掉这条默认 hook 就一直在记。所以种子数据分两部
-分：Sent 文件夹的 To/Cc（自己主动发给谁），加上收件箱里带
-=answered= 标志的邮件的 From（自己回复过谁）——用
-=elmo-folder-list-flagged= 只挑有标志的邮件，普通邮件/广告邮件不会
-被扫到。都是直接按 =idiig/mail-accounts= 里每个账号的信息用 elmo
-开 folder 读，不需要手动先把某个 folder 在 =wl-summary= 里打开。
+下面两节（自动收集、批量导入）共用两份基础设施，放在这里一起定义：
+一份是排除自己地址用的 =bbdb-user-mail-address-re=（3 个账号跨 3 个
+域名，得从 =idiig/mail-accounts= 生成，默认值只认单个
+=user-mail-address= 不够用）；另一份是排除自动化地址用的
+=idiig/bbdb-ignored-address-re=（=support=/=noreply=/=unsubscribe=
+这类地址技术上符合"发给谁"/"回复了谁"的条件，但不是真联系人）。
 #+begin_src emacs-lisp
   (use-package bbdb
     :after wl
@@ -3174,7 +3147,26 @@ From 是陌生人/广告邮件的情况太多，扫进去只会把垃圾邮件�
                      idiig/mail-accounts)
              'words))
       (setq idiig/bbdb-user-mail-address-re-ready t)))
-
+#+end_src
+**** 联系人自动收集（发信/回复）
+新账号还没有任何联系人数据，靠手工 =M-x bbdb-create= 一条条建太慢，
+想要的效果是"自己主动发过信的人自动变成联系人"，而不是看收件箱里
+随便哪封邮件（订阅邮件、陌生人来信）都往库里加。BBDB 自带的
+=bbdb-mua-auto-update-init= 不是这个粒度：给 =wl= 传进去挂的是
+=wl-summary-redisplay-hook=，看邮件（包括收件箱）就会触发，跟需求
+不符，所以没用它。改成自己挂 =wl-draft-send-hook=，从当前撰写中的
+草稿本身读 To/Cc/Bcc，把这些地址记进 BBDB——这也是唯一可行的办法：
+BBDB 给 =wl= 用的 =bbdb/wl-header=（读头域取信的实现）只认
+=wl-summary-buffer-elmo-folder= 里当前选中的那条消息，是给"看信"场
+景写的，压根不支持从撰写中的 =wl-draft-mode= buffer 读头，所以这里
+不走 =bbdb-mua-update-records= 这条封装，直接用 =mail-fetch-field=
+读头、=bbdb-extract-address-components= 拆地址，自己拼好参数交给
+=bbdb-update-records=。收件人里混进自己（比如抄送给自己）的地址、
+或者是上一节说的自动化地址，都要排除掉。=wl-draft-send-hook= 是在
+=wl-draft-send= 最开头就跑（发送前的确认提示、真正联网发送都还没
+发生），所以严格来说是"点了发送"而不是"确认发出成功"才记录，可以
+接受的一点误差。
+#+begin_src emacs-lisp
   (defun idiig/wl-draft-bbdb-record-recipients ()
     "Create/update BBDB records for the To/Cc/Bcc recipients of the
   current wl-draft-mode buffer, via `bbdb-update-records' and
@@ -3210,7 +3202,26 @@ From 是陌生人/广告邮件的情况太多，扫进去只会把垃圾邮件�
 
   (with-eval-after-load 'wl
     (add-hook 'wl-draft-send-hook #'idiig/wl-draft-bbdb-record-recipients))
-
+#+end_src
+**** 联系人批量导入（种子数据）
+新账号还没发过信，上一节的自动收集要等第一次发信才会有数据，等不
+及的话用 =M-x idiig/bbdb-import-correspondents= 从已有邮件一次性
+导入，补个种子数据。这里特意不是"扫收件箱、把 From 都存进去"——收
+件箱里 From 是陌生人/广告邮件的情况太多，扫进去只会把垃圾邮件地址
+也变成联系人。真正想要的是"自己回复过的人"，Wanderlust 自己刚好有
+这个信号：=wl-draft-reply-hook= 默认值就带一条
+=(wl-draft-setup-parent-flag 'answered)=——回复某封邮件时，原邮件
+会被记下待标记，发送成功后 =wl-draft-send= 就把原邮件在收件箱里标
+成 IMAP 的 =\Answered= 标志（对应 elmo 的 =answered= flag），不用
+额外配置，只要没关掉这条默认 hook 就一直在记。所以种子数据分两部
+分：Sent 文件夹的 To/Cc（自己主动发给谁），加上收件箱里带
+=answered= 标志的邮件的 From（自己回复过谁）——用
+=elmo-folder-list-flagged= 只挑有标志的邮件，普通邮件/广告邮件不会
+被扫到，混进来的自动化地址仍然靠上面的 =idiig/bbdb-ignored-address-p=
+挡掉。都是直接按 =idiig/mail-accounts= 里每个账号的信息用 elmo 开
+folder 读，不需要手动先把某个 folder 在 =wl-summary= 里打开；某个
+账号连不上时只跳过那一个账号、打印警告，不会拖累其他账号。
+#+begin_src emacs-lisp
   (defun idiig/bbdb-folder-address-entries (folder-spec headers header-class
                                                         &optional filter-numbers)
     "Return a list of (NAME MAIL HEADER HEADER-CLASS wl) entries read
