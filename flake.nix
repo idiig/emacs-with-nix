@@ -1930,16 +1930,30 @@
 	    (defun idiig/wl-bootstrap (&rest _args)
 	      "Prepare everything Wanderlust needs before opening: bootstrap
 	    `wl-folders-file' and the signature file if missing, warm the
-	    auth-source password cache, and register the Hotmail XOAUTH2
-	    client-id.  Runs before every `wl' call via :before advice, which
-	    passes through whatever arguments `wl' was called with (an optional
-	    prefix arg) -- ARGS absorbs those since this function doesn't need
-	    them.  Each step no-ops once already done, so repeating this on
-	    every call is cheap."
+	    auth-source password cache, register the Hotmail XOAUTH2
+	    client-id, and load the `wl-address-completion-list'/BBDB address
+	    sources that the wl-draft-mode CAPFs need.  Runs before every `wl'
+	    call via :before advice, which passes through whatever arguments
+	    `wl' was called with (an optional prefix arg) -- ARGS absorbs those
+	    since this function doesn't need them.  Each step no-ops once
+	    already done, so repeating this on every call is cheap.
+	    
+	    `wl-address-init'/`bbdb-records' can't be called directly here:
+	    this function runs as :before advice, i.e. strictly before `wl'
+	    itself (and therefore wl-address.el/bbdb.el) has loaded on a cold
+	    start, and neither has its own autoload cookie, so calling them
+	    too early signals `void-function'.  `with-eval-after-load' handles
+	    both cases correctly: it defers until the feature loads on the
+	    first call, and runs immediately (refreshing the address lists) on
+	    every call after that, once `wl'/`bbdb' are already loaded."
 	      (idiig/mail-folders-setup)
 	      (idiig/mail-signature-setup)
 	      (idiig/mail-auth-source-warm-cache)
-	      (idiig/sasl-xoauth2-ensure-hotmail-client-id))
+	      (idiig/sasl-xoauth2-ensure-hotmail-client-id)
+	      (with-eval-after-load 'wl
+	        (wl-address-init))
+	      (with-eval-after-load 'bbdb
+	        (bbdb-records)))
 	    (use-package wl
 	      :commands (wl wl-draft wl-user-agent-compose)
 	      :init

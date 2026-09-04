@@ -3290,16 +3290,30 @@ XOAUTH2 client-id）串成一个 bootstrap，各步骤都是幂等操作，重�
   (defun idiig/wl-bootstrap (&rest _args)
     "Prepare everything Wanderlust needs before opening: bootstrap
   `wl-folders-file' and the signature file if missing, warm the
-  auth-source password cache, and register the Hotmail XOAUTH2
-  client-id.  Runs before every `wl' call via :before advice, which
-  passes through whatever arguments `wl' was called with (an optional
-  prefix arg) -- ARGS absorbs those since this function doesn't need
-  them.  Each step no-ops once already done, so repeating this on
-  every call is cheap."
+  auth-source password cache, register the Hotmail XOAUTH2
+  client-id, and load the `wl-address-completion-list'/BBDB address
+  sources that the wl-draft-mode CAPFs need.  Runs before every `wl'
+  call via :before advice, which passes through whatever arguments
+  `wl' was called with (an optional prefix arg) -- ARGS absorbs those
+  since this function doesn't need them.  Each step no-ops once
+  already done, so repeating this on every call is cheap.
+
+  `wl-address-init'/`bbdb-records' can't be called directly here:
+  this function runs as :before advice, i.e. strictly before `wl'
+  itself (and therefore wl-address.el/bbdb.el) has loaded on a cold
+  start, and neither has its own autoload cookie, so calling them
+  too early signals `void-function'.  `with-eval-after-load' handles
+  both cases correctly: it defers until the feature loads on the
+  first call, and runs immediately (refreshing the address lists) on
+  every call after that, once `wl'/`bbdb' are already loaded."
     (idiig/mail-folders-setup)
     (idiig/mail-signature-setup)
     (idiig/mail-auth-source-warm-cache)
-    (idiig/sasl-xoauth2-ensure-hotmail-client-id))
+    (idiig/sasl-xoauth2-ensure-hotmail-client-id)
+    (with-eval-after-load 'wl
+      (wl-address-init))
+    (with-eval-after-load 'bbdb
+      (bbdb-records)))
 #+end_src
 
 =use-package wl= 用 =:commands= 惰性加载；=:init= 按官方手册设
@@ -3321,10 +3335,6 @@ XOAUTH2 client-id 就没预热，发信会失败。两处顺序不影响，都�
 #+end_src
 
 *** TODO 待排查问题
-- 在 =wl-draft-mode= 里输入 To 收件人时，
-  =completion-preview--post-command= 报 =(error "Not an in-range
-  integer, integral float, or cons of integers")=，怀疑是
-  =completion-preview-mode= 跟 wl-draft/bbdb 补全的兼容性问题
 - Gmail 账号长时间不打开 wl 之后再进邮箱，会弹出交互式密码提示
   =IMAP password for chewingguno@gmail.com@imap.gmail.com:993? =，
   怀疑是 =auth-source= 缓存的 App Password 过期/被清掉了，需要确认
