@@ -3077,16 +3077,16 @@ Hotmail 账号删邮件/dispose（=D=/=d= 标记 + 执行）经常要执行两�
 一旦出现第二个 =EXISTS=（=expunge= 过程中邮箱消息数变化、服务器连续
 推了两条 =EXISTS= 就是这样，我们最早那次成功日志里就有
 =(exists 437) ... (exists 448)= 两条），第二次 =nconc= 就变成对裸整
-数调用，直接 =(wrong-type-argument consp 448)=。这解释了报错里那些
+数调用，直接 =(wrong-type-argument consp 448)= 。这解释了报错里那些
 看起来随机的数字——全是当时的邮箱消息总数，不是消息 UID，也不是消
 息数量。
 
-=elmo-imap4-response-value-all= 是 =defsubst=，字节编译时会被内联进
+=elmo-imap4-response-value-all= 是 =defsubst= ，字节编译时会被内联进
 调用它的函数体里，光重新定义这个符号本身对已经编译好的调用点不生
 效（实测确认过：单独重定义完，通过它的调用者
 =elmo-imap4-mailbox-size-update-maybe= 再调还是报同样的错）。
-=elmo-imap4-mailbox-size-update-maybe= 本身是普通 =defun=，不会被内
-联进*它的*调用者（=elmo-imap4-read-response=），所以把它整个用
+=elmo-imap4-mailbox-size-update-maybe= 本身是普通 =defun= ，不会被内
+联进它的调用者 (=elmo-imap4-read-response=)，所以把它整个用
 =advice-add :override= 换成一份修好的实现才真正生效。
 #+begin_src emacs-lisp
   (with-eval-after-load 'elmo-imap4
@@ -3170,27 +3170,6 @@ XOAUTH2 client-id 就没预热，发信会失败。两处顺序不影响，都�
     (advice-add 'wl-draft-create-buffer :before #'idiig/wl-bootstrap))
 #+end_src
 
-*** 待办：填 secrets.yaml
-代码部分到此写完了，实际能用之前还差一步：跑
-=M-x idiig/sops-secrets-setup=。7 个 key（=mail_sdf_user=、
-=mail_sdf_password=、=mail_sdf_address=、=mail_gmail_user=、
-=mail_gmail_app_password=、=mail_hotmail_user=、
-=mail_hotmail_oauth_client_id= ）已经在「账号与本地目录」那节通过
-=idiig/sops-register-keys= 注册过，缺失的会被自动填上
-=TODO: <说明>= 占位符再打开编辑器，不用凭记忆手打 key 名或去翻这份
-文件找说明。=mail_hotmail_oauth_client_id= 填的是「Microsoft OAuth
-配置」一节里在 Azure Portal 注册应用后拿到的 "Application (client)
-ID"，不是密码。
-
-Hotmail 那个账号第一次真正连接（第一次 =wl= 打开 Hotmail 的
-folder）时，=idiig/oauth2-localhost-request-authorization= 会在默
-认浏览器里弹出 Microsoft 的登录/同意页面，你只需要正常登录、同意授
-权；剩下的（浏览器跳转回 =http://localhost:18787= 、Emacs 从这个本
-地回调里读出 code、拿 code 换 token）都是自动的，不需要手动复制粘
-贴任何东西，也不会再卡在 =nativeclient= 那个不稳定的静态展示页
-面（见前面「本地 HTTP 回调接管授权」一节）。跟上面这些 sops key 无
-关，是单独的一次性步骤，之后走 refresh token，除非撤销授权否则不用
-重复。
 *** TODO 待排查问题
 - 启动 =wl= 时报 =gnus-mime-setup is not found.=/=emh-setup is not
   found.=，来源和影响还没查
