@@ -5919,6 +5919,28 @@ CAPF 触发方式上抢了先。
   (add-hook 'agent-shell-completion-mode-hook
             #'idiig/agent-shell-disable-eager-completion-trigger)
 #+end_src
+[[#completion-preview][输入时预览补全]]一节里把
+=completion-preview-minimum-symbol-length= 全局设成 2，是给普通符号补
+全（变量名、单词）用的门槛，避免打一个字符就到处弹提示。但 agent-shell
+的 =@=/=/= 补全场景不一样：触发字符本身已经是明确的补全意图（打了
+=@= 就是要选文件、打了 =/= 就是要选命令），项目文件名和命令名往往一两
+个字符就能区分开，等到第二个字符才出现预览反而变慢。所以在
+agent-shell buffer 里把这个门槛单独降到 1，只影响这个 buffer，不改动
+全局设置。
+#+begin_src emacs-lisp
+  (defun idiig/agent-shell-completion-preview-from-first-char ()
+    "Buffer-locally lower `completion-preview-minimum-symbol-length' to 1
+  in agent-shell buffers.  The global value (see completion-preview
+  config) is 2, tuned for ordinary symbol completion; but here the
+  trigger character (@ or /) already signals clear intent, so waiting
+  for a second character before showing a preview just adds latency
+  without avoiding any noise."
+    (when agent-shell-completion-mode
+      (setq-local completion-preview-minimum-symbol-length 1)))
+
+  (add-hook 'agent-shell-completion-mode-hook
+            #'idiig/agent-shell-completion-preview-from-first-char)
+#+end_src
 **** 依赖
 :PROPERTIES:
 :header-args: :noweb-ref epkgs

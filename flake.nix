@@ -3258,6 +3258,18 @@
 	    
 	    (add-hook 'agent-shell-completion-mode-hook
 	              #'idiig/agent-shell-disable-eager-completion-trigger)
+	    (defun idiig/agent-shell-completion-preview-from-first-char ()
+	      "Buffer-locally lower `completion-preview-minimum-symbol-length' to 1
+	    in agent-shell buffers.  The global value (see completion-preview
+	    config) is 2, tuned for ordinary symbol completion; but here the
+	    trigger character (@ or /) already signals clear intent, so waiting
+	    for a second character before showing a preview just adds latency
+	    without avoiding any noise."
+	      (when agent-shell-completion-mode
+	        (setq-local completion-preview-minimum-symbol-length 1)))
+	    
+	    (add-hook 'agent-shell-completion-mode-hook
+	              #'idiig/agent-shell-completion-preview-from-first-char)
 	    (use-package agent-shell
 	      :demand t
 	      :custom
