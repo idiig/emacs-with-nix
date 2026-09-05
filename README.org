@@ -908,16 +908,16 @@ LSP-Bridge 和 ddskk 的补全机制评估过之后 *没有* 接进来：
   前缀文字"可以让 CAPF 的 BEG/END 落脚；henkan 状态下 SPC/数字键等候选
   切换键还都被 SKK 自己的 keymap 占用，跟任何 CAPF 消费者的候选导航键
   位冲突面比 wl-draft-mode 大得多。SKK 自己已经有成熟的候选 UI
-  （=skk-show-inline=/=skk-show-tooltip=，见 ddskk 一节），接入 CAPF 收
+  （ =skk-show-inline=/=skk-show-tooltip= ，见 ddskk 一节），接入 CAPF 收
   益有限、风险却更大，所以没有做
 
 以上所有 CAPF 补全源，只要候选之间没有公共前缀、需要弹出列表选择（也
 就是 =completion-in-region-mode= 接管的情况），都统一走 vertico 渲染：
 =completion-in-region-function= 设成了 =consult-completion-in-region=
 （见 =consult= 一节），这个函数本身只是个桥——查到 =vertico-mode= 开着
-就把候选丢给 minibuffer 补全（=consult--read=），不开就退回默认的
+就把候选丢给 minibuffer 补全（ =consult--read= ），不开就退回默认的
 *Completions* buffer；真正把这次 minibuffer 读取画成可过滤列表的是早
-就接管了 minibuffer 补全显示的 =vertico=，跟触发源是不是 consult 无
+就接管了 minibuffer 补全显示的 =vertico= ，跟触发源是不是 consult 无
 关。[[#pyim-capf][pyim 转中文]]受益最明显，汉字候选基本不会有公共前
 缀。
 **** 便利的光标首尾移动 (=mwim=)
@@ -1190,7 +1190,7 @@ LSP-Bridge 和 ddskk 的补全机制评估过之后 *没有* 接进来：
       ;;     map))
       ;; (consult-customize consult-line :keymap my-consult-line-map)
       ;; ;; 禁止自动显示consult文件的内容
-      (setq consult-preview-key "C-v")
+      (setq consult-preview-key "C-c C-v")
       ;; Bridge completion-in-region into minibuffer completion (which
       ;; vertico already renders as a filterable list) instead of the
       ;; default in-buffer *Completions* buffer, whenever a CAPF's
@@ -1259,7 +1259,6 @@ LSP-Bridge 和 ddskk 的补全机制评估过之后 *没有* 接进来：
     :ensure t
     :after (consult))
 #+end_src
-                
 **** 撤销 (=vundo=)
 我原来使用 undotree ，现在使用 vundo。这些用于视觉化撤销树。这里我之绑
 定了 =C-x u= ， =C-/= 我依然用的原生的 Undo，这样适合区分使用。

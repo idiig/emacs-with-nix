@@ -579,7 +579,7 @@
 	        ;;     map))
 	        ;; (consult-customize consult-line :keymap my-consult-line-map)
 	        ;; ;; 禁止自动显示consult文件的内容
-	        (setq consult-preview-key "C-v")
+	        (setq consult-preview-key "C-c C-v")
 	        ;; Bridge completion-in-region into minibuffer completion (which
 	        ;; vertico already renders as a filterable list) instead of the
 	        ;; default in-buffer *Completions* buffer, whenever a CAPF's
