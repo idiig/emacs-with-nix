@@ -3704,10 +3704,19 @@ Wanderlust 自己的地址/文件夹/newsgroup 补全（=wl-complete-field-body-
 整管线：地址栏输入 "jane" 能正确弹出 BBDB 记录格式化后的候选，输入
 "bob" 能正确弹出 =wl-address-completion-list= 里的候选，非地址头域
 （比如 Subject）两个 CAPF 都正确返回 nil，不会误触发。
+
+BBDB 的补全表和补全 predicate 在 =bbdb-com= 里定义，所以先等 BBDB
+加载后补上这个依赖：
 #+begin_src emacs-lisp
   (with-eval-after-load 'bbdb
     (require 'bbdb-com))
+#+end_src
 
+CAPF 需要先判断 point 是否还在草稿头域里，以及当前头域应该使用地址、
+文件夹还是 newsgroup 补全。下面这几个小函数只是把
+=wl-complete-field-body-or-tab= 里内联的判断逻辑抽出来，边界计算也沿用
+=wl-complete-field-body= 的分隔符：
+#+begin_src emacs-lisp
   (defun idiig/wl-draft-header-end ()
     "Position of the end of the header area in the current
   `wl-draft-mode' buffer, i.e. just past the blank line that separates
@@ -3741,7 +3750,13 @@ Wanderlust 自己的地址/文件夹/newsgroup 补全（=wl-complete-field-body-
                  (skip-chars-forward " \t")
                  (point))))
       (cons beg end)))
+#+end_src
 
+BBDB 这条 CAPF 只在地址头域生效，直接使用 =bbdb-hashtable= 和
+=bbdb-completion-predicate=。候选选中后，=:exit-function= 再用
+=bbdb-gethash=/=bbdb-dwim-mail= 把补全 key 替换成 BBDB 按用户配置格式化
+出来的真实邮件地址：
+#+begin_src emacs-lisp
   (defun idiig/wl-draft-bbdb-capf ()
     "`completion-at-point-functions' entry wrapping BBDB's own
   `bbdb-hashtable', formatting the chosen candidate via `bbdb-dwim-mail'
@@ -3760,7 +3775,12 @@ Wanderlust 自己的地址/文件夹/newsgroup 补全（=wl-complete-field-body-
                                       (car (bbdb-record-mail record)))))
                   (delete-region (- (point) (length str)) (point))
                   (insert (bbdb-dwim-mail record mail))))))))
+#+end_src
 
+Wanderlust 自己的地址、文件夹和 newsgroup 补全共用另一条 CAPF；具体补全
+表由前面判断出的头域类型决定。地址补全同样需要在退出时把简称替换成
+=wl-address-completion-list= 里保存的完整地址：
+#+begin_src emacs-lisp
   (defun idiig/wl-draft-wl-capf ()
     "`completion-at-point-functions' entry wrapping Wanderlust's own
   address/folder/newsgroups completion tables (`wl-address-completion-list',
@@ -3784,7 +3804,12 @@ Wanderlust 自己的地址/文件夹/newsgroup 补全（=wl-complete-field-body-
                       (unless (string= str full)
                         (delete-region (- (point) (length str)) (point))
                         (insert full))))))))))
+#+end_src
 
+最后在 =wl-draft-mode= 里接入两条 CAPF，并把 BBDB 放在 Wanderlust 前面。
+原来的 TAB / =M-;= / =M-TAB= 绑定不变；这里额外提供的是标准
+=completion-at-point-functions= 通道：
+#+begin_src emacs-lisp
   (with-eval-after-load 'wl
     (add-hook 'wl-draft-mode-hook
               (lambda ()

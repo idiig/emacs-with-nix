@@ -2107,7 +2107,6 @@
 	            records))))
 	    (with-eval-after-load 'bbdb
 	      (require 'bbdb-com))
-	    
 	    (defun idiig/wl-draft-header-end ()
 	      "Position of the end of the header area in the current
 	    `wl-draft-mode' buffer, i.e. just past the blank line that separates
@@ -2141,7 +2140,6 @@
 	                   (skip-chars-forward " \t")
 	                   (point))))
 	        (cons beg end)))
-	    
 	    (defun idiig/wl-draft-bbdb-capf ()
 	      "`completion-at-point-functions' entry wrapping BBDB's own
 	    `bbdb-hashtable', formatting the chosen candidate via `bbdb-dwim-mail'
@@ -2160,7 +2158,6 @@
 	                                        (car (bbdb-record-mail record)))))
 	                    (delete-region (- (point) (length str)) (point))
 	                    (insert (bbdb-dwim-mail record mail))))))))
-	    
 	    (defun idiig/wl-draft-wl-capf ()
 	      "`completion-at-point-functions' entry wrapping Wanderlust's own
 	    address/folder/newsgroups completion tables (`wl-address-completion-list',
@@ -2184,7 +2181,6 @@
 	                        (unless (string= str full)
 	                          (delete-region (- (point) (length str)) (point))
 	                          (insert full))))))))))
-	    
 	    (with-eval-after-load 'wl
 	      (add-hook 'wl-draft-mode-hook
 	                (lambda ()
