@@ -5307,7 +5307,11 @@ Emacs 层面的按键映射，不需要真的装 GNU APL 解释器。
     :diminish valign-mode
     :hook (org-mode . valign-mode))
 #+end_src
-**** 括号匹配 
+**** elec-pair/paren 接口
+Org 的强调标记输入仍然接在 =electric-pair= 上：只在 =org-mode= buffer
+里增加等号、波浪线、加号、星号这些局部配对，并在全角文字旁边自动补空格。这里不改
+=puni= 的全局启用方式，后面的 =puni= 接口只处理选区/结构化编辑层面的
+Org 专用动作。
 #+begin_src emacs-lisp
   ;; Org mode: pair emphasis markers after both org and elec-pair are loaded.
   (with-eval-after-load 'org
@@ -5369,6 +5373,29 @@ Emacs 层面的按键映射，不需要真的装 GNU APL 解释器。
                               #'idiig/org-electric-pair-inhibit-p)
                   (add-hook 'post-self-insert-hook
                             #'idiig/org-space-around-electric-emphasis-pair t t)))))
+#+end_src
+**** puni 接口
+=puni= 本身仍然全局生效；Org 里只需要把强调标记加入当前 buffer 的 syntax
+table，让 =puni= 的移动、删除和结构判断把它们也视为成对 delimiter。这里
+使用 =org-mode-hook= 修改 copy 出来的本地 syntax table，不影响其他 major
+mode：
+#+begin_src emacs-lisp
+  (with-eval-after-load 'org
+    (defconst idiig/org-puni-paired-delimiters '(?= ?~ ?+ ?*)
+      "Org emphasis markers that Puni should treat as paired delimiters.")
+
+    (defun idiig/org-puni-setup-paired-delimiters ()
+      "Teach Puni to treat Org emphasis markers as paired delimiters."
+      (let ((table (copy-syntax-table (syntax-table))))
+        (dolist (char idiig/org-puni-paired-delimiters)
+          (modify-syntax-entry char "$" table))
+        (set-syntax-table table)
+        (syntax-ppss-flush-cache (point-min))))
+
+    (add-hook 'org-mode-hook #'idiig/org-puni-setup-paired-delimiters)
+
+    (when (derived-mode-p 'org-mode)
+      (idiig/org-puni-setup-paired-delimiters)))
 #+end_src
 *** 文献引用处理器 (=citeproc-el=)
 **** 依赖

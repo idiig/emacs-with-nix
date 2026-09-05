@@ -2951,6 +2951,22 @@
 	                    (add-hook 'post-self-insert-hook
 	                              #'idiig/org-space-around-electric-emphasis-pair t t)))))
 	    (with-eval-after-load 'org
+	      (defconst idiig/org-puni-paired-delimiters '(?= ?~ ?+ ?*)
+	        "Org emphasis markers that Puni should treat as paired delimiters.")
+	    
+	      (defun idiig/org-puni-setup-paired-delimiters ()
+	        "Teach Puni to treat Org emphasis markers as paired delimiters."
+	        (let ((table (copy-syntax-table (syntax-table))))
+	          (dolist (char idiig/org-puni-paired-delimiters)
+	            (modify-syntax-entry char "$" table))
+	          (set-syntax-table table)
+	          (syntax-ppss-flush-cache (point-min))))
+	    
+	      (add-hook 'org-mode-hook #'idiig/org-puni-setup-paired-delimiters)
+	    
+	      (when (derived-mode-p 'org-mode)
+	        (idiig/org-puni-setup-paired-delimiters)))
+	    (with-eval-after-load 'org
 	      (setq org-cite-export-processors
 	          '((latex biblatex)
 	            (html csl)
