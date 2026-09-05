@@ -428,17 +428,36 @@
 	    first press, so the 2nd+ press never even reaches this command again
 	    (the keymap only applies while the mode is on), which is exactly why
 	    cycling looked like it did nothing and the count could never reach
-	    the escalation threshold either."
+	    the escalation threshold either.
+	    
+	    If there are fewer candidates than `idiig/completion-preview-tab-cycle-limit'
+	    to begin with, skip cycling entirely and go straight to
+	    `completion-preview-complete' -- cycling one at a time through a
+	    small set is pointless when the full list is only a couple of items
+	    long anyway.  When cycling does happen and reaches the escalation
+	    press, `completion-preview-complete' itself already reorders the
+	    candidates it shows to start right after the one last cycled to (via
+	    its own `(nthcdr cur all)', where `cur' is
+	    `completion-preview-index' -- which is exactly how far our own
+	    cycling has already advanced it) -- but that order alone isn't
+	    enough to survive to the vertico picker, see
+	    `idiig/completion-preview-force-unsorted-consult' in the =consult=
+	    section for why it also has to be bound here."
 	      (interactive)
 	      (completion-preview--inhibit-update)
-	      (setq idiig/completion-preview-tab-cycle-count
-	            (if (eq last-command 'idiig/completion-preview-tab)
-	                (1+ idiig/completion-preview-tab-cycle-count)
-	              1))
-	      (if (> idiig/completion-preview-tab-cycle-count
-	             idiig/completion-preview-tab-cycle-limit)
-	          (completion-preview-complete)
-	        (completion-preview-next-candidate 1)))
+	      (let ((total (length (completion-preview--get 'completion-preview-suffixes)))
+	            (idiig/completion-preview-force-unsorted-consult t))
+	        (if (< total idiig/completion-preview-tab-cycle-limit)
+	            (completion-preview-complete)
+	          (progn
+	            (setq idiig/completion-preview-tab-cycle-count
+	                  (if (eq last-command 'idiig/completion-preview-tab)
+	                      (1+ idiig/completion-preview-tab-cycle-count)
+	                    1))
+	            (if (> idiig/completion-preview-tab-cycle-count
+	                   idiig/completion-preview-tab-cycle-limit)
+	                (completion-preview-complete)
+	              (completion-preview-next-candidate 1))))))
 	    (defun idiig/completion-preview-accept-and-space ()
 	      "Accept the current completion-preview candidate, then insert a space."
 	      (interactive)
@@ -655,6 +674,35 @@
 	            (completion-preview-active-mode -1)))
 	        (advice-add 'consult-completion-in-region :before
 	                    #'idiig/hide-completion-preview-before-consult)
+	        ;; `completion-preview-complete' reorders the candidates it shows
+	        ;; to start from the one last cycled to via its own `(nthcdr cur
+	        ;; all)' (see `idiig/completion-preview-tab' in
+	        ;; [[#completion-preview-keys]]), but that order never survives
+	        ;; to vertico: `consult-completion-in-region' (`consult--in-region')
+	        ;; rebuilds `completion-extra-properties' from scratch before
+	        ;; handing off to `consult--read', keeping only
+	        ;; `:annotation-function'/`:affixation-function'/`:exit-function'
+	        ;; and silently dropping `:display-sort-function' entirely, and
+	        ;; `consult--read' defaults to its own `:sort t' (alphabetical/
+	        ;; length sort) unless told otherwise via its own `:sort' keyword,
+	        ;; which `consult--in-region' never passes -- verified directly:
+	        ;; a collection deliberately ordered `("fod" "foa" "fob" "foc")'
+	        ;; still comes out re-sorted back to alphabetical order once it
+	        ;; reaches vertico.  The only lever that actually works is forcing
+	        ;; `:sort nil' on `consult--read' itself while our own commands
+	        ;; are the ones opening it.
+	        (defvar idiig/completion-preview-force-unsorted-consult nil
+	          "Non-nil while a completion-preview-driven candidate list is open
+	    via `consult-completion-in-region', so candidate order set by the CAPF
+	    (or by `completion-preview-complete's own cur-based reordering)
+	    survives instead of being overwritten by vertico/consult's default
+	    sort.")
+	        (defun idiig/completion-preview-consult-read-unsorted-advice (orig-fn table &rest options)
+	          (if idiig/completion-preview-force-unsorted-consult
+	              (apply orig-fn table (plist-put (copy-sequence options) :sort nil))
+	            (apply orig-fn table options)))
+	        (advice-add 'consult--read :around
+	                    #'idiig/completion-preview-consult-read-unsorted-advice)
 	        ;; 应用 Orderless 的正则解析到 consult-grep/ripgrep/find
 	        (defun consult--orderless-regexp-compiler (input type &rest _config)
 	          (setq input (orderless-pattern-compiler input))

@@ -556,14 +556,28 @@ end of the list instead of appearing first.")
         ;; kept here anyway so this mirrors the README version exactly
         ;; and stays correct if that ever changes.
         (completion-preview--inhibit-update)
-        (setq idiig/completion-preview-tab-cycle-count
-              (if (eq last-command 'idiig/pyim-composing-completion-preview-cycle)
-                  (1+ idiig/completion-preview-tab-cycle-count)
-                1))
-        (if (> idiig/completion-preview-tab-cycle-count
-               idiig/completion-preview-tab-cycle-limit)
-            (completion-preview-complete)
-          (completion-preview-next-candidate 1)))
+        ;; Mirrors the README's `idiig/completion-preview-tab': skip
+        ;; cycling entirely when there are fewer candidates than
+        ;; `idiig/completion-preview-tab-cycle-limit' to begin with, and
+        ;; bind the README's `idiig/completion-preview-force-unsorted-
+        ;; consult' (its `consult--read' advice is already registered
+        ;; globally from the `consult' package's own :config) so the
+        ;; escalated candidate list doesn't get silently re-sorted by
+        ;; vertico the same way the "wo'men" ordering did before that
+        ;; was found -- no need for a second, separate advice here.
+        (let ((total (length (completion-preview--get 'completion-preview-suffixes)))
+              (idiig/completion-preview-force-unsorted-consult t))
+          (if (< total idiig/completion-preview-tab-cycle-limit)
+              (completion-preview-complete)
+            (progn
+              (setq idiig/completion-preview-tab-cycle-count
+                    (if (eq last-command 'idiig/pyim-composing-completion-preview-cycle)
+                        (1+ idiig/completion-preview-tab-cycle-count)
+                      1))
+              (if (> idiig/completion-preview-tab-cycle-count
+                     idiig/completion-preview-tab-cycle-limit)
+                  (completion-preview-complete)
+                (completion-preview-next-candidate 1))))))
     (pyim-toggle-assistant-scheme)))
 (define-key pyim-mode-map (kbd "TAB")
             #'idiig/pyim-composing-completion-preview-cycle)
