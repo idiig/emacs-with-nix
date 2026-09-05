@@ -1616,7 +1616,7 @@ minibuffer的检索]]。
                   (idiig/apply-font-profile 'large))))
 #+end_src
 
-** 智能切换/关闭输入法 (=C-\\=)
+** 智能切换/关闭输入法 (=C-\=)
 :PROPERTIES:
 :header-args: :noweb-ref ecfg
 :END:
