@@ -910,6 +910,16 @@ LSP-Bridge 和 ddskk 的补全机制评估过之后 *没有* 接进来：
   位冲突面比 wl-draft-mode 大得多。SKK 自己已经有成熟的候选 UI
   （=skk-show-inline=/=skk-show-tooltip=，见 ddskk 一节），接入 CAPF 收
   益有限、风险却更大，所以没有做
+
+以上所有 CAPF 补全源，只要候选之间没有公共前缀、需要弹出列表选择（也
+就是 =completion-in-region-mode= 接管的情况），都统一走 vertico 渲染：
+=completion-in-region-function= 设成了 =consult-completion-in-region=
+（见 =consult= 一节），这个函数本身只是个桥——查到 =vertico-mode= 开着
+就把候选丢给 minibuffer 补全（=consult--read=），不开就退回默认的
+*Completions* buffer；真正把这次 minibuffer 读取画成可过滤列表的是早
+就接管了 minibuffer 补全显示的 =vertico=，跟触发源是不是 consult 无
+关。[[#pyim-capf][pyim 转中文]]受益最明显，汉字候选基本不会有公共前
+缀。
 **** 便利的光标首尾移动 (=mwim=)
 ***** 依赖
 :PROPERTIES:
@@ -1181,6 +1191,30 @@ LSP-Bridge 和 ddskk 的补全机制评估过之后 *没有* 接进来：
       ;; (consult-customize consult-line :keymap my-consult-line-map)
       ;; ;; 禁止自动显示consult文件的内容
       (setq consult-preview-key "C-v")
+      ;; Bridge completion-in-region into minibuffer completion (which
+      ;; vertico already renders as a filterable list) instead of the
+      ;; default in-buffer *Completions* buffer, whenever a CAPF's
+      ;; candidates have no common prefix -- applies globally, e.g. to
+      ;; wl-draft/BBDB address completion, agent-shell, and idiig/pyim-capf.
+      (setq completion-in-region-function #'consult-completion-in-region)
+      ;; `completion-preview-complete' (TAB) only inhibits its next
+      ;; post-command-hook refresh before falling through to
+      ;; `completion-at-point' when there's no common prefix left to
+      ;; insert -- it never hides the ghost overlay itself.  That's
+      ;; harmless with the default *Completions* buffer (picking a
+      ;; candidate there is a separate, later command), but
+      ;; consult-completion-in-region's recursive minibuffer read runs
+      ;; synchronously inside the same command, so the overlay is
+      ;; never cleaned up and its stale after-string ends up rendered
+      ;; at the old boundary between what was typed and what got
+      ;; inserted (e.g. type "def", preview suggests "un" for defun,
+      ;; pick defvar from the list -> buffer text is correctly
+      ;; "defvar" but visually shows "defunvar" until the next command).
+      (defun idiig/hide-completion-preview-before-consult (&rest _)
+        (when (bound-and-true-p completion-preview-active-mode)
+          (completion-preview-active-mode -1)))
+      (advice-add 'consult-completion-in-region :before
+                  #'idiig/hide-completion-preview-before-consult)
       ;; 应用 Orderless 的正则解析到 consult-grep/ripgrep/find
       (defun consult--orderless-regexp-compiler (input type &rest _config)
         (setq input (orderless-pattern-compiler input))

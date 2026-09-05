@@ -580,6 +580,30 @@
 	        ;; (consult-customize consult-line :keymap my-consult-line-map)
 	        ;; ;; 禁止自动显示consult文件的内容
 	        (setq consult-preview-key "C-v")
+	        ;; Bridge completion-in-region into minibuffer completion (which
+	        ;; vertico already renders as a filterable list) instead of the
+	        ;; default in-buffer *Completions* buffer, whenever a CAPF's
+	        ;; candidates have no common prefix -- applies globally, e.g. to
+	        ;; wl-draft/BBDB address completion, agent-shell, and idiig/pyim-capf.
+	        (setq completion-in-region-function #'consult-completion-in-region)
+	        ;; `completion-preview-complete' (TAB) only inhibits its next
+	        ;; post-command-hook refresh before falling through to
+	        ;; `completion-at-point' when there's no common prefix left to
+	        ;; insert -- it never hides the ghost overlay itself.  That's
+	        ;; harmless with the default *Completions* buffer (picking a
+	        ;; candidate there is a separate, later command), but
+	        ;; consult-completion-in-region's recursive minibuffer read runs
+	        ;; synchronously inside the same command, so the overlay is
+	        ;; never cleaned up and its stale after-string ends up rendered
+	        ;; at the old boundary between what was typed and what got
+	        ;; inserted (e.g. type "def", preview suggests "un" for defun,
+	        ;; pick defvar from the list -> buffer text is correctly
+	        ;; "defvar" but visually shows "defunvar" until the next command).
+	        (defun idiig/hide-completion-preview-before-consult (&rest _)
+	          (when (bound-and-true-p completion-preview-active-mode)
+	            (completion-preview-active-mode -1)))
+	        (advice-add 'consult-completion-in-region :before
+	                    #'idiig/hide-completion-preview-before-consult)
 	        ;; 应用 Orderless 的正则解析到 consult-grep/ripgrep/find
 	        (defun consult--orderless-regexp-compiler (input type &rest _config)
 	          (setq input (orderless-pattern-compiler input))
