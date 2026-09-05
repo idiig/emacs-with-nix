@@ -951,6 +951,42 @@
 	      ;; (advice-remove 'pyim-activate #'idiig/enable-pyim-region)
 	      ;; (advice-add 'pyim-deactivate :after #'idiig/disable-pyim-region)
 	      (advice-add 'pyim-activate :after #'idiig/enable-pyim-region))
+	    (defun idiig/pyim-capf ()
+	      "`completion-at-point-functions' entry that converts the run of
+	    ASCII pinyin before point into Chinese candidates via pyim's own
+	    synchronous conversion pipeline (`pyim-imobjs-create'/
+	    `pyim-candidates-create'), without touching any of pyim's live
+	    input-method state.  Only called manually, see
+	    `idiig/pyim-completion-at-point'."
+	      (require 'pyim)
+	      (unless (eq input-method-function 'pyim-input-method)
+	        (when-let* ((entered-info (pyim-process--find-entered-at-point)))
+	          (let* ((entered (nth 0 entered-info))
+	                 (len (nth 1 entered-info))
+	                 (scheme (pyim-scheme-current))
+	                 (candidates (pyim-candidates-create
+	                              (pyim-imobjs-create entered scheme) scheme)))
+	            (when candidates
+	              (list (- (point) len) (point)
+	                    ;; Candidates bear no textual relationship to ENTERED,
+	                    ;; so ignore the string argument instead of
+	                    ;; prefix-filtering against it.
+	                    (lambda (string pred action)
+	                      (complete-with-action action candidates "" pred))
+	                    :exclusive 'no))))))
+	    
+	    (defun idiig/pyim-completion-at-point ()
+	      "Run `completion-at-point' with `idiig/pyim-capf' as the only
+	    entry in `completion-at-point-functions', instead of adding it to
+	    the buffer's regular list -- pyim's pinyin character class overlaps
+	    almost entirely with ordinary ASCII words, so leaving it on all the
+	    time would turn ordinary English typing into a stream of irrelevant
+	    Chinese candidates."
+	      (interactive)
+	      (let ((completion-at-point-functions (list #'idiig/pyim-capf)))
+	        (completion-at-point)))
+	    
+	    (global-set-key (kbd "M-i") #'idiig/pyim-completion-at-point)
 	    (with-eval-after-load 'ctrlf
 	      
 	      (defvar pyim-ctrlf-initialized nil
@@ -3116,6 +3152,19 @@
 	      :bind (:map git-commit-mode-map
 	    	      ("C-x g" . gptel-magit-generate-message))
 	      :hook (magit-mode . gptel-magit-install))
+	    (defun idiig/agent-shell-disable-eager-completion-trigger ()
+	      "Undo `agent-shell-completion-mode' eagerly calling
+	    `completion-at-point' right after @/ / (which forces
+	    `completion-in-region-mode' before `completion-preview' gets a
+	    chance to run) -- the two CAPFs it registers stay in
+	    `completion-at-point-functions' either way, so `completion-preview'
+	    keeps consuming them the same passive way as any other CAPF."
+	      (when agent-shell-completion-mode
+	        (remove-hook 'post-self-insert-hook
+	                     #'agent-shell--trigger-completion-at-point t)))
+	    
+	    (add-hook 'agent-shell-completion-mode-hook
+	              #'idiig/agent-shell-disable-eager-completion-trigger)
 	    (use-package agent-shell
 	      :demand t
 	      :custom

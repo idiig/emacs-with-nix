@@ -836,6 +836,7 @@ enclosing bracket pair."
 **** 输入时预览补全 (=completion-preview=, built-in)
 :PROPERTIES:
 :header-args: :noweb-ref ecfg
+:CUSTOM_ID: completion-preview
 :END:
 Emacs 30+ 自带的功能，输入时以浅色文字内联预览排在第一位的补全候选。走
 的是标准 =completion-at-point-functions= 管线，跟 LSP-Bridge 自己的异步
@@ -879,6 +880,36 @@ Emacs 30+ 自带的功能，输入时以浅色文字内联预览排在第一位�
       (add-to-list 'completion-preview-commands #'org-self-insert-command))
     (global-completion-preview-mode 1))
 #+end_src
+***** 接入 CAPF 管线的补全源
+除了 =completion-preview= 自己识别的通用符号补全，下面几个包各自的补全/
+候选机制也已经（或者本来就）接入了标准 =completion-at-point-functions=
+管线，因此同样能被 =completion-preview=、=M-x completion-at-point= 等任
+何走 CAPF 协议的消费者使用，不需要各自的专属 UI：
+- Wanderlust 的地址/文件夹/newsgroup 补全 + BBDB 联系人补全，见
+  [[#wl-draft-capf]]
+- agent-shell 的 =@= 文件路径补全和 =/= 斜杠命令补全——这两个是
+  agent-shell 自带的（=agent-shell-completion.el=），本来就是标准 CAPF
+  实现，不需要我们额外接线，见 [[#agent-shell]]
+- pyim 拼音转中文，见 [[#pyim-capf]]；只手动触发（=M-i=），不放进默认
+  的 =completion-at-point-functions=
+
+LSP-Bridge 和 ddskk 的补全机制评估过之后 *没有* 接进来：
+- LSP-Bridge 自己的补全菜单（ACM）是一套独立于 CAPF 的异步机制——候选
+  是 Python 子进程异步返回后缓存在 =acm-candidates= 里的，缓存与当前光
+  标位置是否还对得上只在 ACM 自己的更新流程（比对
+  =lsp-bridge-last-change-position=）里做校验，从 CAPF 里直接读会绕开
+  这层校验，容易拿到跟当前输入对不上的过期候选；而且 ACM 自己的弹窗和
+  corfu/completion-preview 的弹窗会同时响应同一批按键，双重 UI 抢键位
+  的风险跟 [[#wl-draft-capf][wl-draft-mode 的 TAB 冲突]]是同一类问题，
+  只是这里几乎每个候选切换键都会撞上，不只是 TAB 一个键
+- ddskk 变换候选时，候选文字本身就活在 buffer 里（介于
+  =skk-henkan-start-point=/=skk-henkan-end-point= 之间），每次切换候选
+  （SPC）都会被原地删掉重插——不像地址补全那样有一段稳定不变的"待补全
+  前缀文字"可以让 CAPF 的 BEG/END 落脚；henkan 状态下 SPC/数字键等候选
+  切换键还都被 SKK 自己的 keymap 占用，跟任何 CAPF 消费者的候选导航键
+  位冲突面比 wl-draft-mode 大得多。SKK 自己已经有成熟的候选 UI
+  （=skk-show-inline=/=skk-show-tooltip=，见 ddskk 一节），接入 CAPF 收
+  益有限、风险却更大，所以没有做
 **** 便利的光标首尾移动 (=mwim=)
 ***** 依赖
 :PROPERTIES:
@@ -1625,6 +1656,20 @@ RET 就等价于原来的行为；当前已经开着某个输入法时，再按�
     (skk-load . (lambda ()
                   (require 'context-skk))))
 #+end_src
+**** TODO 候选选择流程统一到 CAPF
+:PROPERTIES:
+:CUSTOM_ID: skk-capf-unify
+:END:
+SKK henkan 时敲键走的是 =input-method-function=，在命令循环、也就是
+=completion-at-point-functions=/=post-command-hook= 这条 completion-preview
+依赖的管线运行之前就把按键截走了——候选是怎么产生、怎么被选中，跟
+CAPF 这套体系完全是两条独立的路。目标不是让 SKK 的候选看起来像
+completion-preview 的内联灰字（=skk-show-inline= 已经是贴在光标处的
+overlay，视觉上够用，不用改），而是让 SKK henkan 的候选*选择*也能走
+CAPF 这条统一管线，跟 pyim、以及走标准 CAPF 的其他补全源用同一套机制，
+不是三套互相独立的实现各自维护一遍"产生候选/展示候选/选中候选"的逻
+辑。henkan 状态下 SPC/x/数字这些切换键保留 SKK 自己的交互习惯不变，
+统一的是底层管线，不是键位或外观。
 *** 检索 (Migemo)
 **** 依赖
 :PROPERTIES:
@@ -1762,6 +1807,97 @@ RET 就等价于原来的行为；当前已经开着某个输入法时，再按�
     ;; (advice-add 'pyim-deactivate :after #'idiig/disable-pyim-region)
     (advice-add 'pyim-activate :after #'idiig/enable-pyim-region))
 #+end_src
+
+***** 拼音转中文接入 CAPF
+:PROPERTIES:
+:CUSTOM_ID: pyim-capf
+:END:
+pyim 作为 input method 使用时（=input-method-function= 是
+=pyim-input-method=），敲下的拼音字母根本不会经过普通的命令循环变成
+buffer 里的字符——它们先进 pyim 自己的隐藏 entered buffer，buffer 里看
+到的只是 =pyim-preview--refresh= 每次按键都重新拼接出来的预览文字，这
+条路径运行的时机跟 =completion-at-point-functions=（命令循环结束之后）
+完全错开，没法接入 CAPF。
+
+但 pyim 还有另一条完全不依赖前面那套状态机的路：不切换 input method，
+直接对着已经打在 buffer 里的一段 ASCII 拼音，同步跑一遍 pyim 自己的转
+换管线——=pyim-process--find-entered-at-point= 从光标往前用当前 scheme
+（=pyim-scheme-current=）的字符集正则抠出这段拼音，
+=pyim-imobjs-create=/=pyim-candidates-create= 再同步查本地 dcache 词库
+（不用等网络/子进程），全程不碰 =pyim-process--imobjs=/
+=pyim-process--candidates= 这些 pyim 输入法状态机自己用的全局变量，是
+一次纯函数式的计算——这条路才是能包成 CAPF 的。
+
+pyim 拼音用的字符集（=quanpin= 下基本就是全部小写字母）跟普通英文单词
+高度重合，如果把这个 CAPF 直接放进 =completion-at-point-functions= 默
+认列表，每敲一个英文单词都会去查一遍拼音词库，误触发太频繁，所以这里
+不自动挂载，只给一个手动命令，绑在 =M-i=（跟 pyim 社区里
+=pyim-convert-string-at-point= 惯用的键位一致），临时把
+=completion-at-point-functions= 换成只有这一个函数再触发补全。=M-i= 在
+=completion-preview-active-mode-map=/=completion-in-region-mode-map= 里
+已经绑了"采纳当前候选"（见 [[#completion-preview][输入时预览补全]]），
+只有 preview 没有激活的时候这个全局绑定才会生效，两边不会打架。
+
+候选词（"你好"）跟被补全的拼音文本（"nihao"）没有任何文字上的对应关
+系，普通 =all-completions= 按前缀过滤会把所有候选都滤掉，所以这里的
+COLLECTION 包成一个忽略输入字符串、永远把候选原样交给
+=complete-with-action= 的补全表；BEG/END 仍然是真实的拼音区间，交给
+=completion-in-region= 的默认替换逻辑处理，不用再手写 =:exit-function=
+删字符。
+#+begin_src emacs-lisp
+  (defun idiig/pyim-capf ()
+    "`completion-at-point-functions' entry that converts the run of
+  ASCII pinyin before point into Chinese candidates via pyim's own
+  synchronous conversion pipeline (`pyim-imobjs-create'/
+  `pyim-candidates-create'), without touching any of pyim's live
+  input-method state.  Only called manually, see
+  `idiig/pyim-completion-at-point'."
+    (require 'pyim)
+    (unless (eq input-method-function 'pyim-input-method)
+      (when-let* ((entered-info (pyim-process--find-entered-at-point)))
+        (let* ((entered (nth 0 entered-info))
+               (len (nth 1 entered-info))
+               (scheme (pyim-scheme-current))
+               (candidates (pyim-candidates-create
+                            (pyim-imobjs-create entered scheme) scheme)))
+          (when candidates
+            (list (- (point) len) (point)
+                  ;; Candidates bear no textual relationship to ENTERED,
+                  ;; so ignore the string argument instead of
+                  ;; prefix-filtering against it.
+                  (lambda (string pred action)
+                    (complete-with-action action candidates "" pred))
+                  :exclusive 'no))))))
+
+  (defun idiig/pyim-completion-at-point ()
+    "Run `completion-at-point' with `idiig/pyim-capf' as the only
+  entry in `completion-at-point-functions', instead of adding it to
+  the buffer's regular list -- pyim's pinyin character class overlaps
+  almost entirely with ordinary ASCII words, so leaving it on all the
+  time would turn ordinary English typing into a stream of irrelevant
+  Chinese candidates."
+    (interactive)
+    (let ((completion-at-point-functions (list #'idiig/pyim-capf)))
+      (completion-at-point)))
+
+  (global-set-key (kbd "M-i") #'idiig/pyim-completion-at-point)
+#+end_src
+
+***** TODO 实时候选选择流程统一到 CAPF
+[[#pyim-capf][前面这条 CAPF]]只能转换已经打在 buffer 里的 ASCII 拼
+音，覆盖不到 pyim 作为输入法激活时的实时候选——那条路走的是
+=input-method-function=，跟 [[#skk-capf-unify][ddskk 那条同名 TODO]]
+分析的原因一样，在命令循环之前就把按键截走了，不经过
+=completion-at-point-functions=。目标不是改候选长什么样（弹窗/内联无
+所谓），而是让实时候选的*选择*流程也走 CAPF 这套统一管线，跟 SKK、以
+及其他标准 CAPF 补全源共用同一套机制，不是各自一套输入法专属实现。
+***** TODO 接入 liberime（RIME 词库/方案引擎）
+pyim 包里已经带了 =pyim-liberime.el=（休眠状态，因为 =liberime= 这个动
+态模块和它依赖的 =pkgs.librime= 都还没装），提供一个新的
+=pyim-scheme-rime= scheme，把候选计算换成 librime（可以用 RIME 的方案
+文件、双拼、模糊音等）。读过源码确认：它只替换候选怎么算出来这一层，
+候选怎么被选择、展示还是走 pyim 原来那一套——所以接入 liberime 跟上一
+条"候选选择流程统一到 CAPF"的 TODO 是两件独立的事，可以分开做。
 
 ***** buffer内检索 (=Ctrlf=) 交互
 这里我写了一个函数 =pyim-cregex-build-lazy= 。这个函数交互 =pyim= 。参见输
@@ -3486,6 +3622,9 @@ folder 读，不需要手动先把某个 folder 在 =wl-summary= 里打开；某
           records))))
 #+end_src
 **** 地址/文件夹补全接入 CAPF
+:PROPERTIES:
+:CUSTOM_ID: wl-draft-capf
+:END:
 Wanderlust 自己的地址/文件夹/newsgroup 补全（=wl-complete-field-body-or-tab=，
 绑在 =wl-draft-mode= 的 TAB）和 BBDB 的联系人补全（=bbdb-complete-mail=，
 绑 =M-;=/=M-TAB=）都是各自独立的老式补全命令，直接改写 buffer 文本，不
@@ -5600,6 +5739,57 @@ gptel 加载后启动，使用 gptel 的默认模型，并在进入 magit-mode �
     :hook (magit-mode . gptel-magit-install))
 #+end_src
 *** Agent shell
+:PROPERTIES:
+:CUSTOM_ID: agent-shell
+:END:
+agent-shell 自己的 =@= 文件路径补全和 =/= 斜杠命令补全
+（=agent-shell-completion.el= 里的 =agent-shell--file-completion-at-point=/
+=agent-shell--command-completion-at-point=）本来就是标准 CAPF 实现，靠
+=agent-shell-completion-mode= 随每个 agent-shell buffer 自动开启
+（=agent-shell-file-completion-enabled= 默认为 t），不需要在这里另外接
+线；参见 [[#completion-preview][输入时预览补全]] 一节里整理的 CAPF 补
+全源列表。
+**** 候选选择流程统一到 CAPF
+:PROPERTIES:
+:header-args: :noweb-ref ecfg
+:END:
+数据源本来就是标准 CAPF，但消费方式不是 =completion-preview=——
+=agent-shell--trigger-completion-at-point= 挂在 =post-self-insert-hook=
+上，敲下 =@=/=/= 之后，在同一个命令周期里就主动调用了
+=(completion-at-point)=，抢在 =completion-preview= 自己的
+=post-command-hook= 逻辑之前，把交互权直接交给了
+=completion-in-region-mode= 那套更"重"的补全会话，而不是让
+=completion-preview= 用它那套安静的内联建议来处理。跟
+[[#skk-capf-unify][SKK/pyim 那条同名 TODO]]是同一类问题的另一种表现：
+不是候选产生得比 CAPF 早（那是输入法的情况），而是 agent-shell 自己在
+CAPF 触发方式上抢了先。
+
+把这个 hook 摘掉即可——两个 CAPF 函数本来就注册在
+=completion-at-point-functions= 里（=agent-shell-completion-mode= 另外
+两行 =add-hook= 加的，不受影响），=global-completion-preview-mode= 会照
+常按自己的节奏（每次敲键之后）去问这些 CAPF，不需要谁主动触发。代价
+是原来"敲下 =@= 就立刻列出所有项目文件"的即时反馈没了——
+=completion-preview-require-minimum-symbol-length= 是按
+=bounds-of-thing-at-point= 算出的符号长度门槛判断要不要显示（这里配的
+是 2），跟 CAPF 自己的 BEG/END 无关，所以要等 =@=/=/= 后面再敲够 2 个
+字符才会出现内联建议，不再是敲下触发字符本身就弹出候选——这是统一到
+同一套消费管线必然要付的代价，换来的是跟其他 CAPF 补全源一致的交互方
+式。
+#+begin_src emacs-lisp
+  (defun idiig/agent-shell-disable-eager-completion-trigger ()
+    "Undo `agent-shell-completion-mode' eagerly calling
+  `completion-at-point' right after @/ / (which forces
+  `completion-in-region-mode' before `completion-preview' gets a
+  chance to run) -- the two CAPFs it registers stay in
+  `completion-at-point-functions' either way, so `completion-preview'
+  keeps consuming them the same passive way as any other CAPF."
+    (when agent-shell-completion-mode
+      (remove-hook 'post-self-insert-hook
+                   #'agent-shell--trigger-completion-at-point t)))
+
+  (add-hook 'agent-shell-completion-mode-hook
+            #'idiig/agent-shell-disable-eager-completion-trigger)
+#+end_src
 **** 依赖
 :PROPERTIES:
 :header-args: :noweb-ref epkgs
