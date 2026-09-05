@@ -2890,6 +2890,66 @@
 	    (use-package valign
 	      :diminish valign-mode
 	      :hook (org-mode . valign-mode))
+	    ;; Org mode: pair emphasis markers after both org and elec-pair are loaded.
+	    (with-eval-after-load 'org
+	      (with-eval-after-load 'elec-pair
+	        (defun idiig/org-electric-pair-inhibit-p (char)
+	          "Avoid pairing Org headline/list marker `*' at beginning of line."
+	          (or (and (eq char ?*)
+	                   (save-excursion
+	                     (skip-chars-backward " \t")
+	                     (bolp)))
+	              (funcall (default-value 'electric-pair-inhibit-predicate) char)))
+	    
+	        (defconst idiig/org-emphasis-pair-markers '(?= ?~ ?+ ?*)
+	          "Org emphasis markers that should get CJK spacing after pairing.")
+	    
+	        (defun idiig/org-fullwidth-char-p (char)
+	          "Return non-nil when CHAR is a fullwidth character."
+	          (and char (= (char-width char) 2)))
+	    
+	        (defun idiig/org-emphasis-pair-at-point-p (char)
+	          "Return non-nil when point is between a freshly paired CHAR pair."
+	          (and (memq char idiig/org-emphasis-pair-markers)
+	               (eq (char-before) char)
+	               (eq (char-after) char)))
+	    
+	        (defun idiig/org-emphasis-pair-needs-leading-space-p (pos)
+	          "Return non-nil when the paired marker at POS follows fullwidth text."
+	          (idiig/org-fullwidth-char-p (char-before (1- pos))))
+	    
+	        (defun idiig/org-emphasis-pair-needs-trailing-space-p (pos)
+	          "Return non-nil when the paired marker at POS precedes fullwidth text."
+	          (idiig/org-fullwidth-char-p (char-after (1+ pos))))
+	    
+	        (defun idiig/org-space-around-electric-emphasis-pair ()
+	          "Insert spaces around paired Org emphasis markers next to fullwidth text."
+	          (let ((char last-command-event)
+	                (pos (point)))
+	            (when (idiig/org-emphasis-pair-at-point-p char)
+	              (when (idiig/org-emphasis-pair-needs-trailing-space-p pos)
+	                (save-excursion
+	                  (goto-char (1+ pos))
+	                  (insert " ")))
+	              (when (idiig/org-emphasis-pair-needs-leading-space-p pos)
+	                (save-excursion
+	                  (goto-char (1- pos))
+	                  (insert " "))
+	                (goto-char (1+ pos))))))
+	    
+	        (add-hook 'org-mode-hook
+	                  (lambda ()
+	                    (idiig/add-local-electric-pairs
+	                     '((?$ . ?$)		; Inline math $...$
+	    		   (?* . ?*)		; Bold *...*
+	    		   (?/ . ?/)		; Italic /.../
+	    		   (?= . ?=)		; Verbatim =...=
+	    		   (?~ . ?~)		; Code ~...~
+	    		   (?+ . ?+)))		; Strike-through +...+
+	                    (setq-local electric-pair-inhibit-predicate
+	                                #'idiig/org-electric-pair-inhibit-p)
+	                    (add-hook 'post-self-insert-hook
+	                              #'idiig/org-space-around-electric-emphasis-pair t t)))))
 	    (with-eval-after-load 'org
 	      (setq org-cite-export-processors
 	          '((latex biblatex)
