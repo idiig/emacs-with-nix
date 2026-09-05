@@ -1552,6 +1552,33 @@ minibuffer的检索]]。
                   (idiig/apply-font-profile 'large))))
 #+end_src
 
+** 智能切换/关闭输入法 (=C-\\=)
+:PROPERTIES:
+:header-args: :noweb-ref ecfg
+:END:
+=C-\= 默认绑定的是 =toggle-input-method= ，会不看情况直接切到
+=default-input-method= （或者被其他 mode，比如 dyalog-mode，临时改掉的
+那个输入法），关不掉当前正在用的那个。改绑成
+=idiig/set-or-disable-input-method= ：当前没有输入法在用时，跳出所有
+已注册输入法的列表（配合 vertico）来选，默认候选还是 =pyim= ，直接
+RET 就等价于原来的行为；当前已经开着某个输入法时，再按一次 =C-\=
+直接关掉它，不用先选中同一个输入法确认一遍才能关闭。
+#+begin_src emacs-lisp
+  (defun idiig/set-or-disable-input-method ()
+    "Turn off `current-input-method' if one is active; otherwise prompt
+  to pick one via `set-input-method'.  Plain `toggle-input-method' can't
+  do this: with no argument it always jumps straight to
+  `default-input-method' instead of whatever's actually active, so
+  turning off a non-default input method needs a second, unrelated
+  command instead of just pressing the same key again."
+    (interactive)
+    (if current-input-method
+        (deactivate-input-method)
+      (call-interactively #'set-input-method)))
+
+  (global-set-key (kbd "C-\\") #'idiig/set-or-disable-input-method)
+#+end_src
+
 ** 日文
 *** 输入法 (ddskk)
 **** 依赖
@@ -1671,18 +1698,11 @@ minibuffer的检索]]。
 :header-args: :noweb-ref ecfg
 :END:
 ***** 基础配置
-=C-\= 默认绑定的是 =toggle-input-method=，会不看情况直接切到
-=default-input-method=（或者被其他 mode，比如 dyalog-mode，临时改掉的
-那个输入法）。改绑成 =set-input-method=，每次都跳出所有已注册输入法的
-列表（配合 vertico）来选，默认候选还是 =pyim=，直接 RET 就等价于原来的
-行为，但想切别的输入法时不用先关再开。
 #+begin_src emacs-lisp
   (use-package pyim
     :diminish pyim-isearch-mode
     :commands
     (toggle-input-method set-input-method)
-    :bind
-    ("C-\\" . set-input-method)
     :custom
     (default-input-method "pyim")
     (pyim-dcache-directory (concat user-emacs-directory "pyim/dcache"))
@@ -3187,6 +3207,20 @@ Wanderlust/SEMI 自己那套 MIME 菜单（=C-c C-x= 前缀）就能调用 GPG �
 了，用得到时 =C-c C-x C-h= 看菜单最准。
 #+begin_src emacs-lisp
   (setq epa-pinentry-mode 'loopback)
+#+end_src
+**** 附件保存目录 (=mime-save-directory=)
+看信时按 =e=（=mime-preview-extract-current-entity=）保存 MIME 附
+件，实际落盘走的是 SEMI 的 =mime-save-content=，取目录用的变量是
+=mime-save-directory=（默认 =~/=）。改成 =~/Downloads/=，跟浏览器
+下载习惯保持一致；这个目录未必已经存在，缺失时先建好，避免第一次
+保存时因为目录不存在直接报错。
+#+begin_src emacs-lisp
+  (defvar idiig/downloads-directory (expand-file-name "~/Downloads/"))
+
+  (unless (file-directory-p idiig/downloads-directory)
+    (make-directory idiig/downloads-directory t))
+
+  (setq mime-save-directory idiig/downloads-directory)
 #+end_src
 **** 地址簿 (=bbdb=)
 参考文档用的是 =lsdb=，但那个包没进 nixpkgs，=bbdb= 有而且更主流，

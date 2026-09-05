@@ -825,6 +825,19 @@
 	                    (set-face-attribute 'menu nil :inherit 'unspecified)
 	                    (set-face-attribute 'tool-bar nil :inherit 'unspecified)
 	                    (idiig/apply-font-profile 'large))))
+	    (defun idiig/set-or-disable-input-method ()
+	      "Turn off `current-input-method' if one is active; otherwise prompt
+	    to pick one via `set-input-method'.  Plain `toggle-input-method' can't
+	    do this: with no argument it always jumps straight to
+	    `default-input-method' instead of whatever's actually active, so
+	    turning off a non-default input method needs a second, unrelated
+	    command instead of just pressing the same key again."
+	      (interactive)
+	      (if current-input-method
+	          (deactivate-input-method)
+	        (call-interactively #'set-input-method)))
+	    
+	    (global-set-key (kbd "C-\\") #'idiig/set-or-disable-input-method)
 	    (use-package ddskk
 	      :defer t
 	      :bind (("C-x j" . skk-mode))
@@ -887,8 +900,6 @@
 	      :diminish pyim-isearch-mode
 	      :commands
 	      (toggle-input-method set-input-method)
-	      :bind
-	      ("C-\\" . set-input-method)
 	      :custom
 	      (default-input-method "pyim")
 	      (pyim-dcache-directory (concat user-emacs-directory "pyim/dcache"))
@@ -1823,6 +1834,12 @@
 	      :init
 	      (setq org-mime-library 'semi))
 	    (setq epa-pinentry-mode 'loopback)
+	    (defvar idiig/downloads-directory (expand-file-name "~/Downloads/"))
+	    
+	    (unless (file-directory-p idiig/downloads-directory)
+	      (make-directory idiig/downloads-directory t))
+	    
+	    (setq mime-save-directory idiig/downloads-directory)
 	    (use-package bbdb
 	      :after wl
 	      :config
