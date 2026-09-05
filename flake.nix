@@ -3113,6 +3113,8 @@
 	        (idiig/gptel-gh-select-model))
 	    (use-package gptel-magit
 	      :commands gptel-magit-generate-message
+	      :bind (:map git-commit-mode-map
+	    	      ("C-x g" . gptel-magit-generate-message))
 	      :hook (magit-mode . gptel-magit-install))
 	    (use-package agent-shell
 	      :demand t

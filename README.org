@@ -5587,10 +5587,16 @@ MCP error -32001: Request timed out)
 ***** =magit= 统合
 这是一个 gptel-magit 的配置，用于在 Magit 中集成 AI 辅助功能。配置在
 gptel 加载后启动，使用 gptel 的默认模型，并在进入 magit-mode 时自
-动安装相关功能。
+动安装相关功能。=gptel-magit-generate-message= 要读取正在编辑的提交
+信息 buffer 才能工作，所以 =C-x g= 绑在 =git-commit-mode-map= 上，
+只在那个 buffer 里生效——绑在 =magit-mode-map=（status/log 等 buffer
+共用的那个 keymap）上的话，会在所有 magit buffer 里把全局的
+=C-x g=（=magit-status=，见「包管理和其他基础」一节）直接遮住。
 #+begin_src emacs-lisp
   (use-package gptel-magit
     :commands gptel-magit-generate-message
+    :bind (:map git-commit-mode-map
+  	      ("C-x g" . gptel-magit-generate-message))
     :hook (magit-mode . gptel-magit-install))
 #+end_src
 *** Agent shell
