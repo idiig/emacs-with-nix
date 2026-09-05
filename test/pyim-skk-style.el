@@ -124,11 +124,32 @@ composition.  Buffer-local; reset to nil whenever a composition ends
 
 ;; 2. Inline preview: "▽" + raw entered code while composing, "▼" +
 ;;    currently-selected candidate once SPC has revealed the page.
+(defun idiig/pyim-pinyin-query-variants (entered)
+  "Return ENTERED plus simple apostrophe split variants."
+  (if (string-match-p "'" entered)
+      (list entered)
+    (let ((variants (list entered))
+          (i 1)
+          (len (length entered)))
+      (while (< i len)
+        (push (concat (substring entered 0 i)
+                      "'"
+                      (substring entered i))
+              variants)
+        (setq i (1+ i)))
+      (nreverse variants))))
+
 (defun idiig/pyim-pinyin-spellings (entered)
   "Return full pinyin spellings for pyim candidates matching ENTERED."
   (let* ((scheme (pyim-scheme-current))
-         (candidates (pyim-candidates-create
-                      (pyim-imobjs-create entered scheme) scheme)))
+         (queries (idiig/pyim-pinyin-query-variants entered))
+         (candidates
+          (delete-dups
+           (apply #'append
+                  (mapcar (lambda (query)
+                            (pyim-candidates-create
+                             (pyim-imobjs-create query scheme) scheme))
+                          queries)))))
     (delete-dups
      (delq nil
            (mapcar (lambda (word)
@@ -144,6 +165,31 @@ composition.  Buffer-local; reset to nil whenever a composition ends
                     (substring spelling (length entered))))
                 (idiig/pyim-pinyin-spellings entered))))
 
+(defun idiig/pyim-pinyin-preview-hint (entered)
+  "Bracketed inline hint guessing ENTERED's full pinyin spelling.
+
+E.g. entered \"wm\" shows \" [wo'men]\" once a matching word is in your
+personal jianpin history.  This is deliberately the exact same first
+element `idiig/pyim-pinyin-overlay-capf' offers as its top completion
+candidate (both read `idiig/pyim-pinyin-spellings' directly, and its
+order is preserved all the way to vertico by
+`idiig/pyim-force-unsorted-consult') -- so the hint always previews
+what accepting the first CAPF candidate would give you, not a
+separate, possibly-different guess.
+
+Only shown once the guess spans two or more syllables (i.e. its
+spelling contains pyim's own \"'\" syllable separator) -- a single
+partial syllable like \"w\" or \"bi\" always has SOME single-character
+match, so requiring `equal' alone isn't enough to keep the hint from
+firing on every ordinary keystroke; jianpin only ever needs one letter
+per syllable, so a real multi-character expansion (what the hint is
+actually for) can't appear until at least two initials have been
+entered anyway."
+  (let ((top (car (idiig/pyim-pinyin-spellings entered))))
+    (if (and top (not (equal top entered)) (string-match-p "'" top))
+        (format " [%s]" top)
+      "")))
+
 (cl-defmethod pyim-preview-string ((_scheme pyim-scheme-quanpin))
   (if idiig/pyim-page-revealed
       (let* ((candidates (pyim-process-get-candidates))
@@ -157,7 +203,8 @@ composition.  Buffer-local; reset to nil whenever a composition ends
                     "'")))
         (when (string< "" rest) (setq preview (concat preview rest)))
         (concat "▼" (pyim-process-magic-convert preview)))
-    (concat "▽" (pyim-process-get-entered 'point-before))))
+    (let ((entered (pyim-process-get-entered 'point-before)))
+      (concat "▽" entered (idiig/pyim-pinyin-preview-hint entered)))))
 
 ;; 3. Suppress the candidate page until revealed; the preview refresh
 ;;    above is a separate hook function and keeps firing on every
@@ -198,6 +245,8 @@ this file."
   (advice-remove 'pyim-page--refresh #'idiig/pyim-page-refresh-gate)
   (advice-remove 'pyim-self-insert-command
                  #'idiig/pyim-self-insert-command-confirm-gate)
+  (advice-remove 'completion-at-point
+                 #'idiig/pyim-completion-at-point-overlay-advice)
   (remove-hook 'pyim-process-ui-hide-hook #'idiig/pyim-reset-reveal-flag)
   (define-key pyim-mode-map " " #'pyim-select-word)
   (define-key pyim-mode-map (kbd "M-i") nil)
@@ -210,6 +259,7 @@ this file."
   (remove-hook 'pyim-activate-hook #'idiig/pyim-pinyin-capf-enable)
   (remove-hook 'pyim-deactivate-hook #'idiig/pyim-pinyin-capf-disable)
   (idiig/pyim-pinyin-capf-disable)
+  (advice-remove 'consult--read #'idiig/pyim-consult-read-unsorted-advice)
   (remove-hook 'pyim-process-ui-refresh-hook
                #'idiig/pyim-composing-completion-preview-refresh)
   (remove-hook 'pyim-process-ui-hide-hook
@@ -252,6 +302,8 @@ this file."
             (lambda (string pred action)
               (complete-with-action action spellings "" pred))
             :exclusive 'yes
+            :display-sort-function #'identity
+            :cycle-sort-function #'identity
             :exit-function
             (lambda (spelling _status)
               ;; The buffer text is already replaced with SPELLING at
@@ -294,6 +346,18 @@ offers only suffix strings."
             (lambda (string pred action)
               (complete-with-action action suffixes "" pred))
             :exclusive 'yes
+            ;; Preserve `pyim-candidates-create's own frequency-based
+            ;; order -- without this, vertico/consult (and the plain
+            ;; *Completions* buffer) apply their own default sort
+            ;; (roughly by length then alphabetically), which is
+            ;; exactly why "wo'men" ended up last in a 17-candidate
+            ;; list instead of first.  `completion-preview-complete'
+            ;; itself does the same `:display-sort-function #'identity'
+            ;; trick when it falls through to a full candidates list;
+            ;; we bypass that function for the jianpin case below, so
+            ;; we need to set this ourselves.
+            :display-sort-function #'identity
+            :cycle-sort-function #'identity
             :exit-function
             (lambda (suffix _status)
               ;; `completion-preview-insert' inserts SUFFIX into the real
@@ -305,6 +369,73 @@ offers only suffix strings."
                 (goto-char (point-max))
                 (insert suffix))
               (pyim-process-run))))))
+
+(defun idiig/pyim-pinyin-overlay-capf ()
+  "CAPF for choosing full pinyin spellings while pyim is composing.
+Unlike `idiig/pyim-pinyin-capf', this completes an empty range at point
+because pyim's entered code lives in `pyim-preview--overlay', not in the
+real buffer."
+  (when (and (pyim-process--translating-p)
+             (not idiig/pyim-page-revealed)
+             (not (pyim-process-without-entered-p)))
+    (let* ((entered (pyim-process-get-entered 'point-before))
+           (spellings (idiig/pyim-pinyin-spellings entered)))
+      (list (point) (point)
+            (lambda (string pred action)
+              (complete-with-action action spellings "" pred))
+            :exclusive 'yes
+            :display-sort-function #'identity
+            :cycle-sort-function #'identity
+            :exit-function
+            (lambda (spelling _status)
+              ;; Completion inserts SPELLING into the real buffer.  Move that
+              ;; text into pyim's hidden entered buffer instead.
+              (delete-region (- (point) (length spelling)) (point))
+              (pyim-process-with-entered-buffer
+                (erase-buffer)
+                (insert spelling))
+              (pyim-process-run))))))
+
+(defvar idiig/pyim-use-overlay-capf-for-completion nil
+  "Non-nil means route `completion-at-point' to pyim's overlay CAPF.")
+
+(defun idiig/pyim-completion-at-point-overlay-advice (orig-fn &rest args)
+  "Use pyim's overlay CAPF while expanding a completion-preview menu."
+  (if idiig/pyim-use-overlay-capf-for-completion
+      (let ((completion-at-point-functions '(idiig/pyim-pinyin-overlay-capf)))
+        (apply orig-fn args))
+    (apply orig-fn args)))
+(advice-add 'completion-at-point :around
+            #'idiig/pyim-completion-at-point-overlay-advice)
+
+(defvar idiig/pyim-force-unsorted-consult nil
+  "Non-nil while a pyim pinyin CAPF list is open via `consult-completion-in-region'.
+
+`pyim-candidates-create' already returns candidates in frequency
+order, and `idiig/pyim-pinyin-spellings'/`idiig/pyim-pinyin-continuation-suffixes'
+preserve that order, but it never survives to vertico: setting
+`:display-sort-function'/`:cycle-sort-function' in the CAPF's plist
+(the standard, documented mechanism) has no effect here, because
+`consult--in-region' rebuilds `completion-extra-properties' from
+scratch before handing off to `consult--read', keeping only
+`:annotation-function'/`:affixation-function'/`:exit-function' and
+silently dropping everything else -- verified by reading
+`consult--in-region' directly.  The only lever `consult--read' itself
+actually exposes for this is its own `:sort' keyword (\"SORT should be
+set to nil if the candidates are already sorted\"), which
+`consult--in-region' never passes, so it always defaults to `:sort t'.
+Advising `consult--read' to force `:sort nil' while this flag is bound
+is the only way found so far to make vertico display our candidates
+in the order pyim's own frequency data puts them in -- without it,
+\"wo'men\" (longer than most competing spellings) gets sorted to the
+end of the list instead of appearing first.")
+
+(defun idiig/pyim-consult-read-unsorted-advice (orig-fn table &rest options)
+  (if idiig/pyim-force-unsorted-consult
+      (apply orig-fn table (plist-put (copy-sequence options) :sort nil))
+    (apply orig-fn table options)))
+(advice-add 'consult--read :around #'idiig/pyim-consult-read-unsorted-advice)
+
 ;; `completion-at-point-functions' is local-variable-if-set, so a bare
 ;; `add-to-list' here would only ever affect whichever buffer happens
 ;; to be current when this file is eval'd, not every buffer where
@@ -318,18 +449,49 @@ offers only suffix strings."
 (add-hook 'pyim-activate-hook #'idiig/pyim-pinyin-capf-enable)
 (add-hook 'pyim-deactivate-hook #'idiig/pyim-pinyin-capf-disable)
 
-;; `M-i' is unbound in `pyim-mode-map' by default (only ASCII
-;; self-insert ranges, digits, and a handful of control/meta commands
-;; are bound there -- see pyim.el), so it's free to reach
-;; `completion-at-point' from inside a composition without pyim
-;; terminating it first (which is what would happen for any key NOT
-;; found in `pyim-mode-map': `pyim-process-input-method' pushes it back
-;; and calls `pyim-process-terminate' before the key is reprocessed).
-(defun idiig/pyim-composing-completion-at-point ()
+;; `M-i' and TAB should both stay inside completion-preview's own
+;; command path.  If pyim has refreshed but CP has no active overlay
+;; yet, create one from the pyim-only suffix CAPF first, then delegate
+;; to `completion-preview-complete'.
+(defun idiig/pyim-composing-completion-preview-complete ()
   (interactive)
-  (let ((completion-at-point-functions '(idiig/pyim-pinyin-capf)))
-    (completion-at-point)))
-(define-key pyim-mode-map (kbd "M-i") #'idiig/pyim-composing-completion-at-point)
+  (unless (bound-and-true-p completion-preview-active-mode)
+    (let ((completion-at-point-functions
+           '(idiig/pyim-pinyin-continuation-capf)))
+      (completion-preview--update)))
+  ;; Both branches below may open a recursive minibuffer (vertico, via
+  ;; the real config's `consult-completion-in-region' bridge) --
+  ;; either through `completion-preview-complete' falling through to
+  ;; `completion-at-point', or directly below for the jianpin case.
+  ;; `pyim-process-input-method' dynamically binds
+  ;; `overriding-terminal-local-map' to `pyim-mode-map' for the ENTIRE
+  ;; composing loop, and that variable outranks every other keymap --
+  ;; including the minibuffer's own -- for the whole duration that
+  ;; binding is on the stack.  Left alone, RET inside the picker hits
+  ;; pyim-mode-map's own RET (`pyim-quit-no-clear') instead of
+  ;; confirming the minibuffer, and C-g likewise hits
+  ;; `pyim-quit-clear' instead of aborting it.  Shadow it back to nil
+  ;; for the duration of this call only; the dynamic let restores
+  ;; pyim's own binding the moment we return, so the composing loop's
+  ;; subsequent `read-key-sequence' calls are unaffected.
+  (let ((overriding-terminal-local-map nil)
+        (idiig/pyim-force-unsorted-consult t))
+    (if (bound-and-true-p completion-preview-active-mode)
+        (let ((idiig/pyim-use-overlay-capf-for-completion t))
+          (completion-preview-complete))
+      ;; No literal continuation to preview (e.g. entered "wm" has no
+      ;; suffix relationship with its jianpin match "wo'men" --
+      ;; established earlier: completion-preview's own filtering
+      ;; requires a literal prefix, which jianpin abbreviations never
+      ;; have).  Fall back to the full jianpin+spelling CAPF instead,
+      ;; which always opens the vertico/consult picker listing every
+      ;; match (e.g. "wo'men"), since these candidates never share a
+      ;; common prefix with ENTERED either.
+      (let ((completion-at-point-functions '(idiig/pyim-pinyin-overlay-capf)))
+        (unless (completion-at-point)
+          (pyim-toggle-assistant-scheme))))))
+(define-key pyim-mode-map (kbd "M-i")
+            #'idiig/pyim-composing-completion-preview-complete)
 
 ;; 7. Real `completion-preview-mode' for pinyin continuations while
 ;;    composing.  The raw entered code shown as "▽entered" is pyim
@@ -354,16 +516,59 @@ offers only suffix strings."
     (completion-preview-active-mode -1)))
 (add-hook 'pyim-process-ui-hide-hook #'idiig/pyim-composing-completion-preview-hide)
 
-;; TAB accepts the showing completion-preview candidate; with nothing
-;; showing, TAB keeps its original pyim meaning
-;; (`pyim-toggle-assistant-scheme').
-(defun idiig/pyim-composing-completion-preview-accept ()
+;; TAB cycles through the currently showing CP candidates, mirroring
+;; the README's global `completion-preview-active-mode-map' binding
+;; (TAB/<tab> -> `idiig/completion-preview-tab', which cycles for the
+;; first `idiig/completion-preview-tab-cycle-limit' consecutive presses
+;; then escalates to `completion-preview-complete').  That global
+;; binding can't reach us here though: `pyim-mode-map' is bound as
+;; `overriding-terminal-local-map' for the whole composing loop, which
+;; outranks every other keymap including minor-mode maps, so TAB has to
+;; be rebound again right here or it would never even reach
+;; `completion-preview-active-mode-map' while composing.
+;;
+;; We CANNOT just call `idiig/completion-preview-tab' directly here:
+;; `pyim-process-input-method' tracks its own `this-command'/
+;; `last-command' in a local `let*' that dynamically shadows the
+;; globals for the whole composing loop (see pyim-process.el), so by
+;; the time we're called, `last-command' is always
+;; `idiig/pyim-composing-completion-preview-cycle' (whatever
+;; `pyim-mode-map' actually dispatched), never
+;; `idiig/completion-preview-tab' -- that function's own
+;; consecutive-press check would never see two presses as consecutive
+;; and would never escalate to `completion-preview-complete'.  So this
+;; reimplements the same counting against its OWN command symbol
+;; instead, while still sharing the README's
+;; `idiig/completion-preview-tab-cycle-count'/`-limit' variables so
+;; configuration and the press count stay unified across both
+;; contexts.  Falls back to pyim's original assistant-scheme toggle
+;; when no CP candidate is showing.
+(defun idiig/pyim-composing-completion-preview-cycle ()
   (interactive)
   (if (bound-and-true-p completion-preview-active-mode)
-      (completion-preview-insert)
+      (progn
+        ;; See the README's `idiig/completion-preview-tab' for why this
+        ;; is needed: without it, `completion-preview--post-command'
+        ;; (were it to run) would treat this wrapper as an unrecognized
+        ;; command and hide the preview it just cycled.  Not actually
+        ;; reachable mid-composition -- `post-command-hook' never runs
+        ;; until `pyim-process-input-method's own loop returns -- but
+        ;; kept here anyway so this mirrors the README version exactly
+        ;; and stays correct if that ever changes.
+        (completion-preview--inhibit-update)
+        (setq idiig/completion-preview-tab-cycle-count
+              (if (eq last-command 'idiig/pyim-composing-completion-preview-cycle)
+                  (1+ idiig/completion-preview-tab-cycle-count)
+                1))
+        (if (> idiig/completion-preview-tab-cycle-count
+               idiig/completion-preview-tab-cycle-limit)
+            (completion-preview-complete)
+          (completion-preview-next-candidate 1)))
     (pyim-toggle-assistant-scheme)))
-(define-key pyim-mode-map (kbd "TAB") #'idiig/pyim-composing-completion-preview-accept)
-(define-key pyim-mode-map [?\t] #'idiig/pyim-composing-completion-preview-accept)
+(define-key pyim-mode-map (kbd "TAB")
+            #'idiig/pyim-composing-completion-preview-cycle)
+(define-key pyim-mode-map [?\t]
+            #'idiig/pyim-composing-completion-preview-cycle)
 
 ;; To restore the original inline-preview-of-selected-candidate
 ;; behavior without restarting Emacs, eval this:

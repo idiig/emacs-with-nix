@@ -843,17 +843,19 @@ Emacs 30+ 自带的功能，输入时以浅色文字内联预览排在第一位�
 补全弹窗是两套机制、互不冲突——在被 LSP-Bridge 接管的编程语言 buffer 里
 基本不会显示，主要在 =M-x=、elisp scratch、shell 等走原生补全的地方起
 作用。配置参照 [[https://protesilaos.com/codelog/2026-08-29-emacs-completion-preview-mode/][Prot 的这篇文章]]：
-- =M-i= 采纳当前候选，=M-n=/=M-p= 切换候选，=M-<return>= 直接插入完整补全，
-  =<tab>= 补到候选间最长公共前缀，没有更多公共前缀可补时才弹
-  *Completions* buffer
+- =M-i= 采纳当前候选，=M-<return>= 直接插入完整补全，=M-n=/=M-p= 切换
+  候选，=TAB=/=<tab>= 补到候选间最长公共前缀，没有更多公共前缀可补时
+  才弹 *Completions* buffer（=TAB= 的自定义行为见下面
+  [[#completion-preview-keys][按键行为微调]] 一节）
 - org-mode 会重新绑定 self-insert-command，不加下面这行的话
   completion-preview 在 org buffer 里根本不会触发
 - GUI 下物理 Tab 键发的是独立的 =<tab>= 事件，TUI 下发的是字面
   =C-i=，两者在 keymap 里是不同的绑定位置——只绑 =<tab>= 的话 TUI 里
   的 Tab 键会落到内置默认的 =C-i= 绑定（=completion-preview-insert=），
   跟 GUI 下的行为不一致，所以两个都要绑
-- =<tab>= 弹出的 *Completions* buffer 由 =completion-in-region-mode=
-  接管，用的是另一个 keymap（=completion-in-region-mode-map=），不是
+- =completion-preview-complete= 弹出的 *Completions* buffer 由
+  =completion-in-region-mode= 接管，用的是另一个 keymap
+  （=completion-in-region-mode-map=），不是
   =completion-preview-active-mode-map=，两边的 =M-i=/=M-n=/=M-p= 要分
   别绑；=minibuffer-visible-completions= 让候选连同当前输入内容一起
   显示，不用切到 *Completions* buffer 里才看得到
@@ -879,6 +881,74 @@ Emacs 30+ 自带的功能，输入时以浅色文字内联预览排在第一位�
     (with-eval-after-load 'org
       (add-to-list 'completion-preview-commands #'org-self-insert-command))
     (global-completion-preview-mode 1))
+#+end_src
+***** 按键行为微调
+:PROPERTIES:
+:header-args: :noweb-ref ecfg
+:CUSTOM_ID: completion-preview-keys
+:END:
+在上面 Prot 文章原版配置的基础上，覆盖两个键的行为：
+- =TAB=/=<tab>= 连续按的前 =idiig/completion-preview-tab-cycle-limit=
+  次切换到下一个候选（跟 =M-n= 相同，=TAB= 更顺手），超过这个次数后
+  才改为原来的 =completion-preview-complete=（补全候选间最长公共前
+  缀，没有更多公共前缀可补时弹 *Completions* buffer）——靠
+  =last-command= 是否还是这条命令本身来判断"连续按了几次"，中间只要
+  打字、移动光标等任何别的命令，计数就重新从头开始，不需要手动重置
+- =SPC= 直接接受当前候选，再插入一个空格——正常打字时这个 keymap 根
+  本不生效（=completion-preview-active-mode-map= 只在候选真的显示出
+  来的时候才激活），所以不会影响没有候选时空格键的正常输入
+#+begin_src emacs-lisp
+  (defvar idiig/completion-preview-tab-cycle-limit 3
+    "How many consecutive TAB presses cycle completion-preview
+  candidates before TAB switches to `completion-preview-complete'
+  instead.  See `idiig/completion-preview-tab'.")
+  (defvar idiig/completion-preview-tab-cycle-count 0)
+  (defun idiig/completion-preview-tab ()
+    "Cycle to the next completion-preview candidate.
+
+  After `idiig/completion-preview-tab-cycle-limit' consecutive presses
+  of this command, switch to `completion-preview-complete' instead
+  (complete the common prefix, or pop up *Completions* once there is no
+  more common prefix to complete).  Consecutive-ness is tracked via
+  `last-command', so any other command in between (typing, moving
+  point, accepting a candidate) resets the count without needing an
+  explicit reset.
+
+  `completion-preview--inhibit-update' has to be called explicitly
+  here: `completion-preview--post-command' (on `post-command-hook')
+  only skips its own hide-if-not-a-trigger-command logic when
+  `this-command' is hardcoded in `completion-preview--internal-commands'
+  -- which lists `completion-preview-next-candidate' itself, but not
+  this wrapper.  Since we call `completion-preview-next-candidate' from
+  inside a different command, `this-command' is
+  `idiig/completion-preview-tab', not
+  `completion-preview-next-candidate', so without this call
+  `completion-preview--post-command' would treat the cycle as an
+  unrecognized command and immediately hide the preview it just
+  showed -- verified directly: without this line,
+  `completion-preview-active-mode' flips to nil right after the very
+  first press, so the 2nd+ press never even reaches this command again
+  (the keymap only applies while the mode is on), which is exactly why
+  cycling looked like it did nothing and the count could never reach
+  the escalation threshold either."
+    (interactive)
+    (completion-preview--inhibit-update)
+    (setq idiig/completion-preview-tab-cycle-count
+          (if (eq last-command 'idiig/completion-preview-tab)
+              (1+ idiig/completion-preview-tab-cycle-count)
+            1))
+    (if (> idiig/completion-preview-tab-cycle-count
+           idiig/completion-preview-tab-cycle-limit)
+        (completion-preview-complete)
+      (completion-preview-next-candidate 1)))
+  (defun idiig/completion-preview-accept-and-space ()
+    "Accept the current completion-preview candidate, then insert a space."
+    (interactive)
+    (completion-preview-insert)
+    (insert " "))
+  (keymap-set completion-preview-active-mode-map "TAB" #'idiig/completion-preview-tab)
+  (keymap-set completion-preview-active-mode-map "<tab>" #'idiig/completion-preview-tab)
+  (keymap-set completion-preview-active-mode-map "SPC" #'idiig/completion-preview-accept-and-space)
 #+end_src
 ***** 接入 CAPF 管线的补全源
 除了 =completion-preview= 自己识别的通用符号补全，下面几个包各自的补全/

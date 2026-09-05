@@ -396,6 +396,57 @@
 	      (with-eval-after-load 'org
 	        (add-to-list 'completion-preview-commands #'org-self-insert-command))
 	      (global-completion-preview-mode 1))
+	    (defvar idiig/completion-preview-tab-cycle-limit 3
+	      "How many consecutive TAB presses cycle completion-preview
+	    candidates before TAB switches to `completion-preview-complete'
+	    instead.  See `idiig/completion-preview-tab'.")
+	    (defvar idiig/completion-preview-tab-cycle-count 0)
+	    (defun idiig/completion-preview-tab ()
+	      "Cycle to the next completion-preview candidate.
+	    
+	    After `idiig/completion-preview-tab-cycle-limit' consecutive presses
+	    of this command, switch to `completion-preview-complete' instead
+	    (complete the common prefix, or pop up *Completions* once there is no
+	    more common prefix to complete).  Consecutive-ness is tracked via
+	    `last-command', so any other command in between (typing, moving
+	    point, accepting a candidate) resets the count without needing an
+	    explicit reset.
+	    
+	    `completion-preview--inhibit-update' has to be called explicitly
+	    here: `completion-preview--post-command' (on `post-command-hook')
+	    only skips its own hide-if-not-a-trigger-command logic when
+	    `this-command' is hardcoded in `completion-preview--internal-commands'
+	    -- which lists `completion-preview-next-candidate' itself, but not
+	    this wrapper.  Since we call `completion-preview-next-candidate' from
+	    inside a different command, `this-command' is
+	    `idiig/completion-preview-tab', not
+	    `completion-preview-next-candidate', so without this call
+	    `completion-preview--post-command' would treat the cycle as an
+	    unrecognized command and immediately hide the preview it just
+	    showed -- verified directly: without this line,
+	    `completion-preview-active-mode' flips to nil right after the very
+	    first press, so the 2nd+ press never even reaches this command again
+	    (the keymap only applies while the mode is on), which is exactly why
+	    cycling looked like it did nothing and the count could never reach
+	    the escalation threshold either."
+	      (interactive)
+	      (completion-preview--inhibit-update)
+	      (setq idiig/completion-preview-tab-cycle-count
+	            (if (eq last-command 'idiig/completion-preview-tab)
+	                (1+ idiig/completion-preview-tab-cycle-count)
+	              1))
+	      (if (> idiig/completion-preview-tab-cycle-count
+	             idiig/completion-preview-tab-cycle-limit)
+	          (completion-preview-complete)
+	        (completion-preview-next-candidate 1)))
+	    (defun idiig/completion-preview-accept-and-space ()
+	      "Accept the current completion-preview candidate, then insert a space."
+	      (interactive)
+	      (completion-preview-insert)
+	      (insert " "))
+	    (keymap-set completion-preview-active-mode-map "TAB" #'idiig/completion-preview-tab)
+	    (keymap-set completion-preview-active-mode-map "<tab>" #'idiig/completion-preview-tab)
+	    (keymap-set completion-preview-active-mode-map "SPC" #'idiig/completion-preview-accept-and-space)
 	    (use-package mwim
 	      :bind
 	      ("C-a" . mwim-beginning-of-code-or-line-or-comment)
