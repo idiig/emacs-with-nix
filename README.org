@@ -1241,9 +1241,11 @@ LSP-Bridge 和 ddskk 的补全机制评估过之后 *没有* 接进来：
     :after vertico
     :bind
     (("C-h B" . embark-bindings)  ;; alternative for `describe-bindings'
+     ("C-c M-." . embark-act)         ;; 对函数进行设置操作
+     ("C-." . embark-act)         ;; 对函数进行设置操作
      (:map minibuffer-local-map
-           ("C-'" . embark-act)         ;; 对函数进行设置操作 
-           ("M-." . embark-dwim)        ;; 实施 
+           ("M-." . embark-dwim)        ;; 实施
+  	 ("C-." . embark-act)         ;; 对函数进行设置操作
            ("C-c C-e" . embark-export))) ;; occur 
     :init
     ;; Optionally replace the key help with a completing-read interface
@@ -4055,14 +4057,6 @@ XOAUTH2 client-id 就没预热，发信会失败。两处顺序不影响，都�
       (message "未找到匹配的括號"))))
 
   (bind-key* "M--" 'idiig/goto-match-paren)
-#+end_src
-*** 点后插入空白
-#+begin_src emacs-lisp
-  (defun idiig/insert-space-after-point ()
-    (interactive)
-    (save-excursion (insert " ")))
-
-  (bind-key* "C-." 'idiig/insert-space-after-point)
 #+end_src
 *** 写作和展示UI（手动开启）  
 **** 依赖

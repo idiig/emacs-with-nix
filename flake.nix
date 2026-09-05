@@ -627,9 +627,11 @@
 	      :after vertico
 	      :bind
 	      (("C-h B" . embark-bindings)  ;; alternative for `describe-bindings'
+	       ("C-c M-." . embark-act)         ;; 对函数进行设置操作
+	       ("C-." . embark-act)         ;; 对函数进行设置操作
 	       (:map minibuffer-local-map
-	             ("C-'" . embark-act)         ;; 对函数进行设置操作 
-	             ("M-." . embark-dwim)        ;; 实施 
+	             ("M-." . embark-dwim)        ;; 实施
+	    	 ("C-." . embark-act)         ;; 对函数进行设置操作
 	             ("C-c C-e" . embark-export))) ;; occur 
 	      :init
 	      ;; Optionally replace the key help with a completing-read interface
@@ -2358,11 +2360,6 @@
 	        (message "未找到匹配的括號"))))
 	    
 	    (bind-key* "M--" 'idiig/goto-match-paren)
-	    (defun idiig/insert-space-after-point ()
-	      (interactive)
-	      (save-excursion (insert " ")))
-	    
-	    (bind-key* "C-." 'idiig/insert-space-after-point)
 	    (use-package spacious-padding
 	      :defer t
 	      :config
