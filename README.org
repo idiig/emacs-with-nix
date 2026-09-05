@@ -466,7 +466,7 @@ Emacs 在处理这类文件时出现卡顿或假死现象。
 #+end_src
 - 窗口的放大缩小转变为持续的行为 ::
   默认行为中放大缩小需要不断反复按 =C-x= 。这里为了避免重复按 =C-x= ，后续
-  行为使用默认 =^, V, {, }= 持续调节边界的位置达到放大缩小窗口的。这里我
+  行为使用默认 =^, v, {, }= 持续调节边界的位置达到放大缩小窗口的。这里我
   没用 =C-x v= 是因为这个键位目前用于 =vc= 的默认快捷键。
 #+begin_src emacs-lisp
   (use-package window
@@ -484,8 +484,10 @@ Emacs 在处理这类文件时出现卡顿或假死现象。
   	 ;; ^ = border moves up
   	 (define-key map (kbd "^")
   		     `(lambda () (interactive) (idiig/smart-adjust-window-size 'up ,delta)))
-  	 ;; V = border moves down
-  	 (define-key map (kbd "V")
+  	 ;; v = border moves down
+  	 (define-key map (kbd "v")
+  		     `(lambda () (interactive) (idiig/smart-adjust-window-size 'down ,delta)))
+  	 (define-key map (kbd "M-v")
   		     `(lambda () (interactive) (idiig/smart-adjust-window-size 'down ,delta)))
   	 ;; { = border moves left
   	 (define-key map (kbd "{")

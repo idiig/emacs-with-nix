@@ -162,8 +162,10 @@
 	    	 ;; ^ = border moves up
 	    	 (define-key map (kbd "^")
 	    		     `(lambda () (interactive) (idiig/smart-adjust-window-size 'up ,delta)))
-	    	 ;; V = border moves down
-	    	 (define-key map (kbd "V")
+	    	 ;; v = border moves down
+	    	 (define-key map (kbd "v")
+	    		     `(lambda () (interactive) (idiig/smart-adjust-window-size 'down ,delta)))
+	    	 (define-key map (kbd "M-v")
 	    		     `(lambda () (interactive) (idiig/smart-adjust-window-size 'down ,delta)))
 	    	 ;; { = border moves left
 	    	 (define-key map (kbd "{")
