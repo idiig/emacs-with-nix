@@ -1771,46 +1771,6 @@ RET 就等价于原来的行为；当前已经开着某个输入法时，再按�
   (global-set-key (kbd "C-\\") #'idiig/set-or-disable-input-method)
 #+end_src
 
-** 输入法补全定制
-**** 外部元
-- 以下代码是 [[https://github.com/idiig/skk-style-completion-framework][skk-style-completion-framework]] 的外部元链接：把 SKK 风
-  格的三段式（continuation/abbrev/convert）组字补全协议抽出来的通用框
-  架，见上面的 TODO。这个仓库自己就是一个 flake（导出了
-  =lib.mkPyimPackage= 等），所以不写 =flake = false=，按正常 flake
-  引用，下面 =externals/pyim-skk-style/default.nix= 直接复用它自己的
-  打包逻辑，不用再手写一份 =melpaBuild=。
-#+begin_src nix :noweb-ref externals
-  skk-style-completion-framework.url = "github:idiig/skk-style-completion-framework";
-#+end_src
-
-- 以下代码是打包文件：转发到 =skk-style-completion-framework= 自己导出
-  的 =lib.mkPyimPackage=（同时把 =skk-style-completion-framework.el= 那
-  个通用协议包一并当依赖装上）。目录名叫 =pyim-skk-style= 而不是
-  =skk-style-completion-framework=，因为这里产出的是 pyim 整合包，跟
-  =externals/default.nix= 里 =packageSources= 那条别名对应。
-#+begin_src nix :tangle externals/pyim-skk-style/default.nix
-  { package_src, emacsPackages }:
-  package_src.lib.mkPyimPackage { inherit emacsPackages; }
-#+end_src
-**** 依赖
-:PROPERTIES:
-:header-args: :noweb-ref epkgs
-:END:
-#+begin_src nix
-  pyim-skk-style
-#+end_src
-**** 配置
-:PROPERTIES:
-:header-args: :noweb-ref ecfg
-:END:
-=pyim= 本身是 =:commands= 延迟加载的（见上面 pyim 那节），这里不直接顶
-层 =require=，而是等 =pyim= 真正加载完之后再挂上 SKK 风格的 shift 启
-动组字、补全预览、候选确认这一整套行为，避免提前强制加载 =pyim=。
-#+begin_src emacs-lisp
-  (with-eval-after-load 'pyim
-    (require 'pyim-skk-style))
-#+end_src
-
 ** 日文
 *** 输入法 (ddskk)
 **** 依赖
@@ -2084,14 +2044,6 @@ COLLECTION 包成一个忽略输入字符串、永远把候选原样交给
   (global-set-key (kbd "M-i") #'idiig/pyim-completion-at-point)
 #+end_src
 
-***** TODO 实时候选选择流程统一到 CAPF
-[[#pyim-capf][前面这条 CAPF]]只能转换已经打在 buffer 里的 ASCII 拼
-音，覆盖不到 pyim 作为输入法激活时的实时候选——那条路走的是
-=input-method-function=，跟 [[#skk-capf-unify][ddskk 那条同名 TODO]]
-分析的原因一样，在命令循环之前就把按键截走了，不经过
-=completion-at-point-functions=。目标不是改候选长什么样（弹窗/内联无
-所谓），而是让实时候选的*选择*流程也走 CAPF 这套统一管线，跟 SKK、以
-及其他标准 CAPF 补全源共用同一套机制，不是各自一套输入法专属实现。
 ***** TODO 接入 liberime（RIME 词库/方案引擎）
 pyim 包里已经带了 =pyim-liberime.el=（休眠状态，因为 =liberime= 这个动
 态模块和它依赖的 =pkgs.librime= 都还没装），提供一个新的
@@ -2200,6 +2152,46 @@ pyim 包里已经带了 =pyim-liberime.el=（休眠状态，因为 =liberime= �
 
     (add-to-list '+orderless-dispatch-alist '(?@ . orderless-pyim)))
 #+end_src
+** 输入法补全定制
+**** 外部元
+- 以下代码是 [[https://github.com/idiig/skk-style-completion-framework][skk-style-completion-framework]] 的外部元链接：把 SKK 风
+  格的三段式（continuation/abbrev/convert）组字补全协议抽出来的通用框
+  架，见上面的 TODO。这个仓库自己就是一个 flake（导出了
+  =lib.mkPyimPackage= 等），所以不写 =flake = false=，按正常 flake
+  引用，下面 =externals/pyim-skk-style/default.nix= 直接复用它自己的
+  打包逻辑，不用再手写一份 =melpaBuild=。
+#+begin_src nix :noweb-ref externals
+  skk-style-completion-framework.url = "github:idiig/skk-style-completion-framework";
+#+end_src
+
+- 以下代码是打包文件：转发到 =skk-style-completion-framework= 自己导出
+  的 =lib.mkPyimPackage=（同时把 =skk-style-completion-framework.el= 那
+  个通用协议包一并当依赖装上）。目录名叫 =pyim-skk-style= 而不是
+  =skk-style-completion-framework=，因为这里产出的是 pyim 整合包，跟
+  =externals/default.nix= 里 =packageSources= 那条别名对应。
+#+begin_src nix :tangle externals/pyim-skk-style/default.nix
+  { package_src, emacsPackages }:
+  package_src.lib.mkPyimPackage { inherit emacsPackages; }
+#+end_src
+**** 依赖
+:PROPERTIES:
+:header-args: :noweb-ref epkgs
+:END:
+#+begin_src nix
+  pyim-skk-style
+#+end_src
+**** 配置
+:PROPERTIES:
+:header-args: :noweb-ref ecfg
+:END:
+=pyim= 本身是 =:commands= 延迟加载的（见上面 pyim 那节），这里不直接顶
+层 =require=，而是等 =pyim= 真正加载完之后再挂上 SKK 风格的 shift 启
+动组字、补全预览、候选确认这一整套行为，避免提前强制加载 =pyim=。
+#+begin_src emacs-lisp
+  (with-eval-after-load 'pyim
+    (require 'pyim-skk-style))
+#+end_src
+
 ** Git (=magit=)
 用 Magit 进行项目与版本的管理
 *** 依赖

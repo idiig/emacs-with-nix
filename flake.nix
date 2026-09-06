@@ -964,8 +964,6 @@
 	        (call-interactively #'set-input-method)))
 	    
 	    (global-set-key (kbd "C-\\") #'idiig/set-or-disable-input-method)
-	    (with-eval-after-load 'pyim
-	      (require 'pyim-skk-style))
 	    (use-package ddskk
 	      :defer t
 	      :bind (("C-x j" . skk-mode))
@@ -1189,6 +1187,8 @@
 	    	(invalid-regexp nil))))
 	    
 	      (add-to-list '+orderless-dispatch-alist '(?@ . orderless-pyim)))
+	    (with-eval-after-load 'pyim
+	      (require 'pyim-skk-style))
 	    (use-package magit
 	      :bind ("C-x g" . magit-status)
 	      :commands magit-status
@@ -3644,11 +3644,11 @@
             ctrlf
             wgrep
             puni
-            pyim-skk-style
             ddskk
             migemo
             pyim
               pyim-basedict
+            pyim-skk-style
             magit
             tramp-rpc
             with-editor
