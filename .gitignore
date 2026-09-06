@@ -7,10 +7,8 @@ result/*
 /result
 /test/
 /-
-/externals
 /api-keys/
 .aider*
 /.emacs-lsp-paths
 *.org#
 /.agent-shell/
-/davmail.log
