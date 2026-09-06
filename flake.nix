@@ -5,6 +5,7 @@
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
     flake-utils.url = "github:numtide/flake-utils";
     emacs-overlay.url = "github:nix-community/emacs-overlay";
+    skk-style-completion-framework.url = "github:idiig/skk-style-completion-framework";
     tramp-rpc = {
       url = "github:ArthurHeymans/emacs-tramp-rpc";
       flake = false;
@@ -963,6 +964,8 @@
 	        (call-interactively #'set-input-method)))
 	    
 	    (global-set-key (kbd "C-\\") #'idiig/set-or-disable-input-method)
+	    (with-eval-after-load 'pyim
+	      (require 'pyim-skk-style))
 	    (use-package ddskk
 	      :defer t
 	      :bind (("C-x j" . skk-mode))
@@ -3641,6 +3644,7 @@
             ctrlf
             wgrep
             puni
+            pyim-skk-style
             ddskk
             migemo
             pyim

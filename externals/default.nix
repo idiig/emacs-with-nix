@@ -5,11 +5,23 @@
   packagesDir = ./.;
   packageSources = inputs // {
     # nano = inputs.nano-emacs;
+    # pyim-skk-style.el/skk-style-completion-framework.el 都在同一个
+    # skk-style-completion-framework 仓库里，这个别名让
+    # externals/pyim-skk-style/default.nix 也能拿到同一个 flake input。
+    pyim-skk-style = inputs.skk-style-completion-framework;
   };
   importFile = dir: let
     packageFunction = import "${packagesDir}/${dir}";
   in emacsPackages.callPackage packageFunction (
     pipe ({
+      # 大多数外部包只需要 package_src 加上面几个版本/构建辅助函数就够
+      # 打包；这里额外注入 emacsPackages 本身，是给像
+      # skk-style-completion-framework 这种自己就是 flake、直接暴露
+      # `lib.mkXxxPackage = { emacsPackages }: ...` 的外部包用的——它
+      # 们的 default.nix 不需要重新写一遍 melpaBuild，只要把
+      # emacsPackages 转发回 package_src (这里是那个 flake 自己的
+      # outputs) 自己的打包函数即可。
+      inherit emacsPackages;
       elispFileVersion = file: let
         output = runCommand "${baseNameOf file}-version" { } ''
           ${emacsPackages.emacs}/bin/emacs -Q --batch \

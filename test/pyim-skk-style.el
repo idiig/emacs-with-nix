@@ -37,6 +37,18 @@
 
 (require 'pyim)
 (require 'completion-preview)
+(require 'ert)
+
+;; Generic 3-stage compose-completion protocol (backend struct, macro,
+;; engine, and the state interface built on `idiig/completion-active-
+;; backend') -- see `skk-style-completion-framework.el' in this same
+;; directory for what it provides and why.  `idiig/completion-backend-
+;; pyim' below (defined once its dependencies exist, alongside the old
+;; capf definitions it replaces) is pyim's own implementation, wired up
+;; everywhere pyim used to call its candidate/accept logic directly.
+(let ((dir (file-name-directory (or load-file-name buffer-file-name default-directory))))
+  (add-to-list 'load-path dir))
+(require 'skk-style-completion-framework)
 
 (defvar-local idiig/pyim-page-revealed nil
   "Non-nil once SPC has revealed the candidate page for the current
@@ -71,19 +83,26 @@ composition.  Buffer-local; reset to nil whenever a composition ends
 (advice-add 'pyim-process-input-method :around
             #'idiig/pyim-process-input-method-shift-gate)
 
-;; 1b. Once the candidate page is revealed (▼), typing anything that
-;;     isn't a recognized candidate-navigation key (SPC, digits, page
-;;     nav -- none of which go through this path) should confirm the
-;;     currently-displayed candidate first, THEN process the new key
-;;     as a fresh keystroke -- mirroring SKK's kakutei-before-anything-
-;;     else behavior in ▼ mode, instead of folding new input into the
-;;     same composition.  This is exactly the pattern pyim's own
-;;     `pyim-process--auto-select-word' already uses internally: push
-;;     the key back for the next read cycle, then confirm/terminate --
-;;     `pyim-process--translating-p' becoming nil makes the enclosing
-;;     `pyim-process-input-method' while loop exit on its next check,
-;;     so the requeued key gets processed by a brand new top-level
-;;     `pyim-input-method' call, hitting the shift-gate logic fresh.
+;; 1b. Confirm-then-redispatch: once there's a candidate ready to
+;;     commit (▼ revealed, or ghost text showing one of ENTERED's own
+;;     word candidates), a SECOND SHIFTED letter -- not just any key --
+;;     confirms the currently-displayed candidate first, THEN processes
+;;     the new key as a fresh keystroke, mirroring SKK's kakutei-
+;;     before-anything-else behavior in ▼ mode, instead of folding new
+;;     input into the same composition.  Only shift triggers this
+;;     (see `idiig/pyim-syllable-boundary-insert', the sole caller of
+;;     `idiig/pyim-confirm-then-redispatch' below) -- an ordinary
+;;     lowercase letter or punctuation reaching
+;;     `pyim-self-insert-command' while a candidate is ready keeps
+;;     folding into ENTERED as usual instead, same as pyim's own
+;;     unmodified behavior there.  This is exactly the pattern pyim's
+;;     own `pyim-process--auto-select-word' already uses internally:
+;;     push the key back for the next read cycle, then
+;;     confirm/terminate -- `pyim-process--translating-p' becoming nil
+;;     makes the enclosing `pyim-process-input-method' while loop exit
+;;     on its next check, so the requeued key gets processed by a
+;;     brand new top-level `pyim-input-method' call, hitting the
+;;     shift-gate logic fresh.
 (defun idiig/pyim-confirm-then-redispatch ()
   (pyim-add-unread-command-events last-command-event)
   ;; Two different "there's a candidate ready to commit" states share
@@ -115,6 +134,12 @@ composition.  Buffer-local; reset to nil whenever a composition ends
 ;; (which only ever sees the first key of a fresh composition).
 (defun idiig/pyim-syllable-boundary-insert ()
   (interactive)
+  ;; A shifted letter while a candidate is already ready to commit
+  ;; (`idiig/pyim-conversion-ready-p') is the ONLY key that
+  ;; confirm-then-redispatches -- see the "1b." comment above.  Plain
+  ;; lowercase letters/punctuation never reach this function at all
+  ;; (they're bound to pyim's own unmodified self-insert-command
+  ;; instead), so there's no separate gate needed for them here.
   (if (idiig/pyim-conversion-ready-p)
       (idiig/pyim-confirm-then-redispatch)
     (pyim-process-with-entered-buffer
@@ -125,17 +150,6 @@ composition.  Buffer-local; reset to nil whenever a composition ends
     (define-key pyim-mode-map (char-to-string i)
                 #'idiig/pyim-syllable-boundary-insert)
     (setq i (1+ i))))
-
-;; Same confirm-then-redispatch treatment for ordinary characters
-;; (lowercase letters, punctuation pyim would otherwise keep folding
-;; into the entered buffer) reaching pyim's own self-insert command
-;; while the page is already revealed.
-(defun idiig/pyim-self-insert-command-confirm-gate (orig-fn &rest args)
-  (if (idiig/pyim-conversion-ready-p)
-      (idiig/pyim-confirm-then-redispatch)
-    (apply orig-fn args)))
-(advice-add 'pyim-self-insert-command :around
-            #'idiig/pyim-self-insert-command-confirm-gate)
 
 ;; 2. Inline preview: "▽" + raw entered code while composing, "▼" +
 ;;    currently-selected candidate once SPC has revealed the page.
@@ -368,8 +382,7 @@ ENTERED into something else entirely (\"dei\") instead of committing
 `idiig/pyim-page-revealed', which this ghost-text state never sets."
   (or idiig/pyim-page-revealed
       (and (bound-and-true-p completion-preview-active-mode)
-           (let ((entered (idiig/pyim-entered)))
-             (and (member entered (idiig/pyim-pinyin-spellings entered)) t)))))
+           (idiig/completion-complete-p))))
 
 (defun idiig/pyim-accept-shown-completion ()
   "Accept whichever completion is currently shown (ghost text or the
@@ -390,27 +403,16 @@ choosing it from that CAPF's popped-up list would."
            (cur (completion-preview--get 'completion-preview-index))
            (com (completion-preview--get 'completion-preview-common))
            (shown (concat com (nth cur all)))
-           (entered (idiig/pyim-entered)))
+           (complete (idiig/completion-complete-p)))
       (completion-preview-active-mode -1)
-      (if (member entered (idiig/pyim-pinyin-spellings entered))
-          (let ((idx (seq-position (pyim-process-get-candidates) shown #'equal)))
-            (when idx
-              (pyim-process-plan-to-select-word idx)
-              (pyim-process-select-word (pyim-scheme-current))))
-        (pyim-process-with-entered-buffer
-          (goto-char (point-max))
-          (insert shown))
-        (pyim-process-run))
+      (idiig/completion-commit shown (if complete 'convert 'continuation))
       t))
    (t
-    (let* ((entered (idiig/pyim-entered))
+    (let* ((entered (idiig/completion-entered))
            (hinted (and (not (idiig/pyim-pinyin-continuation-suffixes entered))
                         (car (idiig/pyim-pinyin-jianpin-candidates-rotated entered)))))
       (when hinted
-        (pyim-process-with-entered-buffer
-          (erase-buffer)
-          (insert hinted))
-        (pyim-process-run)
+        (idiig/completion-commit hinted 'abbrev)
         t)))))
 (defun idiig/pyim-space-reveal-or-select ()
   (interactive)
@@ -488,8 +490,6 @@ this file."
   (advice-remove 'pyim-process-input-method
                  #'idiig/pyim-process-input-method-shift-gate)
   (advice-remove 'pyim-page--refresh #'idiig/pyim-page-refresh-gate)
-  (advice-remove 'pyim-self-insert-command
-                 #'idiig/pyim-self-insert-command-confirm-gate)
   (advice-remove 'completion-at-point
                  #'idiig/pyim-completion-at-point-overlay-advice)
   (remove-hook 'pyim-process-ui-hide-hook #'idiig/pyim-reset-reveal-flag)
@@ -580,142 +580,101 @@ this file."
                 (insert spelling))
               (pyim-process-run))))))
 
-(defun idiig/pyim-pinyin-continuation-capf ()
+;; pyim's own implementation of the 3-stage protocol above: COMPLETE-P
+;; is exactly what decides which of continuation/convert is shown (see
+;; `idiig/pyim-pinyin-continuation-suffixes' and
+;; `idiig/pyim-pinyin-word-capf's old docstring, both folded into this
+;; backend now); ABBREV mirrors the old `idiig/pyim-pinyin-overlay-capf'
+;; exactly -- jianpin candidates first, then whatever other spellings
+;; aren't already jianpin -- since that CAPF's whole job was already
+;; "full alternate readings for what's typed, abbreviation-derived ones
+;; first", just not expressed as a named protocol stage until now.
+;;
+;; CONVERT bakes its own COMPLETE-P check back in (rather than relying
+;; solely on callers checking it first) so that nothing calling
+;; `idiig/completion-stage-candidates' with `convert' on an incomplete
+;; ENTERED gets pyim's current (possibly unrelated) candidate list by
+;; accident.
+(defun idiig/pyim-completion-accept (stage entered candidate)
+  "pyim's ACCEPT function: commit CANDIDATE, chosen at STAGE for
+ENTERED, into pyim's own composing state.
+
+`continuation' and `abbrev' both fold CANDIDATE into pyim's hidden
+entered buffer and keep composing -- the only difference is that a
+`continuation' CANDIDATE is a bare suffix (append after ENTERED) while
+an `abbrev' one is already a full spelling (replace ENTERED outright).
+`convert' instead looks CANDIDATE up in pyim's own current candidate
+list and plans+confirms it, precisely mirroring what choosing it from
+`pyim-select-word's own page would do -- needed because ghost-text TAB-
+cycling (`completion-preview-next-candidate') never touches pyim's own
+internal word-position, so the word actually shown can differ from
+whatever pyim's own tracking last set it to."
+  (pcase stage
+    ('continuation
+     (pyim-process-with-entered-buffer
+       (goto-char (point-max))
+       (insert candidate))
+     (pyim-process-run))
+    ('abbrev
+     (pyim-process-with-entered-buffer
+       (erase-buffer)
+       (insert candidate))
+     (pyim-process-run))
+    ('convert
+     (let ((idx (seq-position (pyim-process-get-candidates) candidate #'equal)))
+       (when idx
+         (pyim-process-plan-to-select-word idx)
+         (pyim-process-select-word (pyim-scheme-current)))))))
+
+(idiig/define-completion-backend pyim
+  :composing-p (lambda ()
+                 (and (pyim-process--translating-p)
+                      (not idiig/pyim-page-revealed)
+                      (not (pyim-process-without-entered-p))))
+  :entered #'idiig/pyim-entered
+  :complete-p (lambda (entered)
+                (and (member entered (idiig/pyim-pinyin-spellings entered)) t))
+  :continuation #'idiig/pyim-pinyin-continuation-suffixes
+  :abbrev (lambda (entered)
+            (let ((jianpin (idiig/pyim-pinyin-jianpin-candidates-rotated entered)))
+              (if jianpin
+                  (append jianpin
+                          (seq-remove (lambda (s) (member s jianpin))
+                                      (idiig/pyim-pinyin-spellings entered)))
+                (idiig/pyim-pinyin-spellings entered))))
+  :convert (lambda (entered)
+             (when (member entered (idiig/pyim-pinyin-spellings entered))
+               (delete-dups (copy-sequence (pyim-process-get-candidates)))))
+  :accept #'idiig/pyim-completion-accept)
+
+;; This file only ever composes through pyim, so the state interface
+;; (`idiig/completion-composing-p' etc.) can just default to this
+;; backend everywhere below instead of naming it at every call site.
+(setq idiig/completion-active-backend idiig/completion-backend-pyim)
+
+;; The three automatic/escalated CAPFs are now just the generic engine
+;; applied to `idiig/completion-backend-pyim' at each of its three
+;; stages -- kept under their old names (via `defalias') since they're
+;; referenced by symbol in several places below (`completion-at-point-
+;; functions' lists, `idiig/pyim-completion-at-point-overlay-advice').
+(defalias 'idiig/pyim-pinyin-continuation-capf
+  (idiig/completion-make-capf idiig/completion-backend-pyim 'continuation)
   "CAPF for real completion-preview pinyin continuations while composing.
-The pyim entered text is displayed by `pyim-preview--overlay', not stored
-in the real buffer, so this CAPF completes an empty range at point and
-offers only suffix strings."
-  (when (and (pyim-process--translating-p)
-             (not idiig/pyim-page-revealed)
-             (not (pyim-process-without-entered-p)))
-    (let* ((entered (idiig/pyim-entered))
-           (suffixes (idiig/pyim-pinyin-continuation-suffixes entered)))
-      (list (point) (point)
-            (lambda (string pred action)
-              (complete-with-action action suffixes "" pred))
-            :exclusive 'yes
-            ;; Preserve `pyim-candidates-create's own frequency-based
-            ;; order -- without this, vertico/consult (and the plain
-            ;; *Completions* buffer) apply their own default sort
-            ;; (roughly by length then alphabetically), which is
-            ;; exactly why "wo'men" ended up last in a 17-candidate
-            ;; list instead of first.  `completion-preview-complete'
-            ;; itself does the same `:display-sort-function #'identity'
-            ;; trick when it falls through to a full candidates list;
-            ;; we bypass that function for the jianpin case below, so
-            ;; we need to set this ourselves.
-            :display-sort-function #'identity
-            :cycle-sort-function #'identity
-            :exit-function
-            (lambda (suffix _status)
-              ;; `completion-preview-insert' inserts SUFFIX into the real
-              ;; buffer first.  Remove that insertion and append it to pyim's
-              ;; hidden entered buffer instead, then let pyim redraw its own
-              ;; preview from the synchronized state.
-              (delete-region (- (point) (length suffix)) (point))
-              (pyim-process-with-entered-buffer
-                (goto-char (point-max))
-                (insert suffix))
-              (pyim-process-run))))))
-
-(defvar idiig/pyim-composing-completion-preview-rotate-to nil
-  "Non-nil while opening the full candidate list from ghost text that
-TAB had already cycled a few times: the exact candidate string ghost
-text was showing at that moment, so `idiig/pyim-pinyin-overlay-capf'
-and `idiig/pyim-pinyin-word-capf' can start their own popped-up list
-from that same place instead of resetting to the top.  Mirrors
-`completion-preview-complete's own `(append (nthcdr cur all) (take cur
-all))' rotation for its native list-opening path, which our CAPFs
-bypass entirely (see `idiig/pyim-composing-completion-preview-open-list').
-Let-bound around the call in `idiig/pyim-composing-completion-preview-cycle';
-nil (the default) for any other caller -- e.g. `M-i', which has no
-ghost-text cursor position to rotate from in the first place.")
-
-(defun idiig/pyim-rotate-to (candidates target)
-  "Rotate CANDIDATES so TARGET is first, if present; otherwise return
-CANDIDATES unchanged."
-  (let ((idx (and target (seq-position candidates target #'equal))))
-    (if idx
-        (append (nthcdr idx candidates) (take idx candidates))
-      candidates)))
-
-(defun idiig/pyim-pinyin-overlay-capf ()
-  "CAPF for choosing full pinyin spellings while pyim is composing.
-Unlike `idiig/pyim-pinyin-capf', this completes an empty range at point
-because pyim's entered code lives in `pyim-preview--overlay', not in the
-real buffer.
-
-Jianpin candidates are rotated to start at whatever TAB has already
-cycled the \"[...]\" hint to (`idiig/pyim-jianpin-hint-index'), mirroring
-how `completion-preview-complete' starts its own popped-up list from
-the ghost-text candidate last cycled to for real continuations -- same
-switching pattern, just applied to the hint instead of an overlay."
-  (when (and (pyim-process--translating-p)
-             (not idiig/pyim-page-revealed)
-             (not (pyim-process-without-entered-p)))
-    (let* ((entered (idiig/pyim-entered))
-           (jianpin-rotated (idiig/pyim-pinyin-jianpin-candidates-rotated entered))
-           (spellings (if jianpin-rotated
-                          (append jianpin-rotated
-                                  (seq-remove (lambda (s) (member s jianpin-rotated))
-                                              (idiig/pyim-pinyin-spellings entered)))
-                        (idiig/pyim-pinyin-spellings entered)))
-           (spellings (idiig/pyim-rotate-to
-                       spellings idiig/pyim-composing-completion-preview-rotate-to)))
-      (list (point) (point)
-            (lambda (string pred action)
-              (complete-with-action action spellings "" pred))
-            :exclusive 'yes
-            :display-sort-function #'identity
-            :cycle-sort-function #'identity
-            :exit-function
-            (lambda (spelling _status)
-              ;; Completion inserts SPELLING into the real buffer.  Move that
-              ;; text into pyim's hidden entered buffer instead.
-              (delete-region (- (point) (length spelling)) (point))
-              (pyim-process-with-entered-buffer
-                (erase-buffer)
-                (insert spelling))
-              (pyim-process-run))))))
-
-(defun idiig/pyim-pinyin-word-capf ()
+The pyim entered text is displayed by `pyim-preview--overlay', not
+stored in the real buffer, so this CAPF completes an empty range at
+point and offers only suffix strings.")
+(defalias 'idiig/pyim-pinyin-overlay-capf
+  (idiig/completion-make-capf idiig/completion-backend-pyim 'abbrev)
+  "CAPF for choosing full pinyin spellings/jianpin expansions while pyim
+is composing.  Unlike `idiig/pyim-pinyin-capf', this completes an empty
+range at point because pyim's entered code lives in
+`pyim-preview--overlay', not in the real buffer.")
+(defalias 'idiig/pyim-pinyin-word-capf
+  (idiig/completion-make-capf idiig/completion-backend-pyim 'convert)
   "CAPF offering ENTERED's own hanzi/word candidates, once ENTERED is
-already a complete quanpin spelling on its own.
-
-`idiig/pyim-pinyin-continuation-suffixes' has nothing left to suggest
-once ENTERED stands on its own (see its docstring) -- ghost text there
-just goes silent.  This CAPF is what automatically takes over instead
-(see `idiig/pyim-composing-completion-preview-refresh'): the ghost text
-switches from \"here's a longer pinyin spelling\" to \"here's the word
-this exact spelling would produce\", so e.g. entered \"de\" shows a real
-ghost \"的\" (candidates are `pyim-process-get-candidates', the same
-list `pyim-select-word' itself would confirm from), TAB cycles which
-candidate is shown exactly like it cycles pinyin suffixes, and SPC
-(`idiig/pyim-accept-shown-completion') selects and confirms whichever
-one is currently shown directly -- no separate page-reveal step needed
-once you already know which word you want."
-  (when (and (pyim-process--translating-p)
-             (not idiig/pyim-page-revealed)
-             (not (pyim-process-without-entered-p)))
-    (let ((entered (idiig/pyim-entered)))
-      (when (member entered (idiig/pyim-pinyin-spellings entered))
-        (let ((words (idiig/pyim-rotate-to
-                      (delete-dups (copy-sequence (pyim-process-get-candidates)))
-                      idiig/pyim-composing-completion-preview-rotate-to)))
-          (when words
-            (list (point) (point)
-                  (lambda (string pred action)
-                    (complete-with-action action words "" pred))
-                  :exclusive 'yes
-                  :display-sort-function #'identity
-                  :cycle-sort-function #'identity
-                  :exit-function
-                  (lambda (word _status)
-                    (delete-region (- (point) (length word)) (point))
-                    (let ((idx (seq-position (pyim-process-get-candidates) word #'equal)))
-                      (when idx
-                        (pyim-process-plan-to-select-word idx)
-                        (pyim-process-select-word (pyim-scheme-current))))))))))))
+already a complete quanpin spelling on its own -- see
+`idiig/pyim-composing-completion-preview-refresh' for when this takes
+over from `idiig/pyim-pinyin-continuation-capf'.")
 
 (defvar idiig/pyim-use-overlay-capf-for-completion nil
   "Non-nil means route `completion-at-point' to pyim's overlay CAPF.")
@@ -883,13 +842,10 @@ end of the list instead of appearing first.")
   ;;   text switches to suggesting which of ENTERED's own hanzi/word
   ;;   candidates would be produced, one stage further along than pinyin
   ;;   completion.
-  (when (and (pyim-process--translating-p)
-             (not idiig/pyim-page-revealed)
-             (not (pyim-process-without-entered-p)))
-    (let* ((entered (idiig/pyim-entered))
-           (capf (if (member entered (idiig/pyim-pinyin-spellings entered))
-                     #'idiig/pyim-pinyin-word-capf
-                   #'idiig/pyim-pinyin-continuation-capf)))
+  (when (idiig/completion-composing-p)
+    (let ((capf (if (idiig/completion-complete-p)
+                    #'idiig/pyim-pinyin-word-capf
+                  #'idiig/pyim-pinyin-continuation-capf)))
       (let ((completion-at-point-functions (list capf)))
         (completion-preview--update)))))
 (add-hook 'pyim-process-ui-refresh-hook
@@ -953,7 +909,7 @@ end of the list instead of appearing first.")
         ;; and stays correct if that ever changes.
         (completion-preview--inhibit-update)
         (let* ((entered (idiig/pyim-entered))
-               (complete (member entered (idiig/pyim-pinyin-spellings entered)))
+               (complete (idiig/completion-complete-p))
                (total (length (completion-preview--get 'completion-preview-suffixes))))
           (setq idiig/completion-preview-tab-cycle-count
                 (if (eq last-command 'idiig/pyim-composing-completion-preview-cycle)
@@ -973,7 +929,7 @@ end of the list instead of appearing first.")
                      (all (completion-preview--get 'completion-preview-suffixes))
                      (cur (completion-preview--get 'completion-preview-index))
                      (shown (concat com (nth cur all)))
-                     (idiig/pyim-composing-completion-preview-rotate-to
+                     (idiig/completion-rotate-to-target
                       (if complete shown (concat entered shown))))
                 ;; ENTERED already complete: ghost text here is one of its
                 ;; own word candidates, so escalating browses more of
@@ -1005,6 +961,46 @@ end of the list instead of appearing first.")
             #'idiig/pyim-composing-completion-preview-cycle)
 (define-key pyim-mode-map [?\t]
             #'idiig/pyim-composing-completion-preview-cycle)
+
+;; pyim conformance: exercises `idiig/completion-backend-pyim' directly,
+;; assuming pyim is already active/configured (as in a real interactive
+;; session) -- these don't spin up their own dcache/dictionary the way
+;; the throwaway batch-test harnesses used while developing this file
+;; did, so run them from a session where pyim already works normally.
+(defun idiig/completion-test--start-pyim-composing (str)
+  "Prime pyim's own composing state directly with STR, bypassing the
+usual key-dispatch loop -- enough for `idiig/completion-backend-pyim's
+functions to have something real to answer about."
+  (pyim-process-ui-init)
+  (pyim-process--set-translating-flag t)
+  (setq idiig/pyim-page-revealed nil)
+  (pyim-process-with-entered-buffer (insert str))
+  (pyim-process-run))
+
+(ert-deftest idiig/completion-backend-pyim-incomplete-entered-offers-continuation ()
+  (idiig/completion-test--start-pyim-composing "b")
+  (unwind-protect
+      (progn
+        (should-not (funcall (idiig/completion-backend-complete-p idiig/completion-backend-pyim) "b"))
+        (should (idiig/completion-stage-candidates idiig/completion-backend-pyim 'continuation "b")))
+    (pyim-process-terminate)))
+
+(ert-deftest idiig/completion-backend-pyim-complete-entered-offers-convert ()
+  (idiig/completion-test--start-pyim-composing "de")
+  (unwind-protect
+      (progn
+        (should (funcall (idiig/completion-backend-complete-p idiig/completion-backend-pyim) "de"))
+        (should (equal (idiig/completion-stage-candidates idiig/completion-backend-pyim 'convert "de")
+                        (delete-dups (copy-sequence (pyim-process-get-candidates))))))
+    (pyim-process-terminate)))
+
+(ert-deftest idiig/completion-backend-pyim-convert-accept-confirms-word ()
+  (idiig/completion-test--start-pyim-composing "de")
+  (unwind-protect
+      (let ((word (car (pyim-process-get-candidates))))
+        (idiig/completion-accept idiig/completion-backend-pyim 'convert "de" word)
+        (should-not (pyim-process--translating-p)))
+    (when (pyim-process--translating-p) (pyim-process-terminate))))
 
 ;; To restore the original inline-preview-of-selected-candidate
 ;; behavior without restarting Emacs, eval this:
