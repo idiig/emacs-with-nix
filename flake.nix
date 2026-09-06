@@ -3204,33 +3204,51 @@
 	           ((null (cdr patterns)) (car patterns))
 	           (t (concat "\\(?:" (string-join patterns "\\|") "\\)")))))
 	    
-	      (defun idiig/orderless-migemo-pyim-try-completion (string table pred point)
-	        "Try completion with migemo and pyim Orderless matchers."
-	        (let ((orderless-matching-styles
-	               '(idiig/orderless-migemo-pyim
-	                 orderless-literal
-	                 orderless-regexp)))
-	          (orderless-try-completion string table pred point)))
-	    
-	      (defun idiig/orderless-migemo-pyim-all-completions (string table pred point)
-	        "Return completions with migemo and pyim Orderless matchers."
-	        (let ((orderless-matching-styles
-	               '(idiig/orderless-migemo-pyim
-	                 orderless-literal
-	                 orderless-regexp)))
-	          (orderless-all-completions string table pred point)))
-	    
-	      (add-to-list 'completion-styles-alist
-	                   '(idiig/orderless-migemo-pyim-style
-	                     idiig/orderless-migemo-pyim-try-completion
-	                     idiig/orderless-migemo-pyim-all-completions
-	                     "Orderless with migemo and pyim matchers.")))
+	      nil)
 	    
 	    (with-eval-after-load 'oc-basic
+	      (defun idiig/org-cite-search-alias-text (candidate key)
+	        "Return hidden search text for Org citation CANDIDATE and KEY."
+	        (replace-regexp-in-string
+	         "[[:space:][:punct:]]+" ""
+	         (concat key " " candidate)))
+	    
+	      (defun idiig/org-cite-add-search-aliases (table)
+	        "Add hidden search aliases to Org citation completion TABLE."
+	        (when (hash-table-p table)
+	          (let (aliases)
+	            (maphash
+	             (lambda (candidate key)
+	               (when (and (stringp candidate)
+	                          (stringp key)
+	                          (not (get-text-property 0 'idiig/org-cite-search-alias
+	                                                  candidate)))
+	                 (let ((alias-text (idiig/org-cite-search-alias-text candidate key)))
+	                   (push
+	                    (cons (concat
+	                           (propertize (concat alias-text " ")
+	                                       'display ""
+	                                       'idiig/org-cite-search-alias t)
+	                           candidate)
+	                          key)
+	                    aliases))))
+	             table)
+	            (dolist (alias aliases)
+	              (puthash (car alias) (cdr alias) table))))
+	        table)
+	    
+	      (advice-add 'org-cite-basic--key-completion-table :filter-return
+	                  #'idiig/org-cite-add-search-aliases)
+	    
 	      (defun idiig/org-cite-basic-complete-key-with-migemo-pyim
 	          (orig-fn &rest args)
 	        "Use migemo/pyim Orderless matching while completing Org citekeys."
-	        (let ((completion-styles '(idiig/orderless-migemo-pyim-style basic)))
+	        (require 'orderless)
+	        (let ((completion-styles '(orderless basic))
+	              (orderless-matching-styles
+	               '(idiig/orderless-migemo-pyim
+	                 orderless-literal
+	                 orderless-regexp)))
 	          (apply orig-fn args)))
 	    
 	      (advice-add 'org-cite-basic--complete-key :around

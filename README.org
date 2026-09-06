@@ -5667,8 +5667,9 @@ mode：
 #+end_src
 ***** =C-c C-x @= search by citekey
 =org-cite= 的 citekey 选择候选显示 bib 条目的作者、年份、标题。这里在
-读取 citekey 时切换到一个专用的 =orderless= style，把已有的
-=orderless-migemo= 和 =orderless-pyim= 合并成同一个 regexp matcher。另
+读取 citekey 时继续使用标准 =orderless= completion style，但临时把
+=orderless-matching-styles= 切到一个组合 matcher：它把已有的
+=orderless-migemo= 和 =orderless-pyim= 合并成同一个 regexp。另
 外给候选表加一个隐藏搜索前缀，包含 citekey 和去掉标点/空白后的候选文
 本，让中文作者名这类 =张, 三= 形式也能被拼音命中。citation key 选择里
 可以直接用日语罗马字、中文拼音或 citekey 过滤候选，不需要手动输入 =#=
@@ -5690,27 +5691,7 @@ mode：
          ((null (cdr patterns)) (car patterns))
          (t (concat "\\(?:" (string-join patterns "\\|") "\\)")))))
 
-    (defun idiig/orderless-migemo-pyim-try-completion (string table pred point)
-      "Try completion with migemo and pyim Orderless matchers."
-      (let ((orderless-matching-styles
-             '(idiig/orderless-migemo-pyim
-               orderless-literal
-               orderless-regexp)))
-        (orderless-try-completion string table pred point)))
-
-    (defun idiig/orderless-migemo-pyim-all-completions (string table pred point)
-      "Return completions with migemo and pyim Orderless matchers."
-      (let ((orderless-matching-styles
-             '(idiig/orderless-migemo-pyim
-               orderless-literal
-               orderless-regexp)))
-        (orderless-all-completions string table pred point)))
-
-    (add-to-list 'completion-styles-alist
-                 '(idiig/orderless-migemo-pyim-style
-                   idiig/orderless-migemo-pyim-try-completion
-                   idiig/orderless-migemo-pyim-all-completions
-                   "Orderless with migemo and pyim matchers.")))
+    nil)
 
   (with-eval-after-load 'oc-basic
     (defun idiig/org-cite-search-alias-text (candidate key)
@@ -5749,7 +5730,12 @@ mode：
     (defun idiig/org-cite-basic-complete-key-with-migemo-pyim
         (orig-fn &rest args)
       "Use migemo/pyim Orderless matching while completing Org citekeys."
-      (let ((completion-styles '(idiig/orderless-migemo-pyim-style basic)))
+      (require 'orderless)
+      (let ((completion-styles '(orderless basic))
+            (orderless-matching-styles
+             '(idiig/orderless-migemo-pyim
+               orderless-literal
+               orderless-regexp)))
         (apply orig-fn args)))
 
     (advice-add 'org-cite-basic--complete-key :around
