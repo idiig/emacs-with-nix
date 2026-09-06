@@ -3188,6 +3188,53 @@
 	    
 	      ;; 挂载 advice
 	      (advice-add 'org-cite-insert :around #'my/oc-insert-then-ask))
+	    (with-eval-after-load 'orderless
+	      (defun idiig/orderless-migemo-pyim (component)
+	        "Match COMPONENT with both migemo and pyim Orderless matchers."
+	        (let* ((empty (string-empty-p component))
+	               (migemo (and (not empty)
+	                            (fboundp 'orderless-migemo)
+	                            (orderless-migemo component)))
+	               (pyim (and (not empty)
+	                          (fboundp 'orderless-pyim)
+	                          (orderless-pyim component)))
+	               (patterns (delete-dups (delq nil (list migemo pyim)))))
+	          (cond
+	           ((null patterns) nil)
+	           ((null (cdr patterns)) (car patterns))
+	           (t (concat "\\(?:" (string-join patterns "\\|") "\\)")))))
+	    
+	      (defun idiig/orderless-migemo-pyim-try-completion (string table pred point)
+	        "Try completion with migemo and pyim Orderless matchers."
+	        (let ((orderless-matching-styles
+	               '(idiig/orderless-migemo-pyim
+	                 orderless-literal
+	                 orderless-regexp)))
+	          (orderless-try-completion string table pred point)))
+	    
+	      (defun idiig/orderless-migemo-pyim-all-completions (string table pred point)
+	        "Return completions with migemo and pyim Orderless matchers."
+	        (let ((orderless-matching-styles
+	               '(idiig/orderless-migemo-pyim
+	                 orderless-literal
+	                 orderless-regexp)))
+	          (orderless-all-completions string table pred point)))
+	    
+	      (add-to-list 'completion-styles-alist
+	                   '(idiig/orderless-migemo-pyim-style
+	                     idiig/orderless-migemo-pyim-try-completion
+	                     idiig/orderless-migemo-pyim-all-completions
+	                     "Orderless with migemo and pyim matchers.")))
+	    
+	    (with-eval-after-load 'oc-basic
+	      (defun idiig/org-cite-basic-complete-key-with-migemo-pyim
+	          (orig-fn &rest args)
+	        "Use migemo/pyim Orderless matching while completing Org citekeys."
+	        (let ((completion-styles '(idiig/orderless-migemo-pyim-style basic)))
+	          (apply orig-fn args)))
+	    
+	      (advice-add 'org-cite-basic--complete-key :around
+	                  #'idiig/org-cite-basic-complete-key-with-migemo-pyim))
 	    (use-package vulpea
 	      :after org
 	      :config
@@ -3705,19 +3752,25 @@
 	      if [ "$(uname)" = "Darwin" ]; then
 	          # macOS
 	          mkdir -p "$HOME/Library/Fonts/"
-	          ${pkgs.rsync}/bin/rsync -av ${pkgs.sarasa-gothic}/share/fonts/truetype/ "$HOME/Library/Fonts/"
+	          if [ ! -e "$HOME/Library/Fonts/Sarasa-Regular.ttc" ]; then
+	              ${pkgs.rsync}/bin/rsync -a --info=progress2 ${pkgs.sarasa-gothic}/share/fonts/truetype/ "$HOME/Library/Fonts/"
+	          fi
 	      else
 	          # Assume Linux
 	          mkdir -p "$HOME/.local/share/fonts/truetype/"
-	          ${pkgs.rsync}/bin/rsync -av ${pkgs.sarasa-gothic}/share/fonts/truetype/ "$HOME/.local/share/fonts/sarasa-gothic/"
+	          if [ ! -e "$HOME/.local/share/fonts/sarasa-gothic/Sarasa-Regular.ttc" ]; then
+	              mkdir -p "$HOME/.local/share/fonts/sarasa-gothic/"
+	              ${pkgs.rsync}/bin/rsync -a --info=progress2 ${pkgs.sarasa-gothic}/share/fonts/truetype/ "$HOME/.local/share/fonts/sarasa-gothic/"
+	          fi
 	          fc-cache -f -v ~/.local/share/fonts/
 	      fi
 
 	      # 更新 Emacs 路径（兼容 macOS 和 Linux）
+        touch "$HOME/.bashrc"
         if sed --version 2>/dev/null | grep "(GNU sed)"; then
 		      sed -i '/^alias ne=/d' "$HOME/.bashrc"
 	      else
-		      sed -i \"\" '/^alias ne=/d' "$HOME/.bashrc"
+		      sed -i "" '/^alias ne=/d' "$HOME/.bashrc"
 	      fi
 
 	      echo "alias ne='${wrappedEmacs}/bin/emacs --init-dir \"$EMACS_DIR\"'" >> "$HOME/.bashrc"

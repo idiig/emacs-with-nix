@@ -200,10 +200,11 @@ flake.nix。接下去运行可以通过在终端运行下面进行调试和版�
   	      <<sys-path>>
 
   	      # 更新 Emacs 路径（兼容 macOS 和 Linux）
+          touch "$HOME/.bashrc"
           if sed --version 2>/dev/null | grep "(GNU sed)"; then
   		      sed -i '/^alias ne=/d' "$HOME/.bashrc"
   	      else
-  		      sed -i \"\" '/^alias ne=/d' "$HOME/.bashrc"
+  		      sed -i "" '/^alias ne=/d' "$HOME/.bashrc"
   	      fi
 
   	      echo "alias ne='${wrappedEmacs}/bin/emacs --init-dir \"$EMACS_DIR\"'" >> "$HOME/.bashrc"
@@ -1672,11 +1673,16 @@ minibuffer的检索]]。
   if [ "$(uname)" = "Darwin" ]; then
       # macOS
       mkdir -p "$HOME/Library/Fonts/"
-      ${pkgs.rsync}/bin/rsync -av ${pkgs.sarasa-gothic}/share/fonts/truetype/ "$HOME/Library/Fonts/"
+      if [ ! -e "$HOME/Library/Fonts/Sarasa-Regular.ttc" ]; then
+          ${pkgs.rsync}/bin/rsync -a --info=progress2 ${pkgs.sarasa-gothic}/share/fonts/truetype/ "$HOME/Library/Fonts/"
+      fi
   else
       # Assume Linux
       mkdir -p "$HOME/.local/share/fonts/truetype/"
-      ${pkgs.rsync}/bin/rsync -av ${pkgs.sarasa-gothic}/share/fonts/truetype/ "$HOME/.local/share/fonts/sarasa-gothic/"
+      if [ ! -e "$HOME/.local/share/fonts/sarasa-gothic/Sarasa-Regular.ttc" ]; then
+          mkdir -p "$HOME/.local/share/fonts/sarasa-gothic/"
+          ${pkgs.rsync}/bin/rsync -a --info=progress2 ${pkgs.sarasa-gothic}/share/fonts/truetype/ "$HOME/.local/share/fonts/sarasa-gothic/"
+      fi
       fc-cache -f -v ~/.local/share/fonts/
   fi
 #+end_src
@@ -5659,7 +5665,96 @@ mode：
     ;; 挂载 advice
     (advice-add 'org-cite-insert :around #'my/oc-insert-then-ask))
 #+end_src
-**** TODO C-c C-x @ search by citekey
+***** =C-c C-x @= search by citekey
+=org-cite= 的 citekey 选择候选显示 bib 条目的作者、年份、标题。这里在
+读取 citekey 时切换到一个专用的 =orderless= style，把已有的
+=orderless-migemo= 和 =orderless-pyim= 合并成同一个 regexp matcher。另
+外给候选表加一个隐藏搜索前缀，包含 citekey 和去掉标点/空白后的候选文
+本，让中文作者名这类 =张, 三= 形式也能被拼音命中。citation key 选择里
+可以直接用日语罗马字、中文拼音或 citekey 过滤候选，不需要手动输入 =#=
+或 =@= 前缀。
+#+begin_src emacs-lisp
+  (with-eval-after-load 'orderless
+    (defun idiig/orderless-migemo-pyim (component)
+      "Match COMPONENT with both migemo and pyim Orderless matchers."
+      (let* ((empty (string-empty-p component))
+             (migemo (and (not empty)
+                          (fboundp 'orderless-migemo)
+                          (orderless-migemo component)))
+             (pyim (and (not empty)
+                        (fboundp 'orderless-pyim)
+                        (orderless-pyim component)))
+             (patterns (delete-dups (delq nil (list migemo pyim)))))
+        (cond
+         ((null patterns) nil)
+         ((null (cdr patterns)) (car patterns))
+         (t (concat "\\(?:" (string-join patterns "\\|") "\\)")))))
+
+    (defun idiig/orderless-migemo-pyim-try-completion (string table pred point)
+      "Try completion with migemo and pyim Orderless matchers."
+      (let ((orderless-matching-styles
+             '(idiig/orderless-migemo-pyim
+               orderless-literal
+               orderless-regexp)))
+        (orderless-try-completion string table pred point)))
+
+    (defun idiig/orderless-migemo-pyim-all-completions (string table pred point)
+      "Return completions with migemo and pyim Orderless matchers."
+      (let ((orderless-matching-styles
+             '(idiig/orderless-migemo-pyim
+               orderless-literal
+               orderless-regexp)))
+        (orderless-all-completions string table pred point)))
+
+    (add-to-list 'completion-styles-alist
+                 '(idiig/orderless-migemo-pyim-style
+                   idiig/orderless-migemo-pyim-try-completion
+                   idiig/orderless-migemo-pyim-all-completions
+                   "Orderless with migemo and pyim matchers.")))
+
+  (with-eval-after-load 'oc-basic
+    (defun idiig/org-cite-search-alias-text (candidate key)
+      "Return hidden search text for Org citation CANDIDATE and KEY."
+      (replace-regexp-in-string
+       "[[:space:][:punct:]]+" ""
+       (concat key " " candidate)))
+
+    (defun idiig/org-cite-add-search-aliases (table)
+      "Add hidden search aliases to Org citation completion TABLE."
+      (when (hash-table-p table)
+        (let (aliases)
+          (maphash
+           (lambda (candidate key)
+             (when (and (stringp candidate)
+                        (stringp key)
+                        (not (get-text-property 0 'idiig/org-cite-search-alias
+                                                candidate)))
+               (let ((alias-text (idiig/org-cite-search-alias-text candidate key)))
+                 (push
+                  (cons (concat
+                         (propertize (concat alias-text " ")
+                                     'display ""
+                                     'idiig/org-cite-search-alias t)
+                         candidate)
+                        key)
+                  aliases))))
+           table)
+          (dolist (alias aliases)
+            (puthash (car alias) (cdr alias) table))))
+      table)
+
+    (advice-add 'org-cite-basic--key-completion-table :filter-return
+                #'idiig/org-cite-add-search-aliases)
+
+    (defun idiig/org-cite-basic-complete-key-with-migemo-pyim
+        (orig-fn &rest args)
+      "Use migemo/pyim Orderless matching while completing Org citekeys."
+      (let ((completion-styles '(idiig/orderless-migemo-pyim-style basic)))
+        (apply orig-fn args)))
+
+    (advice-add 'org-cite-basic--complete-key :around
+                #'idiig/org-cite-basic-complete-key-with-migemo-pyim))
+#+end_src
 **** TODO better variation choocing function
 *** 数据库 (=vulpea=)
 **** 依赖
