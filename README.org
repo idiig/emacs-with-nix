@@ -60,7 +60,9 @@ flake.nix。
 :header-args: :tangle no
 :END:
 用emacs打开本文档， =M-x org-babel-tangle= 或使用快捷键 =C-c C-v t= 生成
-flake.nix。接下去运行可以通过在终端运行下面进行调试和版本回滚：
+flake.nix。接下去运行可以通过在终端运行下面进行调试和版本回滚。
+=packages.default=（同时也是 =packages.emacs=）直接就是包好配置和字体的
+Emacs 本体，=nix run= 会直接启动它，不需要额外 source 任何 shell 配置：
 ** 调试
 #+begin_src sh
   export NIXPKGS_ALLOW_UNFREE=1	# allow unfree packages
@@ -68,8 +70,6 @@ flake.nix。接下去运行可以通过在终端运行下面进行调试和版�
       --impure \			# use impure mode
       --extra-experimental-features nix-command \ # enable nix-command feature
       --extra-experimental-features flakes # enable flakes feature
-  source ~/.bashrc			 # source bash configuration
-  ne			     # starts emacs with the new configuration
 #+end_src
 ** 版本回滚
 *** 使用git
@@ -79,14 +79,67 @@ flake.nix。接下去运行可以通过在终端运行下面进行调试和版�
       --impure \			# use impure mode
       --extra-experimental-features nix-command \ # enable nix-command feature
       --extra-experimental-features flakes # enable flakes feature
-  source ~/.bashrc			 # source bash configuration
-  ne			     # starts emacs with the new configuration
 #+end_src
 *** 备份lock文件
 #+begin_src sh
   nix flake metadata		# check flake metadata
   cp flake.lock flake.lock.bachup	# backup current lock file
   nix run --recreate-lock-file --inputs-from ./flake.lock.backup # recreate lock file
+#+end_src
+* 打包与分发
+:PROPERTIES:
+:header-args: :tangle no
+:END:
+除了 =nix run= 现场安装，也可以把已经构建好的 Emacs（=packages.emacs=，即
+=wrappedEmacs= 闭包，包含全部 elisp 包和外部工具）导出成一个 tar.zst 压缩
+包，拷进 U 盘或者传到 GitHub Release，在另一台已装 Nix 的同架构、同操作
+系统的机器上直接导入使用，不需要联网重新构建。
+
+用法：
+#+begin_src sh
+  ./scripts/bundle.sh          # 在仓库根目录下运行，产物写到 ./dist/
+#+end_src
+
+在目标机器上解压并导入：
+#+begin_src sh
+  zstdcat emacs-<arch>-<date>.tar.zst | tar xf -
+  nix-store --import < emacs-closure.nar   # 需要 nix-daemon 权限
+  ./result/bin/emacs                       # result 符号链接指向 store 里的绝对路径
+#+end_src
+
+=wrappedEmacs= 现在是完全自包含的：elisp 包、外部工具、CJK 字体（见
+「CJK字体」一节）、以及 =init.el=/=early-init.el=（见「配置入口」一节的
+=configInstallScript=）都在启动 wrapper 里自动同步到 =$HOME=，因此也都
+是 =wrappedEmacs= 的运行时闭包依赖，会被 =scripts/bundle.sh= 一并打包。
+目标机器上导入闭包后，直接运行 =./result/bin/emacs= 就是完整可用的状态，
+不需要额外的安装脚本或 alias。
+#+begin_src sh :tangle scripts/bundle.sh :tangle-mode (identity #o755) :shebang "#!/usr/bin/env bash"
+  set -euo pipefail
+
+  # Build the wrappedEmacs closure and export it as a portable tar.zst
+  # archive (Nix store export/import, see packages.emacs in flake.nix).
+  # Target machine must already have Nix installed and match this
+  # machine's OS/architecture.
+
+  cd "$(dirname "$0")/.."
+
+  out_dir="dist"
+  mkdir -p "$out_dir"
+
+  work_dir="$(mktemp -d)"
+  trap 'rm -rf "$work_dir"' EXIT
+
+  # Build result inside work_dir so the nar and the result symlink share
+  # one directory and can be tar'd together with a single -C.
+  nix build .#emacs -o "$work_dir/result"
+
+  nix-store -qR "$work_dir/result" > "$work_dir/paths.txt"
+  nix-store --export $(cat "$work_dir/paths.txt") > "$work_dir/emacs-closure.nar"
+
+  archive="$out_dir/emacs-$(uname -m)-$(date +%Y%m%d).tar.zst"
+  tar cf - -C "$work_dir" emacs-closure.nar result | zstd -19 -T0 > "$archive"
+
+  echo "Bundled: $archive"
 #+end_src
 * 配置入口 (=flake.nix=)
 包的安装基于下面的 =flake.nix= 。可以看到这里使用了几个占位符：
@@ -173,44 +226,43 @@ flake.nix。接下去运行可以通过在终端运行下面进行调试和版�
               <<deps>>
             ];
 
+            # 首次启动时安装 CJK 字体，见「CJK字体」一节
+            fontInstallScript = ''
+              <<font-install>>
+            '';
+
+            # 每次启动都把 init.el/early-init.el 同步到可写的
+            # $HOME/nix-emacs（Emacs 需要可写的 user-emacs-directory 来存
+            # custom.el、native-comp 缓存等运行时状态，不能直接指向只读的
+            # nix store）。文本文件很小，直接每次覆盖，不做存在性检查。
+            configInstallScript = ''
+              mkdir -p "$HOME/nix-emacs"
+              ${pkgs.rsync}/bin/rsync ${emacsConfig} "$HOME/nix-emacs/init.el"
+              ${pkgs.rsync}/bin/rsync ${emacsEarlyInitConfig} "$HOME/nix-emacs/early-init.el"
+            '';
+
             # Wrapper
             wrappedEmacs = pkgs.symlinkJoin {
               name = "emacs-wrapped";
               paths = [ emacsWithPackages ];
               buildInputs = [ pkgs.makeWrapper ];
+              meta.mainProgram = "emacs";
               postBuild = ''
                 wrapProgram $out/bin/emacs \
                   --prefix PATH : "${pkgs.lib.makeBinPath emacsExternalTools}" \
                   --set QT_QUICK_BACKEND software \
                   --set LIBGL_ALWAYS_SOFTWARE 1 \
+                  --run ${pkgs.lib.escapeShellArg fontInstallScript} \
+                  --run ${pkgs.lib.escapeShellArg configInstallScript} \
+                  --add-flags "--init-directory=\$HOME/nix-emacs"
               '';
             };
   	      in {
-  		      packages.default = pkgs.writeShellScriptBin "script" ''
-  	      #!/usr/bin/env bash
-  	      set -e
-
-  	      # 导出配置到 nix-emacs
-  	      EMACS_DIR="$HOME/nix-emacs"
-  	      mkdir -p "$EMACS_DIR"
-  	      ${pkgs.rsync}/bin/rsync ${emacsConfig} "$EMACS_DIR/init.el"
-  	      ${pkgs.rsync}/bin/rsync ${emacsEarlyInitConfig} "$EMACS_DIR/early-init.el"
-
-  	      # 路径
-  	      <<sys-path>>
-
-  	      # 更新 Emacs 路径（兼容 macOS 和 Linux）
-          touch "$HOME/.bashrc"
-          if sed --version 2>/dev/null | grep "(GNU sed)"; then
-  		      sed -i '/^alias ne=/d' "$HOME/.bashrc"
-  	      else
-  		      sed -i "" '/^alias ne=/d' "$HOME/.bashrc"
-  	      fi
-
-  	      echo "alias ne='${wrappedEmacs}/bin/emacs --init-dir \"$EMACS_DIR\"'" >> "$HOME/.bashrc"
-  	      
-  	      echo "Please 'source ~/.bashrc' activate alias ne"
-  	      '';  
+  		      # packages.default 和 packages.emacs 是同一个自包含闭包：
+  		      # 不再需要单独的安装脚本/alias，`nix run` 或者直接执行
+  		      # result/bin/emacs 就会自动同步配置和字体并启动。
+  		      packages.emacs = wrappedEmacs;
+  		      packages.default = wrappedEmacs;
   	      });
   }
 #+END_SRC
@@ -1667,23 +1719,29 @@ minibuffer的检索]]。
 - 方便org等表格等宽表示
 *** 依赖
 :PROPERTIES:
-:header-args: :noweb-ref sys-path
+:header-args: :noweb-ref font-install
 :END:
+这段脚本被 =wrapProgram= 的 =--run= 接到 =wrappedEmacs= 的启动流程里
+（见「配置入口」一节的 =fontInstallScript=），每次运行 =emacs= 都会先执行
+一次，命中缓存（文件已存在）时只是一次 =test -e=，不影响启动速度。相比
+之前放在 =packages.default= 安装脚本里的写法，这样做有两个好处：
+- 不再依赖先跑一次 =nix run= 安装脚本才能装字体，直接导入闭包（比如从
+  U 盘 =nix-store --import=）后第一次启动 =emacs= 就会自动补装。
+- =${pkgs.sarasa-gothic}= 的引用现在写在 =wrappedEmacs= 的
+  =postBuild= 里，字体包会被 Nix 记为 =wrappedEmacs= 的运行时依赖，
+  =nix-store -qR=/=scripts/bundle.sh= 打包时自动带上，不需要额外处理。
 #+begin_src sh
   if [ "$(uname)" = "Darwin" ]; then
-      # macOS
-      mkdir -p "$HOME/Library/Fonts/"
+      mkdir -p "$HOME/Library/Fonts"
       if [ ! -e "$HOME/Library/Fonts/Sarasa-Regular.ttc" ]; then
-          ${pkgs.rsync}/bin/rsync -a --info=progress2 ${pkgs.sarasa-gothic}/share/fonts/truetype/ "$HOME/Library/Fonts/"
+          ${pkgs.rsync}/bin/rsync -a ${pkgs.sarasa-gothic}/share/fonts/truetype/ "$HOME/Library/Fonts/"
       fi
   else
-      # Assume Linux
-      mkdir -p "$HOME/.local/share/fonts/truetype/"
+      mkdir -p "$HOME/.local/share/fonts/sarasa-gothic"
       if [ ! -e "$HOME/.local/share/fonts/sarasa-gothic/Sarasa-Regular.ttc" ]; then
-          mkdir -p "$HOME/.local/share/fonts/sarasa-gothic/"
-          ${pkgs.rsync}/bin/rsync -a --info=progress2 ${pkgs.sarasa-gothic}/share/fonts/truetype/ "$HOME/.local/share/fonts/sarasa-gothic/"
+          ${pkgs.rsync}/bin/rsync -a ${pkgs.sarasa-gothic}/share/fonts/truetype/ "$HOME/.local/share/fonts/sarasa-gothic/"
+          ${pkgs.fontconfig}/bin/fc-cache -f "$HOME/.local/share/fonts/sarasa-gothic"
       fi
-      fc-cache -f -v ~/.local/share/fonts/
   fi
 #+end_src
 

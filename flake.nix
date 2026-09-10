@@ -3747,57 +3747,53 @@
             wmctrl
           ];
 
+          # 首次启动时安装 CJK 字体，见「CJK字体」一节
+          fontInstallScript = ''
+            if [ "$(uname)" = "Darwin" ]; then
+                mkdir -p "$HOME/Library/Fonts"
+                if [ ! -e "$HOME/Library/Fonts/Sarasa-Regular.ttc" ]; then
+                    ${pkgs.rsync}/bin/rsync -a ${pkgs.sarasa-gothic}/share/fonts/truetype/ "$HOME/Library/Fonts/"
+                fi
+            else
+                mkdir -p "$HOME/.local/share/fonts/sarasa-gothic"
+                if [ ! -e "$HOME/.local/share/fonts/sarasa-gothic/Sarasa-Regular.ttc" ]; then
+                    ${pkgs.rsync}/bin/rsync -a ${pkgs.sarasa-gothic}/share/fonts/truetype/ "$HOME/.local/share/fonts/sarasa-gothic/"
+                    ${pkgs.fontconfig}/bin/fc-cache -f "$HOME/.local/share/fonts/sarasa-gothic"
+                fi
+            fi
+          '';
+
+          # 每次启动都把 init.el/early-init.el 同步到可写的
+          # $HOME/nix-emacs（Emacs 需要可写的 user-emacs-directory 来存
+          # custom.el、native-comp 缓存等运行时状态，不能直接指向只读的
+          # nix store）。文本文件很小，直接每次覆盖，不做存在性检查。
+          configInstallScript = ''
+            mkdir -p "$HOME/nix-emacs"
+            ${pkgs.rsync}/bin/rsync ${emacsConfig} "$HOME/nix-emacs/init.el"
+            ${pkgs.rsync}/bin/rsync ${emacsEarlyInitConfig} "$HOME/nix-emacs/early-init.el"
+          '';
+
           # Wrapper
           wrappedEmacs = pkgs.symlinkJoin {
             name = "emacs-wrapped";
             paths = [ emacsWithPackages ];
             buildInputs = [ pkgs.makeWrapper ];
+            meta.mainProgram = "emacs";
             postBuild = ''
               wrapProgram $out/bin/emacs \
                 --prefix PATH : "${pkgs.lib.makeBinPath emacsExternalTools}" \
                 --set QT_QUICK_BACKEND software \
                 --set LIBGL_ALWAYS_SOFTWARE 1 \
+                --run ${pkgs.lib.escapeShellArg fontInstallScript} \
+                --run ${pkgs.lib.escapeShellArg configInstallScript} \
+                --add-flags "--init-directory=\$HOME/nix-emacs"
             '';
           };
 	      in {
-		      packages.default = pkgs.writeShellScriptBin "script" ''
-	      #!/usr/bin/env bash
-	      set -e
-
-	      # 导出配置到 nix-emacs
-	      EMACS_DIR="$HOME/nix-emacs"
-	      mkdir -p "$EMACS_DIR"
-	      ${pkgs.rsync}/bin/rsync ${emacsConfig} "$EMACS_DIR/init.el"
-	      ${pkgs.rsync}/bin/rsync ${emacsEarlyInitConfig} "$EMACS_DIR/early-init.el"
-
-	      # 路径
-	      if [ "$(uname)" = "Darwin" ]; then
-	          # macOS
-	          mkdir -p "$HOME/Library/Fonts/"
-	          if [ ! -e "$HOME/Library/Fonts/Sarasa-Regular.ttc" ]; then
-	              ${pkgs.rsync}/bin/rsync -a --info=progress2 ${pkgs.sarasa-gothic}/share/fonts/truetype/ "$HOME/Library/Fonts/"
-	          fi
-	      else
-	          # Assume Linux
-	          mkdir -p "$HOME/.local/share/fonts/truetype/"
-	          if [ ! -e "$HOME/.local/share/fonts/sarasa-gothic/Sarasa-Regular.ttc" ]; then
-	              mkdir -p "$HOME/.local/share/fonts/sarasa-gothic/"
-	              ${pkgs.rsync}/bin/rsync -a --info=progress2 ${pkgs.sarasa-gothic}/share/fonts/truetype/ "$HOME/.local/share/fonts/sarasa-gothic/"
-	          fi
-	          fc-cache -f -v ~/.local/share/fonts/
-	      fi
-
-	      # 更新 Emacs 路径（兼容 macOS 和 Linux）
-        touch "$HOME/.bashrc"
-        if sed --version 2>/dev/null | grep "(GNU sed)"; then
-		      sed -i '/^alias ne=/d' "$HOME/.bashrc"
-	      else
-		      sed -i "" '/^alias ne=/d' "$HOME/.bashrc"
-	      fi
-
-	      echo "alias ne='${wrappedEmacs}/bin/emacs --init-dir \"$EMACS_DIR\"'" >> "$HOME/.bashrc"
-	      
-	      echo "Please 'source ~/.bashrc' activate alias ne"
-	      '';  
+		      # packages.default 和 packages.emacs 是同一个自包含闭包：
+		      # 不再需要单独的安装脚本/alias，`nix run` 或者直接执行
+		      # result/bin/emacs 就会自动同步配置和字体并启动。
+		      packages.emacs = wrappedEmacs;
+		      packages.default = wrappedEmacs;
 	      });
 }
