@@ -3599,26 +3599,8 @@
 	          syntax-wholeline-max 1000)
 	    '');
 
-          # 首先定义你的基础 Emacs
-          # 用 emacs31-gtk3 而非 emacs30-gtk3：30.2 在较新版本的 clang 下编译
-          # NS（Cocoa）后端的 .m 文件时会报 "unknown type name 'bool'"，是
-          # Emacs/gnulib 在 C23 探测下的上游兼容性 bug，只影响 Objective-C
-          # 编译单元；31 系列已经不受影响，且在 cache.nixos.org 上有预编译
-          # 缓存，无需本地编译 Emacs 核心。
           emacs = pkgs.emacs31-gtk3;
 
-          # 定义覆盖函数
-          # typst-ts-mode 的 typst-ts-compile.el 把 ;;;###autoload 直接标
-          # 在 (define-compilation-mode ...) 宏调用上面，autoload.el 不认
-          # 识这个宏，只能把宏调用原样抄进已发布 tar 包内预生成的
-          # typst-ts-mode-autoloads.el（cookie 注释本身不会留在输出里）。
-          # package-activate-all 在 compile.el（定义该宏）加载之前就会求
-          # 值这份 autoloads，于是报 (void-function define-compilation-mode)。
-          # typst-ts-compile.el 本身第一行就 (require 'compile)，正常加载
-          # 完全没问题；这个包是 elpaBuild（dontUnpack = true，直接从 tar
-          # 装进 $out），没有可 patchPhase 的源码树，只能在 postInstall 里
-          # （抢在默认 postInstall 的 native-compile 循环之前）直接删掉已
-          # 安装的 autoloads 文件里那一段裸露的宏调用。
           overrides = final: prev: mkPackages pkgs final // {
             typst-ts-mode = prev.typst-ts-mode.overrideAttrs (old: {
               postInstall = ''

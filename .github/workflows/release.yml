@@ -1,0 +1,48 @@
+name: Release portable Emacs bundle
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  bundle:
+    strategy:
+      matrix:
+        include:
+          - os: macos-latest
+            system: aarch64-darwin
+          - os: ubuntu-latest
+            system: x86_64-linux
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: DeterminateSystems/nix-installer-action@main
+
+      - name: Build and bundle
+        env:
+          NIXPKGS_ALLOW_UNFREE: "1"
+        run: ./scripts/bundle.sh
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: emacs-${{ matrix.system }}
+          path: dist/*.tar.zst
+
+  release:
+    needs: bundle
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*.tar.zst

@@ -109,10 +109,24 @@ Emacs 本体，=nix run= 会直接启动它，不需要额外 source 任何 shel
 
 =wrappedEmacs= 现在是完全自包含的：elisp 包、外部工具、CJK 字体（见
 「CJK字体」一节）、以及 =init.el=/=early-init.el=（见「配置入口」一节的
-=configInstallScript=）都在启动 wrapper 里自动同步到 =$HOME=，因此也都
+=configInstallScript= ）都在启动 wrapper 里自动同步到 =$HOME= ，因此也都
 是 =wrappedEmacs= 的运行时闭包依赖，会被 =scripts/bundle.sh= 一并打包。
 目标机器上导入闭包后，直接运行 =./result/bin/emacs= 就是完整可用的状态，
 不需要额外的安装脚本或 alias。
+
+*** 自动发布到 GitHub Release
+:PROPERTIES:
+:header-args: :tangle no
+:END:
+推 =v*= tag（或者在 Actions 页面手动 =workflow_dispatch=）会触发
+=.github/workflows/release.yml=：在 =macos-latest=（aarch64-darwin）和
+=ubuntu-latest=（x86_64-linux）上分别跑 =scripts/bundle.sh=，产物上传成
+artifact，再统一发布到对应 tag 的 GitHub Release。这个 workflow 文件没
+有走 =org-babel-tangle=，是直接维护在仓库里的普通文件——CI 编排不算
+Emacs 配置本体的一部分，没必要塞进这份文学编程文档。
+
+想加别的架构（比如 =aarch64-linux=/=x86_64-darwin=）得加对应的 self-hosted
+runner，GitHub 目前没有这两种架构的免费 hosted runner。
 #+begin_src sh :tangle scripts/bundle.sh :tangle-mode (identity #o755) :shebang "#!/usr/bin/env bash"
   set -euo pipefail
 
@@ -120,6 +134,10 @@ Emacs 本体，=nix run= 会直接启动它，不需要额外 source 任何 shel
   # archive (Nix store export/import, see packages.emacs in flake.nix).
   # Target machine must already have Nix installed and match this
   # machine's OS/architecture.
+
+  # claude-agent-acp/codex-acp are unfree packages; nixpkgs only reads
+  # NIXPKGS_ALLOW_UNFREE via impure evaluation, so --impure is required.
+  export NIXPKGS_ALLOW_UNFREE="${NIXPKGS_ALLOW_UNFREE:-1}"
 
   cd "$(dirname "$0")/.."
 
@@ -131,7 +149,10 @@ Emacs 本体，=nix run= 会直接启动它，不需要额外 source 任何 shel
 
   # Build result inside work_dir so the nar and the result symlink share
   # one directory and can be tar'd together with a single -C.
-  nix build .#emacs -o "$work_dir/result"
+  nix build .#emacs -o "$work_dir/result" \
+    --impure \
+    --extra-experimental-features nix-command \
+    --extra-experimental-features flakes
 
   nix-store -qR "$work_dir/result" > "$work_dir/paths.txt"
   nix-store --export $(cat "$work_dir/paths.txt") > "$work_dir/emacs-closure.nar"
@@ -187,26 +208,8 @@ Emacs 本体，=nix run= 会直接启动它，不需要额外 source 任何 shel
   	    <<emacs-early-init-config>>
   	    '');
 
-            # 首先定义你的基础 Emacs
-            # 用 emacs31-gtk3 而非 emacs30-gtk3：30.2 在较新版本的 clang 下编译
-            # NS（Cocoa）后端的 .m 文件时会报 "unknown type name 'bool'"，是
-            # Emacs/gnulib 在 C23 探测下的上游兼容性 bug，只影响 Objective-C
-            # 编译单元；31 系列已经不受影响，且在 cache.nixos.org 上有预编译
-            # 缓存，无需本地编译 Emacs 核心。
             emacs = pkgs.emacs31-gtk3;
 
-            # 定义覆盖函数
-            # typst-ts-mode 的 typst-ts-compile.el 把 ;;;###autoload 直接标
-            # 在 (define-compilation-mode ...) 宏调用上面，autoload.el 不认
-            # 识这个宏，只能把宏调用原样抄进已发布 tar 包内预生成的
-            # typst-ts-mode-autoloads.el（cookie 注释本身不会留在输出里）。
-            # package-activate-all 在 compile.el（定义该宏）加载之前就会求
-            # 值这份 autoloads，于是报 (void-function define-compilation-mode)。
-            # typst-ts-compile.el 本身第一行就 (require 'compile)，正常加载
-            # 完全没问题；这个包是 elpaBuild（dontUnpack = true，直接从 tar
-            # 装进 $out），没有可 patchPhase 的源码树，只能在 postInstall 里
-            # （抢在默认 postInstall 的 native-compile 循环之前）直接删掉已
-            # 安装的 autoloads 文件里那一段裸露的宏调用。
             overrides = final: prev: mkPackages pkgs final // {
               typst-ts-mode = prev.typst-ts-mode.overrideAttrs (old: {
                 postInstall = ''
