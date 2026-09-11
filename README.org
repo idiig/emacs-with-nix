@@ -100,8 +100,11 @@ Emacs 本体，=nix run= 会直接启动它，不需要额外 source 任何 shel
   ./scripts/bundle.sh          # 在仓库根目录下运行，产物写到 ./dist/
 #+end_src
 
-在目标机器上解压并导入：
+这套 Emacs 全部工具加起来经常超过 GitHub Release 单个附件 2GB 的上限（比
+如 =x86_64-linux= 实测 ~4.3GB），所以 =bundle.sh= 会把压缩包切成
+<2GB 的分卷。在目标机器上先把分卷拼回去，再解压导入：
 #+begin_src sh
+  cat emacs-<arch>-<date>.tar.zst.part-* > emacs-<arch>-<date>.tar.zst
   zstdcat emacs-<arch>-<date>.tar.zst | tar xf -
   nix-store --import < emacs-closure.nar   # 需要 nix-daemon 权限
   ./result/bin/emacs                       # result 符号链接指向 store 里的绝对路径
@@ -160,7 +163,16 @@ runner，GitHub 目前没有这两种架构的免费 hosted runner。
   archive="$out_dir/emacs-$(uname -m)-$(date +%Y%m%d).tar.zst"
   tar cf - -C "$work_dir" emacs-closure.nar result | zstd -19 -T0 > "$archive"
 
-  echo "Bundled: $archive"
+  # GitHub Release rejects assets >= 2GiB, but in practice uploads of
+  # ~1.9GB parts also got hard-rejected ("Whoa there") well below that
+  # documented limit -- looks like an edge/WAF body-size cutoff, not the
+  # application-level check. 500M parts upload reliably. Reassemble with:
+  # cat "$archive".part-* > "$archive"
+  split -b 500M -d -a 2 "$archive" "$archive.part-"
+  rm "$archive"
+
+  echo "Bundled parts:"
+  ls -la "$out_dir"
 #+end_src
 * 配置入口 (=flake.nix=)
 包的安装基于下面的 =flake.nix= 。可以看到这里使用了几个占位符：

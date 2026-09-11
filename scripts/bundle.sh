@@ -31,4 +31,13 @@ nix-store --export $(cat "$work_dir/paths.txt") > "$work_dir/emacs-closure.nar"
 archive="$out_dir/emacs-$(uname -m)-$(date +%Y%m%d).tar.zst"
 tar cf - -C "$work_dir" emacs-closure.nar result | zstd -19 -T0 > "$archive"
 
-echo "Bundled: $archive"
+# GitHub Release rejects assets >= 2GiB, but in practice uploads of
+# ~1.9GB parts also got hard-rejected ("Whoa there") well below that
+# documented limit -- looks like an edge/WAF body-size cutoff, not the
+# application-level check. 500M parts upload reliably. Reassemble with:
+# cat "$archive".part-* > "$archive"
+split -b 500M -d -a 2 "$archive" "$archive.part-"
+rm "$archive"
+
+echo "Bundled parts:"
+ls -la "$out_dir"
