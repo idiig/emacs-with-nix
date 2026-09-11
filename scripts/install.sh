@@ -81,8 +81,31 @@ done
 echo "Importing into the Nix store ..."
 # Some paths (e.g. locally-built texlive derivations) were never
 # fetched from a signed binary cache, so they carry no trusted
-# signature; require-sigs=false is scoped to this one import.
-nix-store --import --option require-sigs false < "$work_dir/emacs-closure.nar"
+# signature; require-sigs=false is scoped to this one import. That
+# option is itself restricted to trusted users, so it silently does
+# nothing for anyone else -- detect that case and explain it instead
+# of surfacing Nix's raw "lacks a signature" error.
+import_log="$work_dir/import.log"
+if ! nix-store --import --option require-sigs false \
+    < "$work_dir/emacs-closure.nar" 2>"$import_log"; then
+  cat "$import_log" >&2
+  if grep -q "lacks a signature by a trusted key\|restricted setting" "$import_log"; then
+    cat >&2 <<'EOF'
+
+This closure contains locally-built paths without a trusted signature,
+and this machine's Nix daemon requires one to import them. To fix,
+add yourself to `trusted-users` in this machine's Nix config and
+restart the daemon:
+  - nix-darwin/NixOS: nix.settings.trusted-users = [ "root" "<you>" ];
+    then `darwin-rebuild switch` / `nixos-rebuild switch`
+  - otherwise: add `trusted-users = root <you>` to /etc/nix/nix.conf
+    and restart nix-daemon
+(Or set `require-sigs = false` system-wide, which is weaker since it
+skips signature checks for every import, not just yours.)
+EOF
+  fi
+  exit 1
+fi
 
 install_dir="$HOME/.local/share/emacs-with-nix"
 mkdir -p "$install_dir"
