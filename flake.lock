@@ -149,11 +149,11 @@
         "nixpkgs": "nixpkgs_3"
       },
       "locked": {
-        "lastModified": 1788691982,
-        "narHash": "sha256-Q/6xd+enB5ng5hUptiLH1BYR3l3ByndTRQunT5qVSX8=",
+        "lastModified": 1789273577,
+        "narHash": "sha256-vkW4lmHgJ9GpfCcw4rLG+AyBDIehncQk7AU/kE01dek=",
         "owner": "idiig",
         "repo": "skk-style-completion-framework",
-        "rev": "1402420507115f08492eec025a70d84f67bdcfa3",
+        "rev": "8bee4e2c573cab1f0f157f4cf8604536da46a280",
         "type": "github"
       },
       "original": {
