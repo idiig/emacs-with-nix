@@ -397,21 +397,23 @@
 	      (with-eval-after-load 'org
 	        (add-to-list 'completion-preview-commands #'org-self-insert-command))
 	      (global-completion-preview-mode 1))
-	    (defvar idiig/completion-preview-tab-cycle-limit 3
-	      "How many consecutive TAB presses cycle completion-preview
-	    candidates before TAB switches to `completion-preview-complete'
-	    instead.  See `idiig/completion-preview-tab'.")
-	    (defvar idiig/completion-preview-tab-cycle-count 0)
-	    (defun idiig/completion-preview-tab ()
+	    (defun skk-completion/preview-tab ()
 	      "Cycle to the next completion-preview candidate.
 	    
-	    After `idiig/completion-preview-tab-cycle-limit' consecutive presses
+	    After `skk-completion/preview-tab-cycle-limit' consecutive presses
 	    of this command, switch to `completion-preview-complete' instead
 	    (complete the common prefix, or pop up *Completions* once there is no
 	    more common prefix to complete).  Consecutive-ness is tracked via
 	    `last-command', so any other command in between (typing, moving
 	    point, accepting a candidate) resets the count without needing an
 	    explicit reset.
+	    
+	    `skk-completion/preview-tab-cycle-limit' and
+	    `skk-completion/preview-tab-cycle-count' are defvar'd (with defaults)
+	    by skk-style-completion-framework's =pyim-skk-style.el=, not here --
+	    pyim's own composing loop overrides the global keymap and has to
+	    reimplement this same cycling locally, sharing these two variables so
+	    configuration and press count stay unified across both contexts.
 	    
 	    `completion-preview--inhibit-update' has to be called explicitly
 	    here: `completion-preview--post-command' (on `post-command-hook')
@@ -420,7 +422,7 @@
 	    -- which lists `completion-preview-next-candidate' itself, but not
 	    this wrapper.  Since we call `completion-preview-next-candidate' from
 	    inside a different command, `this-command' is
-	    `idiig/completion-preview-tab', not
+	    `skk-completion/preview-tab', not
 	    `completion-preview-next-candidate', so without this call
 	    `completion-preview--post-command' would treat the cycle as an
 	    unrecognized command and immediately hide the preview it just
@@ -431,7 +433,7 @@
 	    cycling looked like it did nothing and the count could never reach
 	    the escalation threshold either.
 	    
-	    If there are fewer candidates than `idiig/completion-preview-tab-cycle-limit'
+	    If there are fewer candidates than `skk-completion/preview-tab-cycle-limit'
 	    to begin with, skip cycling entirely and go straight to
 	    `completion-preview-complete' -- cycling one at a time through a
 	    small set is pointless when the full list is only a couple of items
@@ -448,15 +450,15 @@
 	      (completion-preview--inhibit-update)
 	      (let ((total (length (completion-preview--get 'completion-preview-suffixes)))
 	            (idiig/completion-preview-force-unsorted-consult t))
-	        (if (< total idiig/completion-preview-tab-cycle-limit)
+	        (if (< total skk-completion/preview-tab-cycle-limit)
 	            (completion-preview-complete)
 	          (progn
-	            (setq idiig/completion-preview-tab-cycle-count
-	                  (if (eq last-command 'idiig/completion-preview-tab)
-	                      (1+ idiig/completion-preview-tab-cycle-count)
+	            (setq skk-completion/preview-tab-cycle-count
+	                  (if (eq last-command 'skk-completion/preview-tab)
+	                      (1+ skk-completion/preview-tab-cycle-count)
 	                    1))
-	            (if (> idiig/completion-preview-tab-cycle-count
-	                   idiig/completion-preview-tab-cycle-limit)
+	            (if (> skk-completion/preview-tab-cycle-count
+	                   skk-completion/preview-tab-cycle-limit)
 	                (completion-preview-complete)
 	              (completion-preview-next-candidate 1))))))
 	    (defun idiig/completion-preview-accept-and-space ()
@@ -464,8 +466,8 @@
 	      (interactive)
 	      (completion-preview-insert)
 	      (insert " "))
-	    (keymap-set completion-preview-active-mode-map "TAB" #'idiig/completion-preview-tab)
-	    (keymap-set completion-preview-active-mode-map "<tab>" #'idiig/completion-preview-tab)
+	    (keymap-set completion-preview-active-mode-map "TAB" #'skk-completion/preview-tab)
+	    (keymap-set completion-preview-active-mode-map "<tab>" #'skk-completion/preview-tab)
 	    (keymap-set completion-preview-active-mode-map "SPC" #'idiig/completion-preview-accept-and-space)
 	    (use-package mwim
 	      :bind
@@ -677,7 +679,7 @@
 	                    #'idiig/hide-completion-preview-before-consult)
 	        ;; `completion-preview-complete' reorders the candidates it shows
 	        ;; to start from the one last cycled to via its own `(nthcdr cur
-	        ;; all)' (see `idiig/completion-preview-tab' in
+	        ;; all)' (see `skk-completion/preview-tab' in
 	        ;; [[#completion-preview-keys]]), but that order never survives
 	        ;; to vertico: `consult-completion-in-region' (`consult--in-region')
 	        ;; rebuilds `completion-extra-properties' from scratch before
