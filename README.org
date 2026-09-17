@@ -457,6 +457,12 @@ runner，GitHub 目前没有这两种架构的免费 hosted runner。
 
   ;; 便于使用mac的JIS日语键盘
   (global-set-key (kbd "C-¥") 'toggle-input-method)
+
+  ;; Translate C-<return> to C-m at key-reading time, not just bind it
+  ;; to whatever command C-m happens to run globally: GUI frames send
+  ;; C-<return> as an event distinct from C-m/RET, so without this it
+  ;; carries none of C-m's per-keymap bindings (e.g. exit-minibuffer).
+  (define-key key-translation-map (kbd "C-<return>") (kbd "C-m"))
 #+end_src
 *** 包管理和其他基础
 这里我考虑了到底是否要使用 =use-package= 。因为我现在在使用 org mode写配
@@ -1967,16 +1973,18 @@ minibuffer的检索]]。
 :END:
 =C-\= 默认绑定的是 =toggle-input-method= ，会不看情况直接切到
 =default-input-method= （或者被其他 mode，比如 dyalog-mode，临时改掉的
-那个输入法），关不掉当前正在用的那个。用 =advice-add= 的 =:override=
-直接覆盖 =toggle-input-method= 本身，而不是另外绑一个新键占用 =C-\=
-——这样不管是默认的 =C-\= ，还是其他地方（菜单、别的 mode 自己的
-keymap）绑的 =toggle-input-method= ，触发的都是这套「有输入法就关、
-没有就弹列表选」的逻辑：当前没有输入法在用时，跳出所有已注册输入法的
-列表（配合 vertico）来选，默认候选还是 =pyim= ，直接 RET 就等价于原来
-的行为；当前已经开着某个输入法时，再触发一次直接关掉它，不用先选中
-同一个输入法确认一遍才能关闭。
+那个输入法），关不掉当前正在用的那个。用 =[remap toggle-input-method]=
+覆盖命令本身，而不是另外绑一个新键占用 =C-\= ——这样不管是默认的
+=C-\= ，还是其他地方（菜单、别的 mode 自己的 keymap）绑的
+=toggle-input-method= ，触发的都是这套「有输入法就关、没有就弹列表
+选」的逻辑：当前没有输入法在用时，跳出所有已注册输入法的列表（配合
+vertico）来选，默认候选还是 =pyim= ，直接 RET 就等价于原来的行为；
+当前已经开着某个输入法时，再触发一次直接关掉它，不用先选中同一个
+输入法确认一遍才能关闭。另外绑了 =C-c i= 作为 =C-\= 的备用键——部分
+远程桌面链路（比如通过 iPad 上的 TeamViewer 控制 Mac）传不了
+=C-\= 里的反斜杠，这时候用 =C-c i= 代替。
 #+begin_src emacs-lisp
-  (defun idiig/set-or-disable-input-method (&rest _)
+  (defun idiig/set-or-disable-input-method ()
     "Turn off `current-input-method' if one is active; otherwise prompt
   to pick one via `set-input-method'.  Plain `toggle-input-method' can't
   do this: with no argument it always jumps straight to
@@ -1984,16 +1992,20 @@ keymap）绑的 =toggle-input-method= ，触发的都是这套「有输入法就
   turning off a non-default input method needs a second, unrelated
   command instead of just pressing the same key again.
 
-  Installed as an `:override' advice on `toggle-input-method' (see
-  below) rather than bound to its own key, so every path that invokes
-  `toggle-input-method' -- not just its default `C-\\' binding -- gets
+  Bound via `[remap toggle-input-method]' on the global map (see
+  below) rather than to its own key, so every keymap that binds
+  `toggle-input-method' -- not just the default `C-\\' binding -- gets
   this behavior instead."
     (interactive)
     (if current-input-method
         (deactivate-input-method)
       (call-interactively #'set-input-method)))
 
-  (advice-add 'toggle-input-method :override #'idiig/set-or-disable-input-method)
+  (global-set-key [remap toggle-input-method] #'idiig/set-or-disable-input-method)
+  ;; `C-\' 里的反斜杠在部分远程桌面链路（比如通过 iPad 上的
+  ;; TeamViewer 控制 Mac）下无法正确传输，导致组合键送不到 Emacs。
+  ;; 额外绑一个不含反斜杠的备用键，作为这种场景下的退路。
+  (global-set-key (kbd "C-c i") #'idiig/set-or-disable-input-method)
 #+end_src
 
 ** 日文

@@ -38,6 +38,12 @@
 	    
 	    ;; 便于使用mac的JIS日语键盘
 	    (global-set-key (kbd "C-¥") 'toggle-input-method)
+	    
+	    ;; Translate C-<return> to C-m at key-reading time, not just bind it
+	    ;; to whatever command C-m happens to run globally: GUI frames send
+	    ;; C-<return> as an event distinct from C-m/RET, so without this it
+	    ;; carries none of C-m's per-keymap bindings (e.g. exit-minibuffer).
+	    (define-key key-translation-map (kbd "C-<return>") (kbd "C-m"))
 	    (require 'use-package)
 	    (require 'diminish)
 	    ;; Useful decorations nil
@@ -953,7 +959,7 @@
 	                    (set-face-attribute 'menu nil :inherit 'unspecified)
 	                    (set-face-attribute 'tool-bar nil :inherit 'unspecified)
 	                    (idiig/apply-font-profile 'large))))
-	    (defun idiig/set-or-disable-input-method (&rest _)
+	    (defun idiig/set-or-disable-input-method ()
 	      "Turn off `current-input-method' if one is active; otherwise prompt
 	    to pick one via `set-input-method'.  Plain `toggle-input-method' can't
 	    do this: with no argument it always jumps straight to
@@ -961,16 +967,20 @@
 	    turning off a non-default input method needs a second, unrelated
 	    command instead of just pressing the same key again.
 	    
-	    Installed as an `:override' advice on `toggle-input-method' (see
-	    below) rather than bound to its own key, so every path that invokes
-	    `toggle-input-method' -- not just its default `C-\\' binding -- gets
+	    Bound via `[remap toggle-input-method]' on the global map (see
+	    below) rather than to its own key, so every keymap that binds
+	    `toggle-input-method' -- not just the default `C-\\' binding -- gets
 	    this behavior instead."
 	      (interactive)
 	      (if current-input-method
 	          (deactivate-input-method)
 	        (call-interactively #'set-input-method)))
 	    
-	    (advice-add 'toggle-input-method :override #'idiig/set-or-disable-input-method)
+	    (global-set-key [remap toggle-input-method] #'idiig/set-or-disable-input-method)
+	    ;; `C-\' 里的反斜杠在部分远程桌面链路（比如通过 iPad 上的
+	    ;; TeamViewer 控制 Mac）下无法正确传输，导致组合键送不到 Emacs。
+	    ;; 额外绑一个不含反斜杠的备用键，作为这种场景下的退路。
+	    (global-set-key (kbd "C-c i") #'idiig/set-or-disable-input-method)
 	    (use-package ddskk
 	      :defer t
 	      :bind (("C-x j" . skk-mode))
