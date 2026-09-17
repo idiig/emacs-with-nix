@@ -1967,25 +1967,33 @@ minibuffer的检索]]。
 :END:
 =C-\= 默认绑定的是 =toggle-input-method= ，会不看情况直接切到
 =default-input-method= （或者被其他 mode，比如 dyalog-mode，临时改掉的
-那个输入法），关不掉当前正在用的那个。改绑成
-=idiig/set-or-disable-input-method= ：当前没有输入法在用时，跳出所有
-已注册输入法的列表（配合 vertico）来选，默认候选还是 =pyim= ，直接
-RET 就等价于原来的行为；当前已经开着某个输入法时，再按一次 =C-\=
-直接关掉它，不用先选中同一个输入法确认一遍才能关闭。
+那个输入法），关不掉当前正在用的那个。用 =advice-add= 的 =:override=
+直接覆盖 =toggle-input-method= 本身，而不是另外绑一个新键占用 =C-\=
+——这样不管是默认的 =C-\= ，还是其他地方（菜单、别的 mode 自己的
+keymap）绑的 =toggle-input-method= ，触发的都是这套「有输入法就关、
+没有就弹列表选」的逻辑：当前没有输入法在用时，跳出所有已注册输入法的
+列表（配合 vertico）来选，默认候选还是 =pyim= ，直接 RET 就等价于原来
+的行为；当前已经开着某个输入法时，再触发一次直接关掉它，不用先选中
+同一个输入法确认一遍才能关闭。
 #+begin_src emacs-lisp
-  (defun idiig/set-or-disable-input-method ()
+  (defun idiig/set-or-disable-input-method (&rest _)
     "Turn off `current-input-method' if one is active; otherwise prompt
   to pick one via `set-input-method'.  Plain `toggle-input-method' can't
   do this: with no argument it always jumps straight to
   `default-input-method' instead of whatever's actually active, so
   turning off a non-default input method needs a second, unrelated
-  command instead of just pressing the same key again."
+  command instead of just pressing the same key again.
+
+  Installed as an `:override' advice on `toggle-input-method' (see
+  below) rather than bound to its own key, so every path that invokes
+  `toggle-input-method' -- not just its default `C-\\' binding -- gets
+  this behavior instead."
     (interactive)
     (if current-input-method
         (deactivate-input-method)
       (call-interactively #'set-input-method)))
 
-  (global-set-key (kbd "C-\\") #'idiig/set-or-disable-input-method)
+  (advice-add 'toggle-input-method :override #'idiig/set-or-disable-input-method)
 #+end_src
 
 ** 日文
