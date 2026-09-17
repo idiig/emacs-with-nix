@@ -953,19 +953,24 @@
 	                    (set-face-attribute 'menu nil :inherit 'unspecified)
 	                    (set-face-attribute 'tool-bar nil :inherit 'unspecified)
 	                    (idiig/apply-font-profile 'large))))
-	    (defun idiig/set-or-disable-input-method ()
+	    (defun idiig/set-or-disable-input-method (&rest _)
 	      "Turn off `current-input-method' if one is active; otherwise prompt
 	    to pick one via `set-input-method'.  Plain `toggle-input-method' can't
 	    do this: with no argument it always jumps straight to
 	    `default-input-method' instead of whatever's actually active, so
 	    turning off a non-default input method needs a second, unrelated
-	    command instead of just pressing the same key again."
+	    command instead of just pressing the same key again.
+	    
+	    Installed as an `:override' advice on `toggle-input-method' (see
+	    below) rather than bound to its own key, so every path that invokes
+	    `toggle-input-method' -- not just its default `C-\\' binding -- gets
+	    this behavior instead."
 	      (interactive)
 	      (if current-input-method
 	          (deactivate-input-method)
 	        (call-interactively #'set-input-method)))
 	    
-	    (global-set-key (kbd "C-\\") #'idiig/set-or-disable-input-method)
+	    (advice-add 'toggle-input-method :override #'idiig/set-or-disable-input-method)
 	    (use-package ddskk
 	      :defer t
 	      :bind (("C-x j" . skk-mode))
