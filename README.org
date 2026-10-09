@@ -6324,7 +6324,7 @@ MCP error -32001: Request timed out)
 
       (idiig/gptel-gh-select-model))
 #+end_src
-***** =magit= 统合
+***** COMMENT =magit= 统合
 这是一个 gptel-magit 的配置，用于在 Magit 中集成 AI 辅助功能。配置在
 gptel 加载后启动，使用 gptel 的默认模型，并在进入 magit-mode 时自
 动安装相关功能。=gptel-magit-generate-message= 要读取正在编辑的提交
@@ -6332,12 +6332,36 @@ gptel 加载后启动，使用 gptel 的默认模型，并在进入 magit-mode �
 只在那个 buffer 里生效——绑在 =magit-mode-map=（status/log 等 buffer
 共用的那个 keymap）上的话，会在所有 magit buffer 里把全局的
 =C-x g=（=magit-status=，见「包管理和其他基础」一节）直接遮住。
+
+gptel-magit 的回调假定 gptel 传回的 response 一定是字符串，直接交给
+=insert= 。而新版 gptel 在模型返回推理内容时（Copilot 上的 Claude、
+GPT-5 等，哪怕推理字段是空串），会先以 =(reasoning . TEXT)= 的形式调
+用一次回调，这一步不受 =gptel-include-reasoning= 控制；此外回调还可能
+收到 =(tool-call . ...)= 、 =abort= 等非字符串值。gptel-magit 没有单
+独设置 =gptel-magit-model= ，沿用的是 =idiig/gptel-gh-select-model= 选
+中的全局模型，所以一旦选了推理模型就会报
+=Wrong type argument: char-or-string-p, (reasoning . "")= 。这里用
+=define-advice= 包装 =gptel-magit--request= 的 =:callback= ，只把字符
+串类型的 response 转交给原回调，其余一律丢弃，这样不论选哪个模型都能
+正常生成提交信息。
 #+begin_src emacs-lisp
   (use-package gptel-magit
     :commands gptel-magit-generate-message
     :bind (:map git-commit-mode-map
   	      ("C-x g" . gptel-magit-generate-message))
-    :hook (magit-mode . gptel-magit-install))
+    :hook (magit-mode . gptel-magit-install)
+    :config
+    ;; Newer gptel also passes non-string responses (e.g. `(reasoning . TEXT)')
+    ;; to the callback; gptel-magit assumes a string, so drop everything else.
+    (define-advice gptel-magit--request (:filter-args (args) only-string-response)
+      (let* ((plist (cdr args))
+             (cb (plist-get plist :callback)))
+        (when cb
+          (setq plist (plist-put plist :callback
+                                 (lambda (response info)
+                                   (when (stringp response)
+                                     (funcall cb response info))))))
+        (cons (car args) plist))))
 #+end_src
 *** Agent shell
 :PROPERTIES:
