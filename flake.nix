@@ -3424,23 +3424,6 @@
 	              (kill-buffer buf))))
 	    
 	        (idiig/gptel-gh-select-model))
-	    (use-package gptel-magit
-	      :commands gptel-magit-generate-message
-	      :bind (:map git-commit-mode-map
-	    	      ("C-x g" . gptel-magit-generate-message))
-	      :hook (magit-mode . gptel-magit-install)
-	      :config
-	      ;; Newer gptel also passes non-string responses (e.g. `(reasoning . TEXT)')
-	      ;; to the callback; gptel-magit assumes a string, so drop everything else.
-	      (define-advice gptel-magit--request (:filter-args (args) only-string-response)
-	        (let* ((plist (cdr args))
-	               (cb (plist-get plist :callback)))
-	          (when cb
-	            (setq plist (plist-put plist :callback
-	                                   (lambda (response info)
-	                                     (when (stringp response)
-	                                       (funcall cb response info))))))
-	          (cons (car args) plist))))
 	    (defun idiig/agent-shell-disable-eager-completion-trigger ()
 	      "Undo `agent-shell-completion-mode' eagerly calling
 	    `completion-at-point' right after @/ / (which forces
@@ -3470,6 +3453,13 @@
 	      :demand t
 	      :custom
 	      (agent-shell-header-style '2)
+	      ;; No logind session under WSL, so the D-Bus sleep inhibit always fails.
+	      (agent-shell-inhibit-system-sleep
+	       (not (and (file-readable-p "/proc/version")
+	                 (with-temp-buffer
+	                   (insert-file-contents "/proc/version")
+	                   (let ((case-fold-search t))
+	                     (re-search-forward "microsoft" nil t))))))
 	      :config
 	      (add-to-list 'exec-path "${pkgs.claude-agent-acp}/bin"))
 	    (use-package eca

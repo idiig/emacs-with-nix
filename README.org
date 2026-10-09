@@ -6456,11 +6456,28 @@ agent-shell buffer 里把这个门槛单独降到 1，只影响这个 buffer，�
 :PROPERTIES:
 :header-args: :noweb-ref ecfg
 :END:
+=agent-shell-inhibit-system-sleep= 默认开启，在 agent 忙碌时通过 Emacs
+31 的 =system-sleep= 库经 D-Bus 向 logind 申请阻止系统休眠。WSL 里用户
+不在 logind 会话中，这个请求总会被拒绝
+（ =org.freedesktop.DBus.Error.AccessDenied= ），agent-shell 会捕获错误，
+但每轮对话都在 echo area 打出一条 =Sleep inhibit unavailable= 提示；而
+且 WSL 的休眠由 Windows 宿主决定，这个功能本来也起不了作用。所以检测到
+运行在 WSL 中时关掉它，其他系统上保持默认。检测看的是
+=/proc/version= 里是否含有 =microsoft= ，而不是 =WSL_DISTRO_NAME= 环
+境变量，因为后者在 Emacs 经由 systemd 用户服务等方式启动时可能没有传
+进来。
 #+begin_src emacs-lisp
   (use-package agent-shell
     :demand t
     :custom
     (agent-shell-header-style '2)
+    ;; No logind session under WSL, so the D-Bus sleep inhibit always fails.
+    (agent-shell-inhibit-system-sleep
+     (not (and (file-readable-p "/proc/version")
+               (with-temp-buffer
+                 (insert-file-contents "/proc/version")
+                 (let ((case-fold-search t))
+                   (re-search-forward "microsoft" nil t))))))
     :config
     (add-to-list 'exec-path "${pkgs.claude-agent-acp}/bin"))
 #+end_src
