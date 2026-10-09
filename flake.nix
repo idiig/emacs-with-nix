@@ -1999,6 +1999,126 @@
 	      (let ((plist (cdr (assq idiig/mail-default-account idiig/mail-accounts))))
 	        (setq wl-from (idiig/mail-format-from (plist-get plist :from-name-key)
 	                                              (plist-get plist :from-key)))))
+	    (defun idiig/mail-inbox-folder-specs ()
+	      "Folder specs of every account's INBOX in `idiig/mail-accounts'."
+	      (mapcar (lambda (account)
+	                (idiig/mail-account-folder-spec (car account) "INBOX"))
+	              idiig/mail-accounts))
+	    
+	    (with-eval-after-load 'wl
+	      (setq wl-auto-check-folder-name 'none
+	            wl-biff-check-folder-list (idiig/mail-inbox-folder-specs)
+	            wl-biff-check-interval 300
+	            wl-biff-check-delay 5
+	            wl-biff-use-idle-timer nil))
+	    (defvar idiig/wl-biff-async-timeout 30
+	      "Seconds to wait for one folder's async STATUS reply before giving
+	    up on it and moving on to the next folder.")
+	    
+	    (defvar idiig/wl-biff-async-queue nil
+	      "Folder names still waiting to be checked in the current round.")
+	    
+	    (defvar idiig/wl-biff-async-unseen 0
+	      "Unseen messages counted so far in the current round.")
+	    
+	    (defvar idiig/wl-biff-async-pending nil
+	      "Token of the STATUS request currently awaiting a reply, or nil.
+	    The reply callback and the timeout watchdog both only act when their
+	    token still matches, so whichever fires second is a no-op instead of
+	    advancing the chain twice.")
+	    
+	    (defun idiig/wl-biff-async-schedule-next ()
+	      "Run the next step of the chain once Emacs is idle again.
+	    Idle timers set while Emacs is already idle only fire after that much
+	    *total* idle time, so the delay is offset by `current-idle-time' --
+	    the same trick `wl-biff-event-handler' uses."
+	      (run-with-idle-timer
+	       (+ 0.5 (if (current-idle-time) (float-time (current-idle-time)) 0))
+	       nil #'idiig/wl-biff-async-next))
+	    
+	    (defun idiig/wl-biff-async-finish ()
+	      "End the current round and update the mode line biff indicator."
+	      (setq wl-biff-check-folders-running nil
+	            idiig/wl-biff-async-queue nil
+	            idiig/wl-biff-async-pending nil)
+	      (wl-biff-notify idiig/wl-biff-async-unseen nil))
+	    
+	    (defun idiig/wl-biff-async-next ()
+	      "Send an async STATUS for the next queued folder, or finish."
+	      (cond
+	       ((not (get-buffer wl-folder-buffer-name))
+	        ;; Wanderlust was exited mid-round.
+	        (setq wl-biff-check-folders-running nil
+	              idiig/wl-biff-async-queue nil
+	              idiig/wl-biff-async-pending nil))
+	       ((null idiig/wl-biff-async-queue)
+	        (idiig/wl-biff-async-finish))
+	       (t
+	        (let ((name (pop idiig/wl-biff-async-queue))
+	              (token (gensym "wl-biff-")))
+	          (condition-case err
+	              (let ((folder (wl-folder-get-elmo-folder name 'biff)))
+	                (if (not (and (elmo-folder-plugged-p folder)
+	                              (eq (elmo-folder-type-internal folder) 'imap4)))
+	                    (idiig/wl-biff-async-schedule-next)
+	                  (elmo-folder-set-biff-internal folder t)
+	                  (setq idiig/wl-biff-async-pending token
+	                        elmo-folder-diff-async-callback #'idiig/wl-biff-async-callback
+	                        elmo-folder-diff-async-callback-data
+	                        (list name (get-buffer wl-folder-buffer-name) token))
+	                  (run-at-time idiig/wl-biff-async-timeout nil
+	                               #'idiig/wl-biff-async-watchdog name token)
+	                  (elmo-folder-diff-async folder)))
+	            (error
+	             (setq idiig/wl-biff-async-pending nil)
+	             (message "wl-biff: %s: %s" name (error-message-string err))
+	             (idiig/wl-biff-async-schedule-next)))))))
+	    
+	    (defun idiig/wl-biff-async-callback (diff data)
+	      "Handle one folder's STATUS reply.
+	    DIFF is (RECENT UNSEEN MESSAGES); DATA is (NAME FOLDER-BUFFER TOKEN).
+	    Updates the folder buffer the same way `wl-biff-check-folder-async-callback'
+	    does, then moves on to the next folder."
+	      (when (eq (nth 2 data) idiig/wl-biff-async-pending)
+	        (setq idiig/wl-biff-async-pending nil)
+	        (let ((recent (or (nth 0 diff) 0))
+	              (unseen (or (nth 1 diff) 0))
+	              (messages (or (nth 2 diff) 0)))
+	          (when (buffer-live-p (nth 1 data))
+	            (with-current-buffer (nth 1 data)
+	              (wl-folder-entity-hashtb-set wl-folder-entity-hashtb (nth 0 data)
+	                                           (list recent (- unseen recent) messages)
+	                                           (current-buffer))))
+	          (setq wl-folder-info-alist-modified t)
+	          (setq idiig/wl-biff-async-unseen (+ idiig/wl-biff-async-unseen unseen)))
+	        (idiig/wl-biff-async-schedule-next)))
+	    
+	    (defun idiig/wl-biff-async-watchdog (name token)
+	      "Skip folder NAME if its STATUS reply for TOKEN never arrived."
+	      (when (eq token idiig/wl-biff-async-pending)
+	        (setq idiig/wl-biff-async-pending nil)
+	        (message "wl-biff: no STATUS reply for %s within %ds, skipped"
+	                 name idiig/wl-biff-async-timeout)
+	        (idiig/wl-biff-async-schedule-next)))
+	    
+	    (defun idiig/wl-biff-check-folders-async ()
+	      "Override for `wl-biff-check-folders': check every folder in
+	    `wl-biff-check-folder-list' through a chain of async STATUS requests
+	    instead of synchronously, so neither `wl' startup nor the periodic
+	    biff timer blocks input while waiting on the servers."
+	      (interactive)
+	      (if wl-biff-check-folders-running
+	          (when (called-interactively-p 'interactive)
+	            (message "Biff process is running."))
+	        (setq wl-biff-check-folders-running t
+	              idiig/wl-biff-async-queue (copy-sequence wl-biff-check-folder-list)
+	              idiig/wl-biff-async-unseen 0
+	              idiig/wl-biff-async-pending nil)
+	        (idiig/wl-biff-async-schedule-next)))
+	    
+	    (with-eval-after-load 'wl-util
+	      (advice-add 'wl-biff-check-folders :override
+	                  #'idiig/wl-biff-check-folders-async))
 	    (defvar idiig/mail-signature-file
 	      (expand-file-name ".signature" idiig/mail-directory))
 	    

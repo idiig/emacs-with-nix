@@ -3737,6 +3737,162 @@ errors loudly instead of silently sending under the wrong identity."
                                             (plist-get plist :from-key)))))
 #+end_src
 
+**** 启动检查与新邮件提醒 (=wl-biff=)
+=wl-auto-check-folder-name= 默认为 =nil= ，即启动时检查 =.folders= 里的
+所有文件夹。 =wl-folder-check-async= 只对 NNTP 生效，IMAP 文件夹都是同
+步检查的，检查期间 Emacs 无法输入。另外 =wl= 在 =wl-folder-auto-check=
+之后还会同步调用一次 =wl-biff-check-folders= ，biff 列表里的文件夹启动
+时会被检查两遍。所以启动时的自动检查关掉（ =none= ），未读数统一交给
+biff 更新，Sent/Drafts/Spam/Trash 等到打开时再更新。
+
+biff 只看各账号的 INBOX：普通定时器每 =wl-biff-check-interval= 秒触发
+一次，再等 Emacs 空闲 =wl-biff-check-delay= 秒才开始检查。不用
+=wl-biff-use-idle-timer= ：它在每段空闲里只触发一次，Emacs 长时间闲置
+时不会继续定期检查。
+#+begin_src emacs-lisp
+  (defun idiig/mail-inbox-folder-specs ()
+    "Folder specs of every account's INBOX in `idiig/mail-accounts'."
+    (mapcar (lambda (account)
+              (idiig/mail-account-folder-spec (car account) "INBOX"))
+            idiig/mail-accounts))
+
+  (with-eval-after-load 'wl
+    (setq wl-auto-check-folder-name 'none
+          wl-biff-check-folder-list (idiig/mail-inbox-folder-specs)
+          wl-biff-check-interval 300
+          wl-biff-check-delay 5
+          wl-biff-use-idle-timer nil))
+#+end_src
+
+=wl-biff-check-folders= 检查多个文件夹时走同步的
+=wl-folder-check-one-entity= ，只有单个 IMAP 文件夹时才用 ELMO 的
+=elmo-folder-diff-async= ：发出 =STATUS= 命令后立即返回，服务器回应时
+由回调更新未读数。这里覆盖 =wl-biff-check-folders= ，把多个 INBOX 的
+=elmo-folder-diff-async= 串成一条链，逐个检查：
+
+- ELMO 的回调存在全局变量 =elmo-folder-diff-async-callback= 里，同时只
+  能有一个请求在等回应，所以一个回来了才发下一个。
+- 每一步都通过 idle timer 调度，第一步也是，所以 =wl= 启动时调用
+  =wl-biff-check-folders= 会立即返回，Folder 界面先显示出来。
+- 建立 IMAP 连接和认证（TLS、LOGIN/XOAUTH2）仍是同步的，ELMO 没有异步
+  连接的机制。第一次检查时每个服务器会短暂阻塞一次，之后会话复用，只剩
+  不阻塞的 =STATUS= 往返。
+- 服务器对 =STATUS= 回 =NO= 或连接断开时回调不会被调用，所以每一步都有
+  一个超时（ =idiig/wl-biff-async-timeout= ），超时就跳过这个文件夹，
+  链不会卡死。
+- 新邮件提醒按 UNSEEN（未读数）判断，不按 RECENT：Gmail 和 Outlook 对
+  =STATUS= 的 RECENT 基本总是回 0，按 RECENT 判断永远不会提醒。
+#+begin_src emacs-lisp
+  (defvar idiig/wl-biff-async-timeout 30
+    "Seconds to wait for one folder's async STATUS reply before giving
+  up on it and moving on to the next folder.")
+
+  (defvar idiig/wl-biff-async-queue nil
+    "Folder names still waiting to be checked in the current round.")
+
+  (defvar idiig/wl-biff-async-unseen 0
+    "Unseen messages counted so far in the current round.")
+
+  (defvar idiig/wl-biff-async-pending nil
+    "Token of the STATUS request currently awaiting a reply, or nil.
+  The reply callback and the timeout watchdog both only act when their
+  token still matches, so whichever fires second is a no-op instead of
+  advancing the chain twice.")
+
+  (defun idiig/wl-biff-async-schedule-next ()
+    "Run the next step of the chain once Emacs is idle again.
+  Idle timers set while Emacs is already idle only fire after that much
+  *total* idle time, so the delay is offset by `current-idle-time' --
+  the same trick `wl-biff-event-handler' uses."
+    (run-with-idle-timer
+     (+ 0.5 (if (current-idle-time) (float-time (current-idle-time)) 0))
+     nil #'idiig/wl-biff-async-next))
+
+  (defun idiig/wl-biff-async-finish ()
+    "End the current round and update the mode line biff indicator."
+    (setq wl-biff-check-folders-running nil
+          idiig/wl-biff-async-queue nil
+          idiig/wl-biff-async-pending nil)
+    (wl-biff-notify idiig/wl-biff-async-unseen nil))
+
+  (defun idiig/wl-biff-async-next ()
+    "Send an async STATUS for the next queued folder, or finish."
+    (cond
+     ((not (get-buffer wl-folder-buffer-name))
+      ;; Wanderlust was exited mid-round.
+      (setq wl-biff-check-folders-running nil
+            idiig/wl-biff-async-queue nil
+            idiig/wl-biff-async-pending nil))
+     ((null idiig/wl-biff-async-queue)
+      (idiig/wl-biff-async-finish))
+     (t
+      (let ((name (pop idiig/wl-biff-async-queue))
+            (token (gensym "wl-biff-")))
+        (condition-case err
+            (let ((folder (wl-folder-get-elmo-folder name 'biff)))
+              (if (not (and (elmo-folder-plugged-p folder)
+                            (eq (elmo-folder-type-internal folder) 'imap4)))
+                  (idiig/wl-biff-async-schedule-next)
+                (elmo-folder-set-biff-internal folder t)
+                (setq idiig/wl-biff-async-pending token
+                      elmo-folder-diff-async-callback #'idiig/wl-biff-async-callback
+                      elmo-folder-diff-async-callback-data
+                      (list name (get-buffer wl-folder-buffer-name) token))
+                (run-at-time idiig/wl-biff-async-timeout nil
+                             #'idiig/wl-biff-async-watchdog name token)
+                (elmo-folder-diff-async folder)))
+          (error
+           (setq idiig/wl-biff-async-pending nil)
+           (message "wl-biff: %s: %s" name (error-message-string err))
+           (idiig/wl-biff-async-schedule-next)))))))
+
+  (defun idiig/wl-biff-async-callback (diff data)
+    "Handle one folder's STATUS reply.
+  DIFF is (RECENT UNSEEN MESSAGES); DATA is (NAME FOLDER-BUFFER TOKEN).
+  Updates the folder buffer the same way `wl-biff-check-folder-async-callback'
+  does, then moves on to the next folder."
+    (when (eq (nth 2 data) idiig/wl-biff-async-pending)
+      (setq idiig/wl-biff-async-pending nil)
+      (let ((recent (or (nth 0 diff) 0))
+            (unseen (or (nth 1 diff) 0))
+            (messages (or (nth 2 diff) 0)))
+        (when (buffer-live-p (nth 1 data))
+          (with-current-buffer (nth 1 data)
+            (wl-folder-entity-hashtb-set wl-folder-entity-hashtb (nth 0 data)
+                                         (list recent (- unseen recent) messages)
+                                         (current-buffer))))
+        (setq wl-folder-info-alist-modified t)
+        (setq idiig/wl-biff-async-unseen (+ idiig/wl-biff-async-unseen unseen)))
+      (idiig/wl-biff-async-schedule-next)))
+
+  (defun idiig/wl-biff-async-watchdog (name token)
+    "Skip folder NAME if its STATUS reply for TOKEN never arrived."
+    (when (eq token idiig/wl-biff-async-pending)
+      (setq idiig/wl-biff-async-pending nil)
+      (message "wl-biff: no STATUS reply for %s within %ds, skipped"
+               name idiig/wl-biff-async-timeout)
+      (idiig/wl-biff-async-schedule-next)))
+
+  (defun idiig/wl-biff-check-folders-async ()
+    "Override for `wl-biff-check-folders': check every folder in
+  `wl-biff-check-folder-list' through a chain of async STATUS requests
+  instead of synchronously, so neither `wl' startup nor the periodic
+  biff timer blocks input while waiting on the servers."
+    (interactive)
+    (if wl-biff-check-folders-running
+        (when (called-interactively-p 'interactive)
+          (message "Biff process is running."))
+      (setq wl-biff-check-folders-running t
+            idiig/wl-biff-async-queue (copy-sequence wl-biff-check-folder-list)
+            idiig/wl-biff-async-unseen 0
+            idiig/wl-biff-async-pending nil)
+      (idiig/wl-biff-async-schedule-next)))
+
+  (with-eval-after-load 'wl-util
+    (advice-add 'wl-biff-check-folders :override
+                #'idiig/wl-biff-check-folders-async))
+#+end_src
+
 **** 签名与外观
 =~/mails/.signature= 不存在时写一个占位符（=-- \n=），指给 Emacs 内
 置的 =mail-signature-file=（*不是* =wl-signature-file-name=——
