@@ -6374,7 +6374,7 @@ MCP error -32001: Request timed out)
 
       (idiig/gptel-gh-select-model))
 #+end_src
-***** COMMENT =magit= 统合
+***** =magit= 统合
 这是一个 gptel-magit 的配置，用于在 Magit 中集成 AI 辅助功能。配置在
 gptel 加载后启动，使用 gptel 的默认模型，并在进入 magit-mode 时自
 动安装相关功能。=gptel-magit-generate-message= 要读取正在编辑的提交
