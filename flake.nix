@@ -3284,17 +3284,49 @@
 	        "Path to the Vulpea database file.")
 	      (defvar idiig/vulpea-db-repo-url "git@github.com:idiig/notes.git"
 	        "URL of the Vulpea database git repository.")
-	      (unless (file-exists-p idiig/vulpea-db-path)
+	    
+	      (defun idiig/vulpea-db-enable ()
+	        "Point Vulpea at `idiig/vulpea-db-path', scan it, and enable autosync."
+	        (setq vulpea-db-sync-directories (list idiig/vulpea-db-path))
+	        (vulpea-db-sync-full-scan)
+	        (vulpea-db-autosync-mode +1))
+	    
+	      (defun idiig/vulpea-clone-notes ()
+	        "Clone `idiig/vulpea-db-repo-url' into `idiig/vulpea-db-path' via Magit.
+	    Runs asynchronously so Magit's process filter can relay ssh prompts
+	    (host key confirmation, key passphrase) to the minibuffer, and
+	    calls `idiig/vulpea-db-enable' once the clone succeeds."
+	        (interactive)
+	        (when (file-exists-p idiig/vulpea-db-path)
+	          (user-error "%s already exists" idiig/vulpea-db-path))
+	        (require 'magit)
 	        (make-directory idiig/vulpea-directory t)
-	        (let ((result (shell-command 
-	                       (format "git clone %s %s" 
-	                               idiig/vulpea-db-repo-url 
-	                               idiig/vulpea-db-path))))
-	          (when (not (= result 0))
-	            (warn "Failed to clone Vulpea database repository"))))
-	      (setq vulpea-db-sync-directories `(,idiig/vulpea-db-path))
-	      (vulpea-db-sync-full-scan)
-	      (vulpea-db-autosync-mode +1))
+	        (let ((default-directory idiig/vulpea-directory))
+	          (magit-run-git-async "clone" "--" idiig/vulpea-db-repo-url
+	                               (magit-convert-filename-for-git idiig/vulpea-db-path)))
+	        ;; Same pattern as `magit-clone-internal', minus opening magit-status.
+	        (process-put magit-this-process 'inhibit-refresh t)
+	        (set-process-sentinel
+	         magit-this-process
+	         (lambda (process event)
+	           (when (memq (process-status process) '(exit signal))
+	             ;; On failure Magit looks up the status buffer of
+	             ;; `default-directory', which is not a repo here.
+	             (ignore-error magit-outside-git-repo
+	               (magit-process-sentinel process event))
+	             (if (and (eq (process-status process) 'exit)
+	                      (= (process-exit-status process) 0))
+	                 (idiig/vulpea-db-enable)
+	               (warn "Failed to clone %s (see the Magit process buffer); fix it and re-run M-x idiig/vulpea-clone-notes"
+	                     idiig/vulpea-db-repo-url))))))
+	    
+	      (cond
+	       ((file-directory-p idiig/vulpea-db-path)
+	        (idiig/vulpea-db-enable))
+	       ((or (daemonp) noninteractive)
+	        (warn "%s not found; run M-x idiig/vulpea-clone-notes" idiig/vulpea-db-path))
+	       (t
+	        (idiig/vulpea-clone-notes))))
 	    (use-package ox-reveal
 	      :after org
 	      :init
