@@ -812,6 +812,41 @@ Emacs 在处理这类文件时出现卡顿或假死现象。
             (unless (file-exists-p dir)
               (make-directory dir t)))))))
 #+end_src
+**** WSL 下用 Windows 默认浏览器打开链接 (=browse-url=, built-in)
+:PROPERTIES:
+:header-args: :noweb-ref ecfg
+:END:
+WSL 里没有 =xdg-open= ， =browse-url= 找不到能用的浏览器。把
+=browse-url-generic-program= 设成 =explorer.exe= 只对简单 URL 有效：
+带查询参数（ =?= 、 =&= 、 =%20= ）的 URL 会被 =explorer.exe= 当成路径
+解析失败，结果只打开一个文件夹窗口，OAuth 授权页这类长 URL 因此打不开。
+改用 =rundll32.exe url.dll,FileProtocolHandler= ：URL 作为单个参数原样
+交给 Windows 默认浏览器，不经过 =cmd.exe= ， =&= 也不会被截断。
+
+WSL 的检测看 =/proc/version= 里是否含有 =microsoft= ，而不是
+=WSL_DISTRO_NAME= 环境变量，因为后者在 Emacs 经由 systemd 用户服务等方
+式启动时可能没有传进来。这个判断定义成函数，其他需要区分 WSL 的配置
+（如 agent-shell）也复用它。
+#+begin_src emacs-lisp
+  (defun idiig/wsl-p ()
+    "Non-nil when Emacs is running inside WSL."
+    (and (file-readable-p "/proc/version")
+         (with-temp-buffer
+           (insert-file-contents "/proc/version")
+           (let ((case-fold-search t))
+             (re-search-forward "microsoft" nil t)))))
+
+  (use-package browse-url
+    :config
+    (defun idiig/browse-url-wsl (url &rest _args)
+      "Open URL in the Windows default browser from inside WSL.
+  Uses rundll32's FileProtocolHandler instead of explorer.exe, which
+  fails on URLs with query strings and opens a folder window instead."
+      (call-process "rundll32.exe" nil 0 nil
+                    "url.dll,FileProtocolHandler" (browse-url-encode-url url)))
+    (when (and (idiig/wsl-p) (executable-find "rundll32.exe"))
+      (setq browse-url-browser-function #'idiig/browse-url-wsl)))
+#+end_src
 **** 记录和读取最近打开的文档 (=recentf=, built-in)
 :PROPERTIES:
 :header-args: :noweb-ref ecfg
@@ -2981,10 +3016,16 @@ Authentication → "Mobile and desktop applications" 平台下加一条
                                      "tab and go back to Emacs.</body></html>"))
                        (delete-process conn)))))))
       (unwind-protect
-          (progn
-            (browse-url (oauth2--build-authorization-request-url
-                         auth-url client-id redirect-uri scope state
-                         user-name code-verifier))
+          (let ((url (oauth2--build-authorization-request-url
+                      auth-url client-id redirect-uri scope state
+                      user-name code-verifier)))
+            ;; Fallback for when no browser window shows up: the URL can
+            ;; be yanked into a browser by hand, and the local listener
+            ;; still catches the redirect either way.
+            (kill-new url)
+            (message "OAuth authorization URL copied to kill-ring; waiting for redirect on localhost:%d"
+                     idiig/oauth2-localhost-redirect-port)
+            (browse-url url)
             (let ((deadline (+ (float-time) idiig/oauth2-localhost-redirect-timeout)))
               (while (and (not code) (< (float-time) deadline))
                 (accept-process-output nil 1)))
@@ -3672,6 +3713,28 @@ errors loudly instead of silently sending under the wrong identity."
   (with-eval-after-load 'wl-template
     (advice-add 'wl-template-apply :around
                 #'idiig/wl-template-apply-strict))
+#+end_src
+
+全局 =wl-from= 不设时退回 =user-mail-address= 的默认值
+=用户名@本机hostname= （如 =nixos@nixos= ），Wanderlust 启动时的
+=wl-check-environment= 会报 2 条警告：From 的域名像本机 hostname；
+=wl-message-id-use-message-from= 默认开启，Message-ID 也由这个地址生成。
+所以把全局 =wl-from= 设成 =idiig/mail-default-account= 指定账号（SDF）
+的地址。它只是没套用任何账号模板时草稿里显示的 From：全局没有设置
+=wl-smtp-posting-server= ，这种草稿本来就发不出去，不会因此用错身份
+发信。实际发信时 From 仍由上面的 =wl-draft-config-alist= /
+=wl-template-alist= 按账号覆盖。跟 =wl-dispose-folder-alist= 一样，这
+个值要在 wl 加载时算好，所以这个账号的地址会在加载时解密一次。
+#+begin_src emacs-lisp
+  (defvar idiig/mail-default-account 'sdf
+    "The `idiig/mail-accounts' entry whose address becomes the global
+  `wl-from'.  Only a fallback: per-account From/SMTP still come from
+  `wl-draft-config-alist'/`wl-template-alist'.")
+
+  (with-eval-after-load 'wl
+    (let ((plist (cdr (assq idiig/mail-default-account idiig/mail-accounts))))
+      (setq wl-from (idiig/mail-format-from (plist-get plist :from-name-key)
+                                            (plist-get plist :from-key)))))
 #+end_src
 
 **** 签名与外观
@@ -6512,22 +6575,15 @@ agent-shell buffer 里把这个门槛单独降到 1，只影响这个 buffer，�
 （ =org.freedesktop.DBus.Error.AccessDenied= ），agent-shell 会捕获错误，
 但每轮对话都在 echo area 打出一条 =Sleep inhibit unavailable= 提示；而
 且 WSL 的休眠由 Windows 宿主决定，这个功能本来也起不了作用。所以检测到
-运行在 WSL 中时关掉它，其他系统上保持默认。检测看的是
-=/proc/version= 里是否含有 =microsoft= ，而不是 =WSL_DISTRO_NAME= 环
-境变量，因为后者在 Emacs 经由 systemd 用户服务等方式启动时可能没有传
-进来。
+运行在 WSL 中时关掉它，其他系统上保持默认。WSL 的检测用
+[[*WSL 下用 Windows 默认浏览器打开链接 (=browse-url=, built-in)][=idiig/wsl-p=]] 。
 #+begin_src emacs-lisp
   (use-package agent-shell
     :demand t
     :custom
     (agent-shell-header-style '2)
     ;; No logind session under WSL, so the D-Bus sleep inhibit always fails.
-    (agent-shell-inhibit-system-sleep
-     (not (and (file-readable-p "/proc/version")
-               (with-temp-buffer
-                 (insert-file-contents "/proc/version")
-                 (let ((case-fold-search t))
-                   (re-search-forward "microsoft" nil t))))))
+    (agent-shell-inhibit-system-sleep (not (idiig/wsl-p)))
     :config
     (add-to-list 'exec-path "${pkgs.claude-agent-acp}/bin"))
 #+end_src

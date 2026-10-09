@@ -242,6 +242,24 @@
 	    	(when dir
 	              (unless (file-exists-p dir)
 	                (make-directory dir t)))))))
+	    (defun idiig/wsl-p ()
+	      "Non-nil when Emacs is running inside WSL."
+	      (and (file-readable-p "/proc/version")
+	           (with-temp-buffer
+	             (insert-file-contents "/proc/version")
+	             (let ((case-fold-search t))
+	               (re-search-forward "microsoft" nil t)))))
+	    
+	    (use-package browse-url
+	      :config
+	      (defun idiig/browse-url-wsl (url &rest _args)
+	        "Open URL in the Windows default browser from inside WSL.
+	    Uses rundll32's FileProtocolHandler instead of explorer.exe, which
+	    fails on URLs with query strings and opens a folder window instead."
+	        (call-process "rundll32.exe" nil 0 nil
+	                      "url.dll,FileProtocolHandler" (browse-url-encode-url url)))
+	      (when (and (idiig/wsl-p) (executable-find "rundll32.exe"))
+	        (setq browse-url-browser-function #'idiig/browse-url-wsl)))
 	    (use-package recentf
 	      :defer t
 	      :commands (consult-recent-file)
@@ -1462,10 +1480,16 @@
 	                                       "tab and go back to Emacs.</body></html>"))
 	                         (delete-process conn)))))))
 	        (unwind-protect
-	            (progn
-	              (browse-url (oauth2--build-authorization-request-url
-	                           auth-url client-id redirect-uri scope state
-	                           user-name code-verifier))
+	            (let ((url (oauth2--build-authorization-request-url
+	                        auth-url client-id redirect-uri scope state
+	                        user-name code-verifier)))
+	              ;; Fallback for when no browser window shows up: the URL can
+	              ;; be yanked into a browser by hand, and the local listener
+	              ;; still catches the redirect either way.
+	              (kill-new url)
+	              (message "OAuth authorization URL copied to kill-ring; waiting for redirect on localhost:%d"
+	                       idiig/oauth2-localhost-redirect-port)
+	              (browse-url url)
 	              (let ((deadline (+ (float-time) idiig/oauth2-localhost-redirect-timeout)))
 	                (while (and (not code) (< (float-time) deadline))
 	                  (accept-process-output nil 1)))
@@ -1966,6 +1990,15 @@
 	      (with-eval-after-load 'wl-template
 	        (advice-add 'wl-template-apply :around
 	                    #'idiig/wl-template-apply-strict))
+	    (defvar idiig/mail-default-account 'sdf
+	      "The `idiig/mail-accounts' entry whose address becomes the global
+	    `wl-from'.  Only a fallback: per-account From/SMTP still come from
+	    `wl-draft-config-alist'/`wl-template-alist'.")
+	    
+	    (with-eval-after-load 'wl
+	      (let ((plist (cdr (assq idiig/mail-default-account idiig/mail-accounts))))
+	        (setq wl-from (idiig/mail-format-from (plist-get plist :from-name-key)
+	                                              (plist-get plist :from-key)))))
 	    (defvar idiig/mail-signature-file
 	      (expand-file-name ".signature" idiig/mail-directory))
 	    
@@ -3503,12 +3536,7 @@
 	      :custom
 	      (agent-shell-header-style '2)
 	      ;; No logind session under WSL, so the D-Bus sleep inhibit always fails.
-	      (agent-shell-inhibit-system-sleep
-	       (not (and (file-readable-p "/proc/version")
-	                 (with-temp-buffer
-	                   (insert-file-contents "/proc/version")
-	                   (let ((case-fold-search t))
-	                     (re-search-forward "microsoft" nil t))))))
+	      (agent-shell-inhibit-system-sleep (not (idiig/wsl-p)))
 	      :config
 	      (add-to-list 'exec-path "${pkgs.claude-agent-acp}/bin"))
 	    (use-package eca
