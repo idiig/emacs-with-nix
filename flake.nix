@@ -24,7 +24,23 @@
           
 		      pkgs = import nixpkgs {
 			      inherit system;
-			      overlays = [ emacs-overlay.overlay ];
+			      overlays = [
+                emacs-overlay.overlay
+                (final: prev: {
+                  codex = prev.codex.overrideAttrs (old: {
+                    buildInputs = (old.buildInputs or []) ++ [ final.aws-lc final.zstd final.oniguruma final.sqlite ];
+                    env = (old.env or {}) // {
+                      AWS_LC_SYS_SYSTEM_DIR = final.symlinkJoin {
+                        name = "aws-lc-system";
+                        paths = [ (final.lib.getDev final.aws-lc) (final.lib.getLib final.aws-lc) ];
+                        postBuild = ''
+                          ln -s aws-lc/openssl "$out/include/openssl"
+                        '';
+                      };
+                    };
+                  });
+                })
+              ];
 		      };
 
 		      # 主配置文件（首行 cookie 用字符串拼接，确保在第0列）
