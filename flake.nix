@@ -27,18 +27,11 @@
 			      overlays = [
                 emacs-overlay.overlay
                 (final: prev: {
-                  codex = prev.codex.overrideAttrs (old: {
-                    buildInputs = (old.buildInputs or []) ++ [ final.aws-lc final.zstd final.oniguruma final.sqlite ];
-                    env = (old.env or {}) // {
-                      AWS_LC_SYS_SYSTEM_DIR = final.symlinkJoin {
-                        name = "aws-lc-system";
-                        paths = [ (final.lib.getDev final.aws-lc) (final.lib.getLib final.aws-lc) ];
-                        postBuild = ''
-                          ln -s aws-lc/openssl "$out/include/openssl"
-                        '';
-                      };
-                    };
-                  });
+                  # Temporary: nixos-unstable's codex lacks the system libs
+                  # that cargoUseSystemLibs now requires (fixed upstream in
+                  # NixOS/nixpkgs@16b4636). Build the vendored copies instead;
+                  # drop this override once the fix reaches nixos-unstable.
+                  codex = prev.codex.overrideAttrs { dontCargoUseSystemLibs = true; };
                 })
               ];
 		      };

@@ -317,7 +317,19 @@ runner，GitHub 目前没有这两种架构的免费 hosted runner。
 - =<<emacs-early-init-config>>= :: 这里放置 emacs 的 early-init 配置代码
 - =<<externals>>= :: 这里放置外部包的定义
 
-这些占位符会在后续的代码块中被替换。  
+这些占位符会在后续的代码块中被替换。
+
+=pkgs= 里除了 =emacs-overlay= 之外还有一个针对 =codex= 的临时 overlay。
+nixpkgs 的 Rust 构建 hook（ =cargo-setup-hook.sh= 里的
+=cargoUseSystemLibs= ）默认强制 =-sys= crate 链接系统库
+（ ~AWS_LC_SYS_USE_SYSTEM=1~ 、 ~ZSTD_SYS_USE_PKG_CONFIG=1~ 等），而
+nixos-unstable 上的 =codex= 包没有把 aws-lc、zstd、oniguruma、sqlite 加
+进 =buildInputs= ，构建会在 =aws-lc-sys= 处失败。 =codex-acp= 依赖源码
+构建的 =codex= ，因此整个 =nix build .#default= 都会失败。这里用 hook 自
+带的开关 =dontCargoUseSystemLibs= 让 =codex= 改用 vendored 源码编译这
+些库，不需要额外引入依赖。上游已在 nixpkgs master 修复
+（ =16b4636= ， =codex: fix build with sys libs= ），等它进入
+nixos-unstable 并 =nix flake update= 后即可删除这个 overlay。
 #+BEGIN_SRC nix :tangle flake.nix :noweb yes
   {
     description = "idiig's Emacs Configuration with Nix Flakes";
@@ -344,18 +356,11 @@ runner，GitHub 目前没有这两种架构的免费 hosted runner。
   			      overlays = [
                   emacs-overlay.overlay
                   (final: prev: {
-                    codex = prev.codex.overrideAttrs (old: {
-                      buildInputs = (old.buildInputs or []) ++ [ final.aws-lc final.zstd final.oniguruma final.sqlite ];
-                      env = (old.env or {}) // {
-                        AWS_LC_SYS_SYSTEM_DIR = final.symlinkJoin {
-                          name = "aws-lc-system";
-                          paths = [ (final.lib.getDev final.aws-lc) (final.lib.getLib final.aws-lc) ];
-                          postBuild = ''
-                            ln -s aws-lc/openssl "$out/include/openssl"
-                          '';
-                        };
-                      };
-                    });
+                    # Temporary: nixos-unstable's codex lacks the system libs
+                    # that cargoUseSystemLibs now requires (fixed upstream in
+                    # NixOS/nixpkgs@16b4636). Build the vendored copies instead;
+                    # drop this override once the fix reaches nixos-unstable.
+                    codex = prev.codex.overrideAttrs { dontCargoUseSystemLibs = true; };
                   })
                 ];
   		      };
